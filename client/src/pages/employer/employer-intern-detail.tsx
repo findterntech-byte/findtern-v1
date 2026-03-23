@@ -1118,7 +1118,7 @@ export default function EmployerInternDetailPage() {
             <Button
               variant="outline"
               className="rounded-xl"
-              disabled={isInCompare || isHiredProposal || isHiredAnywhere || isFullTime || hasAnyExistingProposal}
+              disabled={isInCompare || isHiredProposal || isHiredAnywhere || isFullTime}
               onClick={() => {
                 const key = intern?.id ?? routeInternId;
                 if (!key) return;
@@ -1158,6 +1158,7 @@ export default function EmployerInternDetailPage() {
               disabled={(() => {
                 if (isFullTime) return true;
                 if (shouldShowSendFullTimeOffer) return false;
+                if (isAcceptedProposal) return false;
                 return hasAnyExistingProposal || (!isAcceptedProposal && !isHiredLike && isInCart);
               })()}
               onClick={() => {
@@ -1168,6 +1169,10 @@ export default function EmployerInternDetailPage() {
                   return;
                 }
                 if (isFullTime) {
+                  return;
+                }
+                if (isAcceptedProposal) {
+                  setLocation("/employer/cart?tab=checkout&scroll=checkout#checkout");
                   return;
                 }
                 if (hasAnyExistingProposal) {
