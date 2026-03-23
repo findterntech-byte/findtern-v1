@@ -379,6 +379,7 @@ export default function ProposalDetailPage() {
     if (s === "accepted") return "Approved";
     if (s === "rejected") return "Rejected";
     if (s === "expired") return "Expired";
+    if (s === "withdrawn") return "Withdrawn";
     if (s === "hired") return "Hired";
     return s || "Awaiting your approval";
   })();
@@ -884,7 +885,7 @@ export default function ProposalDetailPage() {
                   onClick={() => {
                     const url = String(fullTimeOffer?.offerLetterUrl ?? "").trim();
                     if (!url) return;
-                    window.open(url, "_blank", "noopener,noreferrer");
+                    window.open(`https://findtern.in/${url}`, "_blank", "noopener,noreferrer");
                   }}
                 >
                   <Download className="w-4 h-4" />
