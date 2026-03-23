@@ -427,11 +427,14 @@ export default function EmployerDashboardPage() {
     const v = String(value ?? "").trim();
     if (!v) return "";
     const lower = v.toLowerCase();
-    if (lower === "short" || lower === "medium" || lower === "long" || lower === "not_sure") return lower;
-    if (lower.includes("not sure") || lower.includes("not_sure") || lower.includes("unsure")) return "not_sure";
-    if (lower.includes("short") || lower.includes("30") || lower.includes("60")) return "short";
-    if (lower.includes("medium") || lower.includes("90")) return "medium";
-    if (lower.includes("long") || lower.includes("90+") || lower.includes("90 +")) return "long";
+    if (lower === "short" || lower === "short-term") return "short-term";
+    if (lower === "medium" || lower === "medium-term") return "medium-term";
+    if (lower === "long" || lower === "long-term") return "long-term";
+    if (lower === "not_sure" || lower === "not-sure") return "not-sure";
+    if (lower.includes("not sure") || lower.includes("not_sure") || lower.includes("unsure")) return "not-sure";
+    if (lower.includes("short") || lower.includes("30") || lower.includes("60")) return "short-term";
+    if (lower.includes("medium") || lower.includes("90")) return "medium-term";
+    if (lower.includes("long") || lower.includes("90+") || lower.includes("90 +")) return "long-term";
     return v;
   };
 
@@ -2422,7 +2425,7 @@ export default function EmployerDashboardPage() {
   const handleEditProjectClick = (project: Project) => {
     setEditingProject(project);
     setNewProjectName(project.name);
-    setProjectScope(project.scopeOfWork ?? "");
+    setProjectScope(normalizeProjectScope(project.scopeOfWork));
     setProjectFullTimeOffer(!!project.fullTimeOffer);
 
     const normalizedLocationType = normalizeProjectLocationType(project.locationType);
@@ -5212,22 +5215,12 @@ export default function EmployerDashboardPage() {
                 </div>
 
                 <div className="space-y-2">
-                  {[{
-                    id: "short",
-                    label: "Short-Term: 30–60 days",
-                  },
-                  {
-                    id: "medium",
-                    label: "Medium-Term: 60–90 days",
-                  },
-                  {
-                    id: "long",
-                    label: "Long-Term: 90+ days",
-                  },
-                  {
-                    id: "not_sure",
-                    label: "Not sure",
-                  }].map((opt) => {
+                  {[
+                    { id: "short-term", label: "Short-Term: 30–60 days" },
+                    { id: "medium-term", label: "Medium-Term: 60–90 days" },
+                    { id: "long-term", label: "Long-Term: 90+ days" },
+                    { id: "not-sure", label: "Not Sure" },
+                  ].map((opt) => {
                     const selected = projectScope === opt.id;
                     return (
                       <button
@@ -5240,12 +5233,14 @@ export default function EmployerDashboardPage() {
                           }`}
                       >
                         <span>{opt.label}</span>
-                        <span
-                          className={`h-4 w-4 rounded-full border ${selected
+                        <div
+                          className={`h-4 w-4 rounded-full border flex items-center justify-center ${selected
                             ? "border-emerald-500 bg-emerald-500"
                             : "border-slate-300 bg-white"
                             }`}
-                        />
+                        >
+                          {selected && <Check className="h-2.5 w-2.5 text-white" />}
+                        </div>
                       </button>
                     );
                   })}
