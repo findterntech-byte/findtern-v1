@@ -464,16 +464,27 @@ export default function ProposalDetailPage() {
   })();
 
   const requiredSkills = (() => {
+    const fromApi = (proposal as any)?.projectSkills;
     const fromOfferA = (offer as any)?.requiredSkills;
     const fromOfferB = (offer as any)?.projectSkills;
-    const arr = Array.isArray(fromOfferA) ? fromOfferA : Array.isArray(fromOfferB) ? fromOfferB : [];
+    const fromProposal = (proposal as any)?.skills;
+    const arr =
+      Array.isArray(fromApi) && fromApi.length > 0
+        ? fromApi
+        : Array.isArray(fromOfferA) && fromOfferA.length > 0
+          ? fromOfferA
+          : Array.isArray(fromOfferB) && fromOfferB.length > 0
+            ? fromOfferB
+            : Array.isArray(fromProposal)
+              ? fromProposal
+              : [];
     return arr
       .map((s: any) => String(s ?? "").trim())
       .filter((s: string) => s.length > 0);
   })();
 
   const normalizedRequiredSkills = new Set(requiredSkills.map((s) => s.toLowerCase()));
-  const displaySkills = skills.length > 0 ? skills : requiredSkills;
+  const displaySkills = requiredSkills;
 
   const companyDetailsLocked =
     !hasFullTimeOffer &&
@@ -941,7 +952,14 @@ export default function ProposalDetailPage() {
               {roleTitle[0]?.toUpperCase() || "P"}
             </div>
             <div className="flex-1 space-y-1.5">
-              <h1 className="text-xl md:text-2xl font-semibold text-slate-900">{roleTitle}</h1>
+              <div className="flex flex-col gap-0.5">
+                <h1 className="text-xl md:text-2xl font-semibold text-slate-900 leading-tight">{roleTitle}</h1>
+                {(proposal as any)?.projectName && (
+                  <p className="text-[13px] font-semibold text-emerald-700">
+                    Project: {(proposal as any).projectName}
+                  </p>
+                )}
+              </div>
               <p className="text-sm text-slate-700 flex items-center gap-1">
                 <MapPin className="w-4 h-4 text-red-400" />
                 <span className="capitalize">{mode}</span>
@@ -1059,7 +1077,7 @@ export default function ProposalDetailPage() {
                 {!hasFullTimeOffer ? (
                   <div className="flex flex-wrap gap-1.5">
                     {displaySkills.length === 0 && (
-                      <span className="text-[11px] text-slate-500">No skills highlighted in this offer.</span>
+                      <span className="text-[11px] text-slate-500">No project skills highlighted in this offer.</span>
                     )}
                     {displaySkills.map((skill) => (
                       <Badge
@@ -1302,11 +1320,13 @@ export default function ProposalDetailPage() {
                     className="prose prose-slate prose-sm max-w-none break-words [overflow-wrap:anywhere]"
                     dangerouslySetInnerHTML={{ __html: jdSafeHtml }}
                   />
+                ) : (proposal as any)?.projectScopeOfWork ? (
+                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                    {(proposal as any).projectScopeOfWork}
+                  </p>
                 ) : (
                   <p className="text-sm text-slate-700 leading-relaxed">
-                    Use this space to review the expectations you have communicated to the candidate. Ensure that
-                    the scope of work, timelines, and communication expectations are aligned with your internal team
-                    before sending or confirming the offer.
+                    No roles and responsibilities details available for this proposal.
                   </p>
                 )}
               </Card>

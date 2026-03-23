@@ -442,15 +442,26 @@ export default function ProposalsPage() {
             const fullTimeOffer = (offer as any)?.fullTimeOffer ?? null;
             const hasFullTimeOffer = !!fullTimeOffer && typeof fullTimeOffer === "object";
             const ratings = (proposal.aiRatings || {}) as any;
-            const skills = (proposal.skills || []) as string[];
             const requiredSkills = (() => {
+              const fromApi = (proposal as any)?.projectSkills;
               const fromOfferA = (offer as any)?.requiredSkills;
               const fromOfferB = (offer as any)?.projectSkills;
-              const arr = Array.isArray(fromOfferA) ? fromOfferA : Array.isArray(fromOfferB) ? fromOfferB : [];
+              const fromProposal = (proposal as any)?.skills;
+              const arr =
+                Array.isArray(fromApi) && fromApi.length > 0
+                  ? fromApi
+                  : Array.isArray(fromOfferA) && fromOfferA.length > 0
+                    ? fromOfferA
+                    : Array.isArray(fromOfferB) && fromOfferB.length > 0
+                      ? fromOfferB
+                      : Array.isArray(fromProposal)
+                        ? fromProposal
+                        : [];
               return arr
                 .map((s: any) => String(s ?? "").trim())
                 .filter((s: string) => s.length > 0);
             })();
+            const skills = requiredSkills;
             const normalizedRequiredSkills = new Set(requiredSkills.map((s) => s.toLowerCase()));
             const employerMeta = (proposal.employer || null) as any;
             const jdRaw = String(offer.jd ?? "").trim();
@@ -592,14 +603,21 @@ export default function ProposalsPage() {
                 {/* Header: company + meta */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <GraduationCap className="w-4 h-4 text-emerald-600" />
-
-                      <p className="text-sm font-semibold text-slate-900 line-clamp-1 break-words [overflow-wrap:anywhere]">
-                        {hasFullTimeOffer
-                          ? String((fullTimeOffer as any)?.jobTitle ?? "").trim() || "Full Proposal"
-                          : offer.roleTitle || "Internship Offer"}
-                      </p>
+                    <div className="flex flex-col gap-0.5 mb-1">
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="w-4 h-4 text-emerald-600" />
+                        <p className="text-sm font-semibold text-slate-900 line-clamp-1 break-words [overflow-wrap:anywhere]">
+                          {hasFullTimeOffer
+                            ? String((fullTimeOffer as any)?.jobTitle ?? "").trim() || "Full Proposal"
+                            : offer.roleTitle || "Internship Offer"}
+                        </p>
+                      </div>
+                      {proposal.projectName && (
+                        <div className="flex items-center gap-1 ml-6">
+                           <span className="text-[10px] font-medium text-slate-500 uppercase tracking-tight">Project:</span>
+                           <span className="text-[11px] font-semibold text-emerald-700">{proposal.projectName}</span>
+                        </div>
+                      )}
                     </div>
                     <p className="flex items-center gap-1 text-xs text-slate-600">
                       <MapPin className="w-3.5 h-3.5 text-red-400" />
@@ -678,10 +696,10 @@ export default function ProposalsPage() {
 
                 {/* Skills */}
                 <div>
-                  <p className="mb-1 text-xs font-semibold text-slate-800">Skills</p>
+                  <p className="mb-1 text-xs font-semibold text-slate-800">Project Skills</p>
                   <div className="flex flex-wrap gap-1.5">
                     {skills.length === 0 && (
-                      <span className="text-[11px] text-slate-500">No skills data available</span>
+                      <span className="text-[11px] text-slate-500">No project skills data available</span>
                     )}
                     {skills.map((skill) => (
                       <span

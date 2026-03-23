@@ -120,7 +120,7 @@ export default function CompanyAccountPage() {
         <div className="space-y-1">
           <h1 className="text-2xl md:text-3xl font-semibold text-slate-900">Company Account</h1>
           <p className="text-sm text-slate-600">
-            Manage your company profile, billing and orders from one place. This page is a static design preview.
+            Manage your company profile, billing and orders from one place.
           </p>
         </div>
 
@@ -344,10 +344,7 @@ export default function CompanyAccountPage() {
           </div>
         </div>
 
-        <p className="text-center text-[11px] text-slate-400 flex items-center justify-center gap-1 mt-4">
-          <ArrowRight className="w-3 h-3" />
-          Static company account page · hook real data later.
-        </p>
+        
       </main>
     </div>
   );

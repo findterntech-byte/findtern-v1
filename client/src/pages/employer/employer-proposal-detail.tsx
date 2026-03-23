@@ -538,12 +538,28 @@ export default function EmployerProposalDetailPage() {
 
 
   const offer = proposal.offerDetails ?? {};
-
   const fullTimeOffer = ((offer as any)?.fullTimeOffer ?? null) as any;
-
   const hasFullTimeOffer = !!fullTimeOffer && typeof fullTimeOffer === "object";
 
-  const skills = Array.isArray(proposal.skills) ? proposal.skills : [];
+  const projectSkills = (() => {
+    const fromApi = (proposal as any)?.projectSkills;
+    const fromOfferA = (offer as any)?.projectSkills;
+    const fromOfferB = (offer as any)?.requiredSkills;
+    const fromProposal = proposal?.skills;
+    const arr =
+      Array.isArray(fromApi) && fromApi.length > 0
+        ? fromApi
+        : Array.isArray(fromOfferA) && fromOfferA.length > 0
+          ? fromOfferA
+          : Array.isArray(fromOfferB) && fromOfferB.length > 0
+            ? fromOfferB
+            : Array.isArray(fromProposal)
+              ? fromProposal
+              : [];
+    return arr
+      .map((s: any) => String(s ?? "").trim())
+      .filter((s: string) => s.length > 0);
+  })();
 
   const ratings = proposal.aiRatings ?? {};
 
@@ -1905,37 +1921,21 @@ export default function EmployerProposalDetailPage() {
 
 
             <Card className="rounded-2xl border border-slate-100 bg-white p-4 md:p-5 space-y-3">
-
-              <h3 className="text-sm md:text-base font-semibold text-slate-900">Skills highlighted</h3>
-
+              <h3 className="text-sm md:text-base font-semibold text-slate-900">Project Skills highlighted</h3>
               <div className="flex flex-wrap gap-1.5">
-
-                {skills.length === 0 && (
-
-                  <span className="text-[11px] text-slate-500">No skills data available for this proposal.</span>
-
+                {projectSkills.length === 0 && (
+                  <span className="text-[11px] text-slate-500">No project skills data available for this proposal.</span>
                 )}
-
-                {skills.map((skill) => (
-
+                {projectSkills.map((skill) => (
                   <Badge
-
                     key={skill}
-
                     variant="outline"
-
                     className="text-[11px] px-2.5 py-1 rounded-full border-emerald-200 bg-emerald-50/60 text-emerald-700"
-
                   >
-
                     {skill}
-
                   </Badge>
-
                 ))}
-
               </div>
-
             </Card>
 
           </div>

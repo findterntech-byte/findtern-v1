@@ -436,6 +436,7 @@ export default function EmployerSendProposalPage() {
   const [proposalMonthlyHours, setProposalMonthlyHours] = useState("160");
   const [proposalMonthlyAmount, setProposalMonthlyAmount] = useState("");
   const [proposalTotalPrice, setProposalTotalPrice] = useState("");
+  const [proposalSkills, setProposalSkills] = useState<string[]>([]);
 
   const allowedModes = useMemo(() => {
     const set = new Set((internMeta?.locationTypes ?? []).map((v) => String(v ?? "").trim().toLowerCase()));
@@ -693,6 +694,9 @@ export default function EmployerSendProposalPage() {
         if (!cancelled && tz && !proposalTimezoneTouched) {
           setProposalTimezone(tz);
         }
+
+        const skills = Array.isArray(match?.skills) ? match.skills : [];
+        if (!cancelled && skills.length > 0) setProposalSkills(skills);
       } catch {
         return;
       }
@@ -1292,6 +1296,7 @@ export default function EmployerSendProposalPage() {
                         hourlyRate: proposalHourlyRate,
                         perHireCharge: proposalPerHireCharge,
                         candidateScore,
+                        projectSkills: proposalSkills,
                       };
 
                       const res = await fetch(`/api/employer/${encodeURIComponent(String(employerId))}/proposals`, {
@@ -1309,7 +1314,7 @@ export default function EmployerSendProposalPage() {
                             aptitude: internMeta?.aiRatings?.aptitude ?? 0,
                             overall: internMeta?.score ?? 0,
                           },
-                          skills: Array.isArray(internMeta?.skills) ? internMeta?.skills : [],
+                          skills: proposalSkills,
                         }),
                       });
 

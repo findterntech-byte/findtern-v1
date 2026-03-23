@@ -12529,6 +12529,7 @@ export async function registerRoutes(
           (p as any)?.projectName ?? (p as any)?.project_name ?? (project as any)?.projectName ?? (project as any)?.project_name ?? "",
         ).trim();
         const projectUpdatedAt = (project as any)?.updatedAt ?? (project as any)?.updated_at ?? null;
+        const projectSkills = Array.isArray(project?.skills) ? project.skills : [];
 
         return {
           ...p,
@@ -12542,6 +12543,7 @@ export async function registerRoutes(
           employerName: employerName || null,
           projectName,
           projectUpdatedAt,
+          projectSkills,
           findternScore,
         };
       });
@@ -13303,6 +13305,9 @@ export async function registerRoutes(
       const projectId = String((proposal as any)?.projectId ?? (proposal as any)?.project_id ?? "").trim();
       const project = projectId ? await storage.getProject(projectId).catch(() => undefined) : undefined;
       const projectUpdatedAt = (project as any)?.updatedAt ?? (project as any)?.updated_at ?? null;
+      const projectSkills = Array.isArray(project?.skills) ? project.skills : [];
+      const projectName = String(project?.projectName ?? project?.project_name ?? "").trim();
+      const projectScopeOfWork = String(project?.scopeOfWork ?? project?.scope_of_work ?? "").trim();
 
       const maskedProposal = {
         ...proposal,
@@ -13313,6 +13318,9 @@ export async function registerRoutes(
         },
         employer: employerMeta,
         projectUpdatedAt,
+        projectSkills,
+        projectName,
+        projectScopeOfWork,
       };
 
       return res.json({ proposal: maskedProposal });
@@ -13331,12 +13339,23 @@ export async function registerRoutes(
       if (!proposal) {
         return res.status(404).json({ message: "Proposal not found" });
       }
+
+      const project = await storage.getProject(proposal.projectId).catch(() => undefined);
+      const projectSkills = Array.isArray(project?.skills) ? project.skills : [];
+      const projectName = String(project?.projectName ?? project?.project_name ?? "").trim();
+      const projectScopeOfWork = String(project?.scopeOfWork ?? project?.scope_of_work ?? "").trim();
+
       const internOnboarding = proposal.internId
         ? await storage.getInternOnboardingByUserId(proposal.internId).catch(() => undefined)
         : undefined;
 
       return res.json({
-        proposal,
+        proposal: {
+          ...proposal,
+          projectSkills,
+          projectName,
+          projectScopeOfWork,
+        },
         internOnboarding: internOnboarding
           ? { hasLaptop: internOnboarding.hasLaptop ?? null }
           : null,
