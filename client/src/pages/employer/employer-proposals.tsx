@@ -307,9 +307,13 @@ export default function EmployerProposalsPage() {
       const internId = String(p?.internId ?? "").trim();
       const projectId = String(p?.projectId ?? "").trim();
       const typeKey = p.isFullTimeOffer ? "full_time" : "internship";
-      const statusKey = p.isFullTimeOffer ? String(p.status ?? "sent") : "latest";
-      const rejectedKey = p.status === "rejected" ? `:rejected:${String(p.id)}` : "";
-      const key = `${projectId}:${internId}:${typeKey}:${statusKey}${rejectedKey}`;
+
+      // For internship proposals, we want to show multiple proposals if they are in different terminal states
+      // (withdrawn, rejected, expired) so they don't overwrite each other.
+      const isTerminal = p.status === "withdrawn" || p.status === "rejected" || p.status === "expired";
+      const statusKey = p.isFullTimeOffer ? String(p.status ?? "sent") : isTerminal ? `terminal:${p.status}:${p.id}` : "active";
+
+      const key = `${projectId}:${internId}:${typeKey}:${statusKey}`;
       if (!internId || !projectId) {
         latestByKey.set(`__misc__:${String(p.id)}`, p);
         continue;
@@ -475,7 +479,6 @@ export default function EmployerProposalsPage() {
                 <SelectItem value="accepted">Accepted</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
                 <SelectItem value="hired">Hired</SelectItem>
-                <SelectItem value="interview_scheduled">Interview scheduled</SelectItem>
                 <SelectItem value="expired">Expired</SelectItem>
                 <SelectItem value="withdrawn">Withdrawn</SelectItem>
               </SelectContent>

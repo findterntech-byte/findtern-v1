@@ -4074,7 +4074,10 @@ export async function registerRoutes(
       if (payload.city !== undefined) update.city = payload.city;
       if (payload.state !== undefined) update.state = payload.state;
 
-      if (payload.primaryContactName !== undefined) update.primaryContactName = payload.primaryContactName;
+      if (payload.primaryContactName !== undefined) {
+        update.primaryContactName = payload.primaryContactName;
+        update.name = payload.primaryContactName;
+      }
       if (payload.primaryContactRole !== undefined) update.primaryContactRole = payload.primaryContactRole;
       if (payload.primaryContactCountryCode !== undefined) update.countryCode = payload.primaryContactCountryCode;
       if (payload.primaryContactPhone !== undefined) update.phoneNumber = primaryPhoneDigits;
@@ -13029,8 +13032,10 @@ export async function registerRoutes(
       const projectId = String((proposal as any)?.projectId ?? (proposal as any)?.project_id ?? "").trim();
       const project = projectId ? await storage.getProject(projectId).catch(() => undefined) : undefined;
 
-      const internName = String((internUser as any)?.name ?? (internUser as any)?.fullName ?? "").trim() || null;
-      const projectName = String((project as any)?.title ?? (project as any)?.name ?? "").trim() || null;
+      const internName = internUser
+        ? `${String((internUser as any)?.firstName ?? "").trim()} ${String((internUser as any)?.lastName ?? "").trim()}`.trim()
+        : null;
+      const projectName = String((project as any)?.projectName ?? "").trim() || null;
 
       return res.json({
         timesheet: {

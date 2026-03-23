@@ -98,10 +98,11 @@ export default function CompanyAccountPage() {
 
   const maskedPhone = (() => {
     const raw = employer?.phoneNumber as string | undefined;
+    const code = (employer?.countryCode as string | undefined) || "+91";
     if (!raw) return "";
-    if (raw.length <= 4) return raw;
+    if (raw.length <= 4) return `${code}-${raw}`;
     const visible = raw.slice(-4);
-    return `${raw.startsWith("+") ? "" : "+91-"}****${visible}`;
+    return `${code}-****${visible}`;
   })();
 
   const maskedAccountNumber = (() => {

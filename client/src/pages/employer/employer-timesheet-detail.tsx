@@ -87,7 +87,7 @@ function exportTimesheetXlsx(timesheet: any) {
   const managerNote = String(timesheet?.managerNote ?? "");
 
   const summaryAoA = [
-    ["Candidate", candidate],
+    ["Intern", candidate],
     ["Project", project],
     ["Period Start", periodStart],
     ["Period End", periodEnd],
@@ -414,7 +414,7 @@ export default function EmployerTimesheetDetailPage() {
             <h1 className="mt-4 text-xl font-semibold text-slate-900">Timesheet details</h1>
             
             <div className="mt-1 text-sm text-slate-600">
-              {String(timesheet?.internName ?? "").trim() || "Candidate"}
+              {String(timesheet?.internName ?? "").trim() || "Intern"}
               {projectName ? ` • ${projectName}` : ""}
               {displayPeriodStart && displayPeriodEnd ? ` • ${displayPeriodStart} → ${displayPeriodEnd}` : ""}
             </div>

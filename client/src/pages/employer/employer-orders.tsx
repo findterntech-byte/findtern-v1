@@ -595,7 +595,7 @@ export default function EmployerOrdersPage() {
     const managerNote = String(t?.managerNote ?? "");
 
     const summaryAoA = [
-      ["Candidate", candidate],
+      ["Intern", candidate],
       ["Project", project],
       ["Period Start", periodStart],
       ["Period End", periodEnd],
@@ -2192,7 +2192,7 @@ export default function EmployerOrdersPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-hidden">
             <Card className="p-4 rounded-2xl border-slate-200 bg-white lg:col-span-1">
-              <p className="text-xs text-slate-500">Candidate</p>
+              <p className="text-xs text-slate-500">Intern</p>
               <p className="text-sm font-semibold text-slate-900 mt-1">
                 {String(tsSelectedProposal?.internName ?? "—") || "—"}
               </p>
@@ -2445,7 +2445,7 @@ export default function EmployerOrdersPage() {
                             : "";
 
                           const internId = String(p?.internId ?? p?.intern_id ?? "").trim();
-                          const internName = String(p?.internName ?? "").trim() || "Candidate";
+                          const internName = String(p?.internName ?? "").trim() || "Intern";
                           const projectName = projectLabel(p);
 
                           const isFullTimeOfferDisabled =
@@ -2833,7 +2833,7 @@ export default function EmployerOrdersPage() {
                             const duration = String(offer?.duration ?? "").trim();
                             const rawMonthlyAmount = Number(offer?.monthlyAmount ?? 0);
                             const totalPrice = Number(offer?.totalPrice ?? 0);
-                            const internName = String(p?.internName ?? "").trim() || "Candidate";
+                            const internName = String(p?.internName ?? "").trim() || "Intern";
                             const projectName = projectLabel(p);
                             const currencyCode = String(
                               (hasFullTimeOffer ? (fullTimeOffer as any)?.ctcCurrency : offer?.currency) ?? p?.currency ?? "INR",
