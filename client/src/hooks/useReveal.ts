@@ -1,0 +1,47 @@
+import { useEffect } from "react";
+
+export default function useReveal(): void {
+  useEffect(() => {
+    const elements = Array.from(document.querySelectorAll<HTMLElement>(".reveal"));
+    if (!elements.length) return;
+
+    const staggerGroups = Array.from(document.querySelectorAll<HTMLElement>(".reveal-stagger"));
+    staggerGroups.forEach((group) => {
+      Array.from(group.children).forEach((child, idx) => {
+        (child as HTMLElement).style.setProperty("--reveal-i", String(idx));
+      });
+    });
+
+    if (
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      elements.forEach((el) => el.classList.add("is-visible"));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            (entry.target as HTMLElement).classList.add("is-visible");
+
+            if ((entry.target as HTMLElement).classList.contains("reveal-stagger")) {
+              Array.from((entry.target as HTMLElement).children).forEach((child) =>
+                (child as HTMLElement).classList.add("is-visible"),
+              );
+            }
+
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.15 },
+    );
+
+    elements.forEach((el) => observer.observe(el));
+    staggerGroups.forEach((el) => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, []);
+}
