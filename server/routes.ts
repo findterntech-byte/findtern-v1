@@ -13375,7 +13375,7 @@ export async function registerRoutes(
         .partial()
         .extend({
           status: z
-            .enum(["draft", "sent", "accepted", "rejected", "expired", "interview_scheduled"])
+            .enum(["draft", "sent", "accepted", "rejected", "expired", "interview_scheduled", "withdrawn"])
             .optional(),
         });
 

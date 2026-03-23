@@ -46,7 +46,7 @@ interface EmployerProposal {
   internProfilePhotoName?: string | null;
   projectId?: string;
   projectName: string;
-  status: "draft" | "sent" | "accepted" | "rejected" | "interview_scheduled" | "hired" | "expired";
+  status: "draft" | "sent" | "accepted" | "rejected" | "interview_scheduled" | "hired" | "expired" | "withdrawn";
   createdAt: string; // ISO date
   amountPerMonth: number;
   offerCurrency?: "INR" | "USD";
@@ -127,6 +127,7 @@ function mapToEmployerProposal(p: any): EmployerProposal {
       "rejected",
       "interview_scheduled",
       "expired",
+      "withdrawn",
     ];
     return (allowed.includes(raw as any) ? raw : "sent") as EmployerProposal["status"];
   })();
@@ -365,7 +366,7 @@ export default function EmployerProposalsPage() {
 
   const canWithdrawStatus = (status: EmployerProposal["status"]) => {
     const s = String(status ?? "").trim().toLowerCase();
-    return s !== "rejected" && s !== "hired" && s !== "expired";
+    return s !== "rejected" && s !== "hired" && s !== "expired" && s !== "withdrawn";
   };
 
   const handleConfirmWithdraw = async () => {
@@ -377,7 +378,7 @@ export default function EmployerProposalsPage() {
       const res = await fetch(`/api/proposals/${encodeURIComponent(proposalId)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "expired" }),
+        body: JSON.stringify({ status: "withdrawn" }),
       });
       if (!res.ok) {
         const errJson = await res.json().catch(() => null);
@@ -474,7 +475,9 @@ export default function EmployerProposalsPage() {
                 <SelectItem value="accepted">Accepted</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
                 <SelectItem value="hired">Hired</SelectItem>
-                <SelectItem value="expired">Withdrawn</SelectItem>
+                <SelectItem value="interview_scheduled">Interview scheduled</SelectItem>
+                <SelectItem value="expired">Expired</SelectItem>
+                <SelectItem value="withdrawn">Withdrawn</SelectItem>
               </SelectContent>
             </Select>
 
@@ -529,7 +532,8 @@ export default function EmployerProposalsPage() {
                       hired: "Hired",
                       rejected: "Rejected",
                       interview_scheduled: "Interview scheduled",
-                      expired: "Withdrawn",
+                      expired: "Expired",
+                      withdrawn: "Withdrawn",
                     };
 
                     const statusColorMap: Record<EmployerProposal["status"], string> = {
@@ -540,6 +544,7 @@ export default function EmployerProposalsPage() {
                       rejected: "bg-red-50 text-red-700 border-red-200",
                       interview_scheduled: "bg-amber-50 text-amber-700 border-amber-200",
                       expired: "bg-slate-100 text-slate-700 border-slate-200",
+                      withdrawn: "bg-slate-100 text-slate-700 border-slate-200",
                     };
 
                     const stipendCurrency: "INR" | "USD" = (proposal.offerCurrency ?? expectedCurrency) as "INR" | "USD";
@@ -777,7 +782,8 @@ export default function EmployerProposalsPage() {
                 hired: "Hired",
                 rejected: "Rejected",
                 interview_scheduled: "Interview scheduled",
-                expired: "Withdrawn",
+                expired: "Expired",
+                withdrawn: "Withdrawn",
               };
 
               const statusColorMap: Record<EmployerProposal["status"], string> = {
@@ -788,6 +794,7 @@ export default function EmployerProposalsPage() {
                 rejected: "bg-red-50 text-red-700 border-red-200",
                 interview_scheduled: "bg-amber-50 text-amber-700 border-amber-200",
                 expired: "bg-slate-100 text-slate-700 border-slate-200",
+                withdrawn: "bg-slate-100 text-slate-700 border-slate-200",
               };
 
               const currency: "INR" | "USD" = (proposal.offerCurrency ?? expectedCurrency) as "INR" | "USD";

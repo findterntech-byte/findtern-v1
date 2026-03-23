@@ -248,6 +248,9 @@ export default function ProposalDetailPage() {
     if (statusLower === "rejected") {
       return { key: "rejected", label: "Rejected" };
     }
+    if (statusLower === "expired") {
+      return { key: "expired", label: "Withdrawn" };
+    }
     if (statusLower === "withdrawn") {
       return { key: "withdrawn", label: "Withdrawn" };
     }
@@ -262,7 +265,7 @@ export default function ProposalDetailPage() {
     const startDateYmd = String((offer as any)?.startDate ?? "").trim();
     const isStartDateToday = /^\d{4}-\d{2}-\d{2}$/.test(startDateYmd) && startDateYmd === todayYmd;
     if (isStartDateToday) {
-      return { key: "expired", label: "Expired" };
+      return { key: "expired", label: "Withdrawn" };
     }
 
     const created = new Date(String((proposal as any)?.createdAt ?? (proposal as any)?.created_at ?? "")).getTime();
@@ -385,14 +388,15 @@ export default function ProposalDetailPage() {
   const isRejected = status === "rejected";
   const isExpired = status === "expired";
   const isHired = status === "hired";
-  const isFinal = isAccepted || isRejected || isExpired || isHired;
+  const isWithdrawn = status === "withdrawn";
+  const isFinal = isAccepted || isRejected || isExpired || isHired || isWithdrawn;
 
   const statusLabel = (() => {
     const s = String(status || "").trim().toLowerCase();
     if (s === "sent") return "Awaiting your approval";
     if (s === "accepted") return "Approved";
     if (s === "rejected") return "Rejected";
-    if (s === "expired") return "Expired";
+    if (s === "expired") return "Withdrawn";
     if (s === "withdrawn") return "Withdrawn";
     if (s === "hired") return "Hired";
     return s || "Awaiting your approval";
