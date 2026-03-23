@@ -83,6 +83,7 @@ export default function EmployerInternDetailPage() {
   const [latestProposalId, setLatestProposalId] = useState<string>("");
   const [isHiredAnywhere, setIsHiredAnywhere] = useState(false);
   const [hasFullTimeOfferSent, setHasFullTimeOfferSent] = useState(false);
+  const [isFullTimeAccepted, setIsFullTimeAccepted] = useState(false);
   const { toast } = useToast();
 
   const preferredLocationsDisplay = useMemo(() => {
@@ -774,22 +775,30 @@ export default function EmployerInternDetailPage() {
         });
         setIsHiredAnywhere(hired);
 
-        const hasFteAnyProject = list.some((p) => {
+        let hasFteAnyProject = false;
+        let hasFteAccepted = false;
+        for (const p of list) {
           const pid = String(p?.internId ?? p?.intern_id ?? "").trim();
-          if (pid !== internKey) return false;
+          if (pid !== internKey) continue;
           const statusLower = String(p?.status ?? "").trim().toLowerCase();
-          if (
-            statusLower === "rejected" ||
-            statusLower === "expired" ||
-            statusLower === "withdrawn"
-          ) {
-            return false;
-          }
           const offer = (p?.offerDetails ?? {}) as any;
           const fullTimeOffer = (offer as any)?.fullTimeOffer ?? null;
-          return !!fullTimeOffer && typeof fullTimeOffer === "object";
-        });
+          const isFte = !!fullTimeOffer && typeof fullTimeOffer === "object";
+          if (!isFte) continue;
+
+          if (
+            statusLower !== "rejected" &&
+            statusLower !== "expired" &&
+            statusLower !== "withdrawn"
+          ) {
+            hasFteAnyProject = true;
+          }
+          if (statusLower === "accepted") {
+            hasFteAccepted = true;
+          }
+        }
         setHasFullTimeOfferSent(hasFteAnyProject);
+        setIsFullTimeAccepted(hasFteAccepted);
 
         if (!selectedProjectId) {
           const unlocked = hired || hasFteAnyProject;
@@ -1156,6 +1165,7 @@ export default function EmployerInternDetailPage() {
             <Button
               className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
               disabled={(() => {
+                if (isFullTimeAccepted) return false;
                 if (isFullTime) return true;
                 if (shouldShowSendFullTimeOffer) return false;
                 if (isAcceptedProposal) return false;
@@ -1166,6 +1176,10 @@ export default function EmployerInternDetailPage() {
                   const key = intern?.id ?? routeInternId;
                   if (!key) return;
                   setLocation(`/employer/orders?ftInternId=${encodeURIComponent(String(key).trim())}`);
+                  return;
+                }
+                if (isFullTimeAccepted) {
+                  setLocation("/employer/cart?tab=checkout&scroll=checkout#checkout");
                   return;
                 }
                 if (isFullTime) {
@@ -1244,15 +1258,17 @@ export default function EmployerInternDetailPage() {
             >
               {shouldShowSendFullTimeOffer
                 ? "Send full-time offer"
-                : shouldShowOrders
-                  ? "Full-time"
-                  : isAcceptedProposal
-                    ? "Proceed to Hire"
-                    : isInCart
-                      ? "In Cart"
-                      : isFullTime
-                        ? "Full-time"
-                        : "Add to Cart"}
+                : isFullTimeAccepted
+                  ? "Proceed to Hire"
+                  : shouldShowOrders
+                    ? "Full-time"
+                    : isAcceptedProposal
+                      ? "Proceed to Hire"
+                      : isInCart
+                        ? "In Cart"
+                        : isFullTime
+                          ? "Full-time"
+                          : "Add to Cart"}
             </Button>
           </div>
         </div>

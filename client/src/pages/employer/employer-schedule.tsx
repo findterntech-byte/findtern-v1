@@ -411,9 +411,10 @@ export default function EmployerSchedulePage() {
       }
 
       if (q) {
-        const name = String(interview?.internName ?? "").trim().toLowerCase();
+        const nameRaw = String(interview?.internName ?? "").trim();
+        const initials = getInitials(nameRaw).toLowerCase();
         const projectName = getProjectTitle(interview).toLowerCase();
-        if (!name.includes(q) && !projectName.includes(q)) return false;
+        if (!initials.includes(q) && !projectName.includes(q)) return false;
       }
 
       if (dateFilterKey) {
