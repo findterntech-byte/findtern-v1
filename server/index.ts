@@ -28,6 +28,10 @@ declare module "express-session" {
 const app = express();
 const httpServer = createServer(app);
 
+ if (process.env.NODE_ENV === "production") {
+   app.set("trust proxy", 1);
+ }
+
 const runtimeDirname = (() => {
   const entrypoint = process.argv[1];
   if (typeof entrypoint === "string" && entrypoint.length > 0) {
@@ -69,7 +73,7 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: false,
+      secure: process.env.NODE_ENV === "production",
     },
   }),
 );

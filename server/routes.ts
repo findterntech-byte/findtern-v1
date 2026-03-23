@@ -3054,7 +3054,7 @@ export async function registerRoutes(
         let tokenError: unknown = null;
 
         try {
-          const oauth2Client = getOAuth2Client();
+          const oauth2Client = getFindternOAuth2Client();
           const result = await oauth2Client.getToken(code);
           tokens = result?.tokens;
         } catch (err) {
@@ -3063,7 +3063,7 @@ export async function registerRoutes(
 
         if (!tokens) {
           try {
-            const oauth2Client = getFindternOAuth2Client();
+            const oauth2Client = getOAuth2Client();
             const result = await oauth2Client.getToken(code);
             tokens = result?.tokens;
             tokenError = null;
@@ -3273,7 +3273,31 @@ export async function registerRoutes(
       return res.redirect(to);
     } catch (error) {
       const info = formatGoogleApiError(error);
-      console.error("Google OAuth callback error:", info);
+      let googleClientConfig: { clientId?: string; redirectUri?: string } = {};
+      try {
+        const config = getGoogleOAuthClientConfig();
+        googleClientConfig = { clientId: config.clientId, redirectUri: config.redirectUri };
+      } catch {
+        // ignore
+      }
+
+      let findternClientConfig: { clientId?: string; redirectUri?: string } = {};
+      try {
+        const config = getFindternGoogleOAuthClientConfig();
+        findternClientConfig = { clientId: config.clientId, redirectUri: config.redirectUri };
+      } catch {
+        // ignore
+      }
+
+      console.error("Google OAuth callback error:", {
+        ...info,
+        path: String(req?.path ?? ""),
+        hasCode: Boolean(req?.query?.code),
+        hasState: Boolean(req?.query?.state),
+        scope: String(req?.query?.scope ?? ""),
+        googleClientConfig,
+        findternClientConfig,
+      });
 
       const stateRaw = String(req.query.state ?? "");
       let role: AuthOAuthRole = "intern";
