@@ -238,8 +238,20 @@ export default function ProposalDetailPage() {
 
   const badge = (() => {
     const statusLower = String((proposal as any)?.status ?? "sent").trim().toLowerCase();
-    if (statusLower === "hired") return "hired" as const;
-    if (statusLower === "accepted") return "approved" as const;
+
+    if (statusLower === "hired") {
+      return { key: "hired", label: "Hired" };
+    }
+    if (statusLower === "accepted") {
+      return { key: "approved", label: "Approved" };
+    }
+    if (statusLower === "rejected") {
+      return { key: "rejected", label: "Rejected" };
+    }
+    if (statusLower === "withdrawn") {
+      return { key: "withdrawn", label: "Withdrawn" };
+    }
+
     if (statusLower !== "sent") return null;
 
     const todayYmd = (() => {
@@ -249,7 +261,9 @@ export default function ProposalDetailPage() {
 
     const startDateYmd = String((offer as any)?.startDate ?? "").trim();
     const isStartDateToday = /^\d{4}-\d{2}-\d{2}$/.test(startDateYmd) && startDateYmd === todayYmd;
-    if (isStartDateToday) return "expired" as const;
+    if (isStartDateToday) {
+      return { key: "expired", label: "Expired" };
+    }
 
     const created = new Date(String((proposal as any)?.createdAt ?? (proposal as any)?.created_at ?? "")).getTime();
     const updated = new Date(String((proposal as any)?.updatedAt ?? (proposal as any)?.updated_at ?? "")).getTime();
@@ -263,7 +277,7 @@ export default function ProposalDetailPage() {
       (Number.isFinite(updated) && updated > created) ||
       (Number.isFinite(projectUpdated) && projectUpdated > created);
 
-    return changedByEmployer ? ("updated" as const) : null;
+    return changedByEmployer ? { key: "updated", label: "Updated" } : null;
   })();
 
   const roleTitle = hasFullTimeOffer
@@ -727,39 +741,23 @@ export default function ProposalDetailPage() {
 
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
             <div className="flex flex-wrap items-center gap-2">
-              {/* <Badge
-                variant="outline"
-                className={`${statusBadgeClasses} h-7 rounded-full px-3 text-[11px] font-medium whitespace-nowrap`}
-              >
-                Status: {maskedStatusForBadge}
-              </Badge> */}
-              {badge === "updated" ? (
+              {badge ? (
                 <Badge
                   variant="outline"
-                  className="h-7 rounded-full px-3 text-[11px] font-medium border-emerald-200 bg-emerald-50/60 text-emerald-700 whitespace-nowrap"
+                  className={(() => {
+                    if (badge.key === "updated") {
+                      return "h-7 rounded-full px-3 text-[11px] font-medium border-emerald-200 bg-emerald-50/60 text-emerald-700 whitespace-nowrap";
+                    }
+                    if (badge.key === "approved" || badge.key === "hired") {
+                      return "h-7 rounded-full px-3 text-[11px] font-medium border-emerald-200 bg-emerald-100 text-emerald-800 whitespace-nowrap";
+                    }
+                    if (badge.key === "expired" || badge.key === "rejected" || badge.key === "withdrawn") {
+                      return "h-7 rounded-full px-3 text-[11px] font-medium border-red-200 bg-red-50 text-red-700 whitespace-nowrap";
+                    }
+                    return "";
+                  })()}
                 >
-                  Updated
-                </Badge>
-              ) : badge === "approved" ? (
-                <Badge
-                  variant="outline"
-                  className="h-7 rounded-full px-3 text-[11px] font-medium border-emerald-200 bg-emerald-100 text-emerald-800 whitespace-nowrap"
-                >
-                  Approved
-                </Badge>
-              ) : badge === "hired" ? (
-                <Badge
-                  variant="outline"
-                  className="h-7 rounded-full px-3 text-[11px] font-medium border-emerald-200 bg-emerald-100 text-emerald-800 whitespace-nowrap"
-                >
-                  Hired
-                </Badge>
-              ) : badge === "expired" ? (
-                <Badge
-                  variant="outline"
-                  className="h-7 rounded-full px-3 text-[11px] font-medium border-red-200 bg-red-50 text-red-700 whitespace-nowrap"
-                >
-                  Expired
+                  {badge.label}
                 </Badge>
               ) : null}
             </div>

@@ -517,13 +517,7 @@ export default function ProposalsPage() {
                 };
               }
 
-              if (statusLower === "withdrawn") {
-                return {
-                  label: "Withdrawn",
-                  className:
-                    "absolute top-3 right-3 inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[11px] text-red-700 border border-red-200",
-                };
-              }
+
 
               if (isExpired) {
                 return {
