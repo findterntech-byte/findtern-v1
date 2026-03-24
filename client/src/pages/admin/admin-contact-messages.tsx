@@ -36,7 +36,8 @@ import {
   ChevronRight,
   Inbox,
   Calendar,
-  FilterX
+  FilterX,
+  Loader2
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -467,7 +468,7 @@ export default function AdminContactMessagesPage() {
                   <TableRow>
                     <TableCell colSpan={6} className="py-20 text-center">
                       <div className="flex flex-col items-center gap-2">
-                        <Activity className="h-8 w-8 text-emerald-600 animate-pulse" />
+                        <Loader2 className="h-8 w-8 text-emerald-600 animate-spin" />
                         <p className="text-muted-foreground animate-pulse font-medium">Loading inbox...</p>
                       </div>
                     </TableCell>
