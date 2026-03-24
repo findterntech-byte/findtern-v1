@@ -3,6 +3,8 @@ import { useLocation } from "wouter";
 import { AdminLayout } from "@/pages/admin/admin-layout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -51,6 +53,18 @@ import {
   Star,
   UploadCloud,
   Download,
+  Users,
+  CheckCircle2,
+  Clock,
+  Activity,
+  UserCheck,
+  LayoutGrid,
+  ListFilter,
+  ChevronRight,
+  Receipt,
+  Sparkles,
+  GraduationCap,
+  X,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import * as XLSX from "xlsx";
@@ -160,6 +174,48 @@ export default function AdminInternsPage() {
   const [dashboardAnalytics, setDashboardAnalytics] = useState<AdminDashboardAnalytics | null>(null);
   const [dashboardAnalyticsError, setDashboardAnalyticsError] = useState<string | null>(null);
 
+  const handleResetFilters = () => {
+    setSearch("");
+    setInterviewStatusFilter("");
+    setLiveHiddenFilter("");
+    setInternshipStatusFilter("");
+    setPaymentStatusFilter("");
+    setOnboardingStatusFilter("");
+    setProfileStatusFilter("");
+    setInternPayoutFilter("");
+    setOfferStatusFilter("");
+    setMinFindternScore("");
+    setSortBy("createdAt");
+    setSortDir("desc");
+    setPage(1);
+  };
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      search !== "" ||
+      interviewStatusFilter !== "" ||
+      liveHiddenFilter !== "" ||
+      internshipStatusFilter !== "" ||
+      paymentStatusFilter !== "" ||
+      onboardingStatusFilter !== "" ||
+      profileStatusFilter !== "" ||
+      internPayoutFilter !== "" ||
+      offerStatusFilter !== "" ||
+      minFindternScore !== ""
+    );
+  }, [
+    search,
+    interviewStatusFilter,
+    liveHiddenFilter,
+    internshipStatusFilter,
+    paymentStatusFilter,
+    onboardingStatusFilter,
+    profileStatusFilter,
+    internPayoutFilter,
+    offerStatusFilter,
+    minFindternScore,
+  ]);
+
   type ColumnKey =
     | "sno"
     | "name"
@@ -244,6 +300,7 @@ export default function AdminInternsPage() {
     const pendingApproval = interns.filter((i) => i.approvalStatus === "Pending").length;
     const approved = interns.filter((i) => i.approvalStatus === "Approved").length;
     const rejected = interns.filter((i) => i.approvalStatus === "Rejected").length;
+    const onboarded = interns.filter((i) => i.onboardingStatus === "Onboarded").length;
 
     const interviewCounts = interns.reduce(
       (acc, i) => {
@@ -255,9 +312,9 @@ export default function AdminInternsPage() {
     );
 
     const approvalSeries = [
-      { key: "Approved", value: approved, fill: "hsl(142 76% 36%)" },
-      { key: "Pending", value: pendingApproval, fill: "hsl(38 92% 50%)" },
-      { key: "Rejected", value: rejected, fill: "hsl(0 72% 51%)" },
+      { key: "Approved", value: approved, fill: "hsl(var(--primary))" },
+      { key: "Pending", value: pendingApproval, fill: "hsl(var(--warning))" },
+      { key: "Rejected", value: rejected, fill: "hsl(var(--destructive))" },
     ].filter((x) => x.value > 0);
 
     const interviewSeries = ["Waiting", "Applied", "Interview", "Completed"].map(
@@ -268,27 +325,27 @@ export default function AdminInternsPage() {
     );
 
     const interviewPalette: Record<string, string> = {
-      Waiting: "hsl(215 16% 47%)",
-      Applied: "hsl(38 92% 50%)",
-      Interview: "hsl(0 72% 51%)",
-      Completed: "hsl(199 89% 48%)",
+      Waiting: "hsl(var(--muted-foreground))",
+      Applied: "hsl(var(--warning))",
+      Interview: "hsl(var(--primary))",
+      Completed: "hsl(var(--success, 142 76% 36%))",
     };
 
     const interviewSeriesWithFill = interviewSeries
       .filter((x) => x.value > 0)
-      .map((x) => ({ ...x, fill: interviewPalette[x.key] ?? "hsl(215 16% 47%)" }));
+      .map((x) => ({ ...x, fill: interviewPalette[x.key] ?? "hsl(var(--muted-foreground))" }));
 
     const approvalConfig = {
-      Approved: { label: "Approved", color: "hsl(142 76% 36%)" },
-      Pending: { label: "Pending", color: "hsl(38 92% 50%)" },
-      Rejected: { label: "Rejected", color: "hsl(0 72% 51%)" },
+      Approved: { label: "Approved", color: "hsl(var(--primary))" },
+      Pending: { label: "Pending", color: "hsl(var(--warning))" },
+      Rejected: { label: "Rejected", color: "hsl(var(--destructive))" },
     } as const;
 
     const interviewConfig = {
-      Waiting: { label: "Waiting", color: "hsl(215 16% 47%)" },
-      Applied: { label: "Applied", color: "hsl(38 92% 50%)" },
-      Interview: { label: "Interview", color: "hsl(0 72% 51%)" },
-      Completed: { label: "Completed", color: "hsl(199 89% 48%)" },
+      Waiting: { label: "Waiting", color: "hsl(var(--muted-foreground))" },
+      Applied: { label: "Applied", color: "hsl(var(--warning))" },
+      Interview: { label: "Interview", color: "hsl(var(--primary))" },
+      Completed: { label: "Completed", color: "hsl(var(--success, 142 76% 36%))" },
     } as const;
 
     return {
@@ -298,6 +355,7 @@ export default function AdminInternsPage() {
       pendingApproval,
       approved,
       rejected,
+      onboarded,
       approvalSeries,
       interviewSeries: interviewSeriesWithFill,
       approvalConfig,
@@ -1222,286 +1280,462 @@ export default function AdminInternsPage() {
       title="Interns"
       description="Review intern proposals, update ratings, and manage interview links."
     >
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className="p-5 md:col-span-2 xl:col-span-2">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Proposal vs Interview</p>
-        
+      <div className="flex flex-col gap-6">
+        {/* KPI Cards */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="flex flex-row items-center justify-between p-6 transition-all hover:shadow-md">
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Interns</p>
+              <h2 className="text-3xl font-bold tracking-tight">{overview.total}</h2>
             </div>
-          </div>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            
-
-            <ChartContainer config={overview.interviewConfig as any} className="h-[220px] w-full">
-              <PieChart>
-                <ChartTooltip content={<ChartTooltipContent nameKey="key" />} />
-                <Pie
-                  data={overview.interviewSeries}
-                  dataKey="value"
-                  nameKey="key"
-                  innerRadius={55}
-                  outerRadius={85}
-                  paddingAngle={2}
-                >
-                  {overview.interviewSeries.map((entry) => (
-                    <Cell key={entry.key} fill={(entry as any).fill} />
-                  ))}
-                </Pie>
-                <ChartLegend content={<ChartLegendContent nameKey="key" />} />
-              </PieChart>
-            </ChartContainer>
-          </div>
-        </Card>
-
-        <Card className="p-5 md:col-span-2 xl:col-span-2">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Total Proposals vs AI Interviews</p>
-              <p className="mt-2 text-sm text-muted-foreground">Last 6 months</p>
+            <div className="rounded-full bg-primary/10 p-3 text-primary">
+              <Users className="h-6 w-6" />
             </div>
-          </div>
-          <div className="mt-4 h-[240px]">
-            {dashboardAnalyticsError ? (
-              <p className="text-sm text-red-600">{dashboardAnalyticsError}</p>
-            ) : (
-              <ChartContainer config={trendConfig}>
-                <ResponsiveContainer>
-                  <LineChart data={proposalsTrendData}>
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
-                    <YAxis tickLine={false} axisLine={false} tickMargin={8} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <ChartLegend content={<ChartLegendContent />} />
-                    <Line
-                      type="monotone"
-                      dataKey="applications"
-                      stroke="var(--color-applications)"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="interviews"
-                      stroke="var(--color-interviews)"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            )}
-          </div>
-        </Card>
+          </Card>
 
-       
-      </div>
-
-      <Card className="border-none shadow-sm">
-        <div className="flex flex-col gap-4 border-b px-6 py-4 md:flex-row md:items-center md:justify-between">
-          <p className="text-sm font-medium text-muted-foreground">Intern List</p>
-          <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end md:w-auto">
-            <div className="relative w-full sm:w-[320px]">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                placeholder="Search name, email, phone..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-10 pl-10"
-              />
+          <Card className="flex flex-row items-center justify-between p-6 transition-all hover:shadow-md">
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Active Now</p>
+              <h2 className="text-3xl font-bold tracking-tight text-emerald-600">{overview.active}</h2>
             </div>
-
-            <Select
-              value={interviewStatusFilter}
-              onValueChange={(v) => setInterviewStatusFilter(v === "__clear__" ? "" : (v as any))}
-            >
-              <SelectTrigger className="h-10 w-full sm:w-[190px]">
-                <SelectValue placeholder="Proposal vs Interview" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__clear__">All Proposal vs Interview</SelectItem>
-                <SelectItem value="Waiting">Not applied</SelectItem>
-                <SelectItem value="Applied">Applied / Pending</SelectItem>
-                <SelectItem value="Interview">Scheduled</SelectItem>
-                <SelectItem value="Completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={internPayoutFilter} onValueChange={(v) => setInternPayoutFilter(v === "__clear__" ? "" : (v as any))}>
-              <SelectTrigger className="h-10 w-full sm:w-[170px]">
-                <SelectValue placeholder="Intern payout" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__clear__">All payout</SelectItem>
-                <SelectItem value="Not started">Not started</SelectItem>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={offerStatusFilter} onValueChange={(v) => setOfferStatusFilter(v === "__clear__" ? "" : (v as any))}>
-              <SelectTrigger className="h-10 w-full sm:w-[190px]">
-                <SelectValue placeholder="Offer status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__clear__">All offer status</SelectItem>
-                <SelectItem value="Rejected">Offer rejected by intern</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={liveHiddenFilter}
-              onValueChange={(v) => setLiveHiddenFilter(v === "__clear__" ? "" : (v as any))}
-            >
-              <SelectTrigger className="h-10 w-full sm:w-[170px]">
-                <SelectValue placeholder="Live / Hidden" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__clear__">All Live / Hidden</SelectItem>
-                <SelectItem value="Live">Live</SelectItem>
-                <SelectItem value="Hidden">Hidden</SelectItem>
-                <SelectItem value="Deactivated">Deactivated</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={internshipStatusFilter}
-              onValueChange={(v) => setInternshipStatusFilter(v === "__clear__" ? "" : (v as any))}
-            >
-              <SelectTrigger className="h-10 w-full sm:w-[190px]">
-                <SelectValue placeholder="Internship Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__clear__">All Internship Status</SelectItem>
-                <SelectItem value="Ongoing">Ongoing</SelectItem>
-                <SelectItem value="Completed">Completed</SelectItem>
-                <SelectItem value="-">-</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={paymentStatusFilter}
-              onValueChange={(v) => setPaymentStatusFilter(v === "__clear__" ? "" : (v as any))}
-            >
-              <SelectTrigger className="h-10 w-full sm:w-[170px]">
-                <SelectValue placeholder="Payment Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__clear__">All Payment Status</SelectItem>
-                <SelectItem value="Paid">Paid</SelectItem>
-                <SelectItem value="Unpaid">Unpaid</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={onboardingStatusFilter}
-              onValueChange={(v) => setOnboardingStatusFilter(v === "__clear__" ? "" : (v as any))}
-            >
-              <SelectTrigger className="h-10 w-full sm:w-[190px]">
-                <SelectValue placeholder="Onboarding status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__clear__">All Onboarding</SelectItem>
-                <SelectItem value="Onboarded">Onboarded</SelectItem>
-                <SelectItem value="Not onboarded">Not onboarded</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={profileStatusFilter}
-              onValueChange={(v) => setProfileStatusFilter(v === "__clear__" ? "" : (v as any))}
-            >
-              <SelectTrigger className="h-10 w-full sm:w-[190px]">
-                <SelectValue placeholder="Profile status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__clear__">All Profile Status</SelectItem>
-                <SelectItem value="Complete">Profile Complete</SelectItem>
-                <SelectItem value="Incomplete">Incomplete Profile</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <div className="w-full sm:w-[180px]">
-              <Input
-                className="h-10"
-                value={minFindternScore}
-                onChange={(e) => setMinFindternScore(e.target.value)}
-                placeholder="Min score (0-10)"
-                inputMode="numeric"
-              />
+            <div className="rounded-full bg-emerald-50 p-3 text-emerald-600">
+              <Activity className="h-6 w-6" />
             </div>
+          </Card>
 
-            <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-              <SelectTrigger className="h-10 w-full sm:w-[160px]">
-                <SelectValue placeholder="Sort" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="createdAt">Created On</SelectItem>
-                <SelectItem value="name">Name</SelectItem>
-                <SelectItem value="email">Email</SelectItem>
-              </SelectContent>
-            </Select>
+          <Card className="flex flex-row items-center justify-between p-6 transition-all hover:shadow-md">
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Pending Approval</p>
+              <h2 className="text-3xl font-bold tracking-tight text-amber-600">{overview.pendingApproval}</h2>
+            </div>
+            <div className="rounded-full bg-amber-50 p-3 text-amber-600">
+              <Clock className="h-6 w-6" />
+            </div>
+          </Card>
 
-            <Select value={sortDir} onValueChange={(v) => setSortDir(v as any)}>
-              <SelectTrigger className="h-10 w-full sm:w-[140px]">
-                <SelectValue placeholder="Order" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="desc">DESC</SelectItem>
-                <SelectItem value="asc">ASC</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0] ?? null;
-                e.target.value = "";
-                if (!file) return;
-                void handleUploadFile(file);
-              }}
-            />
-
-            <Button
-              className="h-10 bg-[#0E6049] hover:bg-[#0b4b3a]"
-              onClick={handleUploadClick}
-              disabled={uploading}
-            >
-              <UploadCloud className="mr-2 h-4 w-4" />
-              {uploading ? "Uploading..." : "Upload Skill Ratings"}
-            </Button>
-            <Button className="h-10" variant="outline" onClick={handleDownloadSample}>
-              <Download className="mr-2 h-4 w-4" />
-              Download Sample
-            </Button>
-            <Button
-              className="h-10"
-              variant="outline"
-              onClick={handleExportExcel}
-              disabled={sorted.length === 0}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
-          </div>
+          <Card className="flex flex-row items-center justify-between p-6 transition-all hover:shadow-md">
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Onboarded</p>
+              <h2 className="text-3xl font-bold tracking-tight text-blue-600">{overview.onboarded}</h2>
+            </div>
+            <div className="rounded-full bg-blue-50 p-3 text-blue-600">
+              <UserCheck className="h-6 w-6" />
+            </div>
+          </Card>
         </div>
 
-        {(uploadMessage || uploadError) && (
-          <div className="px-6 pt-3 text-sm">
-            {uploadError ? (
-              <span className="text-red-600">{uploadError}</span>
-            ) : (
-              <span className="text-emerald-700">{uploadMessage}</span>
+        {/* Analytics Section */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card className="flex flex-col p-6 transition-all hover:shadow-md">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Proposal vs Interview</h3>
+                <p className="text-sm text-muted-foreground">Status distribution of all interns</p>
+              </div>
+              <LayoutGrid className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div className="flex flex-1 items-center justify-center">
+              <ChartContainer config={overview.interviewConfig as any} className="h-[240px] w-full">
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent nameKey="key" />} />
+                  <Pie
+                    data={overview.interviewSeries}
+                    dataKey="value"
+                    nameKey="key"
+                    innerRadius={60}
+                    outerRadius={90}
+                    paddingAngle={4}
+                    strokeWidth={0}
+                  >
+                    {overview.interviewSeries.map((entry) => (
+                      <Cell key={entry.key} fill={(entry as any).fill} />
+                    ))}
+                  </Pie>
+                  <ChartLegend content={<ChartLegendContent nameKey="key" />} />
+                </PieChart>
+              </ChartContainer>
+            </div>
+          </Card>
+
+          <Card className="flex flex-col p-6 transition-all hover:shadow-md">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Activity Trends</h3>
+                <p className="text-sm text-muted-foreground">Proposals vs Interviews (Last 6 months)</p>
+              </div>
+              <Activity className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div className="h-[240px] w-full">
+              {dashboardAnalyticsError ? (
+                <div className="flex h-full items-center justify-center text-sm text-destructive">
+                  {dashboardAnalyticsError}
+                </div>
+              ) : (
+                <ChartContainer config={trendConfig} className="h-full w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={proposalsTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <XAxis
+                        dataKey="month"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={12}
+                        className="text-xs font-medium"
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={12}
+                        className="text-xs font-medium"
+                      />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Line
+                        type="monotone"
+                        dataKey="applications"
+                        stroke="var(--color-applications)"
+                        strokeWidth={3}
+                        dot={{ r: 4, strokeWidth: 2, fill: "white" }}
+                        activeDot={{ r: 6, strokeWidth: 0 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="interviews"
+                        stroke="var(--color-interviews)"
+                        strokeWidth={3}
+                        dot={{ r: 4, strokeWidth: 2, fill: "white" }}
+                        activeDot={{ r: 6, strokeWidth: 0 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        {/* Intern List Section */}
+        <Card className="border-none shadow-sm overflow-hidden bg-background">
+          <div className="flex flex-col gap-8 p-8">
+            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-1">
+                <h3 className="text-2xl font-bold tracking-tight text-foreground">Intern Directory</h3>
+                <p className="text-sm text-muted-foreground">Manage, evaluate, and monitor all registered interns in one place.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    e.target.value = "";
+                    if (!file) return;
+                    void handleUploadFile(file);
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="h-10 gap-2 border-muted-foreground/20 hover:bg-muted/50 shadow-sm"
+                  onClick={handleDownloadSample}
+                >
+                  <Download className="h-4 w-4 text-muted-foreground" />
+                  <span>Sample</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="h-10 gap-2 border-muted-foreground/20 hover:bg-muted/50 shadow-sm"
+                  onClick={handleExportExcel}
+                  disabled={sorted.length === 0}
+                >
+                  <Download className="h-4 w-4 text-muted-foreground" />
+                  <span>Export</span>
+                </Button>
+                <Button
+                  size="default"
+                  className="h-10 gap-2 bg-primary hover:bg-primary/90 shadow-md transition-all active:scale-[0.98]"
+                  onClick={handleUploadClick}
+                  disabled={uploading}
+                >
+                  <UploadCloud className="h-4 w-4" />
+                  <span>{uploading ? "Uploading..." : "Upload Ratings"}</span>
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-6">
+              {/* Filter Toolbar */}
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                  <div className="relative flex-1 group">
+                    <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                    <Input
+                      placeholder="Search name, email, phone..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="h-12 pl-12 border-muted-foreground/20 focus-visible:ring-primary transition-all shadow-sm text-base rounded-xl"
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Select
+                      value={interviewStatusFilter}
+                      onValueChange={(v) => setInterviewStatusFilter(v === "__clear__" ? "" : (v as any))}
+                    >
+                      <SelectTrigger className="h-12 w-full sm:w-[220px] border-muted-foreground/20 shadow-sm rounded-xl">
+                        <ListFilter className="mr-2 h-4 w-4 text-muted-foreground" />
+                        <SelectValue placeholder="Interview Status" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="__clear__">All Status</SelectItem>
+                        <SelectItem value="Waiting">Not applied</SelectItem>
+                        <SelectItem value="Applied">Applied / Pending</SelectItem>
+                        <SelectItem value="Interview">Scheduled</SelectItem>
+                        <SelectItem value="Completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <div className="flex items-center gap-2">
+                      <Collapsible className="w-full sm:w-auto">
+                        <CollapsibleTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="h-12 w-full gap-2 border-muted-foreground/20 shadow-sm hover:bg-muted/50 data-[state=open]:bg-muted rounded-xl"
+                          >
+                            <Filter className="h-4 w-4" />
+                            <span className="font-medium">Advanced Filters</span>
+                            {hasActiveFilters && (
+                              <span className="ml-1 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground animate-in zoom-in duration-200">
+                                !
+                              </span>
+                            )}
+                            <ChevronRight className="h-4 w-4 transition-transform duration-200 data-[state=open]:rotate-90" />
+                          </Button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-4 animate-in fade-in slide-in-from-top-2 duration-200 absolute left-0 right-0 z-50">
+                          <div className="rounded-2xl border border-muted-foreground/10 bg-background p-8 shadow-2xl ring-1 ring-black/5">
+                            <div className="flex items-center justify-between mb-6">
+                              <h4 className="text-sm font-bold uppercase tracking-widest text-foreground flex items-center gap-2">
+                                <Filter className="h-4 w-4" />
+                                Advanced Filters
+                              </h4>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleResetFilters}
+                                className="h-8 px-3 text-muted-foreground hover:text-destructive transition-colors"
+                              >
+                                <X className="mr-2 h-3 w-3" />
+                                Reset All
+                              </Button>
+                            </div>
+                            <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                              <div className="space-y-2.5">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-2 px-1">
+                                  <Receipt className="h-3.5 w-3.5" />
+                                  Payout
+                                </label>
+                                <Select value={internPayoutFilter} onValueChange={(v) => setInternPayoutFilter(v === "__clear__" ? "" : (v as any))}>
+                                  <SelectTrigger className="h-10 bg-background border-muted-foreground/20 shadow-sm rounded-lg">
+                                    <SelectValue placeholder="All payout" />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-lg">
+                                    <SelectItem value="__clear__">All payout</SelectItem>
+                                    <SelectItem value="Not started">Not started</SelectItem>
+                                    <SelectItem value="Pending">Pending</SelectItem>
+                                    <SelectItem value="Completed">Completed</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-2.5">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-2 px-1">
+                                  <Activity className="h-3.5 w-3.5" />
+                                  Offer Status
+                                </label>
+                                <Select value={offerStatusFilter} onValueChange={(v) => setOfferStatusFilter(v === "__clear__" ? "" : (v as any))}>
+                                  <SelectTrigger className="h-10 bg-background border-muted-foreground/20 shadow-sm rounded-lg">
+                                    <SelectValue placeholder="All offer status" />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-lg">
+                                    <SelectItem value="__clear__">All offer status</SelectItem>
+                                    <SelectItem value="Rejected">Offer rejected</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-2.5">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-2 px-1">
+                                  <Sparkles className="h-3.5 w-3.5" />
+                                  Visibility
+                                </label>
+                                <Select value={liveHiddenFilter} onValueChange={(v) => setLiveHiddenFilter(v === "__clear__" ? "" : (v as any))}>
+                                  <SelectTrigger className="h-10 bg-background border-muted-foreground/20 shadow-sm rounded-lg">
+                                    <SelectValue placeholder="All Live / Hidden" />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-lg">
+                                    <SelectItem value="__clear__">All Live / Hidden</SelectItem>
+                                    <SelectItem value="Live">Live</SelectItem>
+                                    <SelectItem value="Hidden">Hidden</SelectItem>
+                                    <SelectItem value="Deactivated">Deactivated</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-2.5">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-2 px-1">
+                                  <GraduationCap className="h-3.5 w-3.5" />
+                                  Internship
+                                </label>
+                                <Select value={internshipStatusFilter} onValueChange={(v) => setInternshipStatusFilter(v === "__clear__" ? "" : (v as any))}>
+                                  <SelectTrigger className="h-10 bg-background border-muted-foreground/20 shadow-sm rounded-lg">
+                                    <SelectValue placeholder="All Internship Status" />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-lg">
+                                    <SelectItem value="__clear__">All Internship Status</SelectItem>
+                                    <SelectItem value="Ongoing">Ongoing</SelectItem>
+                                    <SelectItem value="Completed">Completed</SelectItem>
+                                    <SelectItem value="-">-</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-2.5">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-2 px-1">
+                                  <Receipt className="h-3.5 w-3.5" />
+                                  Payment
+                                </label>
+                                <Select value={paymentStatusFilter} onValueChange={(v) => setPaymentStatusFilter(v === "__clear__" ? "" : (v as any))}>
+                                  <SelectTrigger className="h-10 bg-background border-muted-foreground/20 shadow-sm rounded-lg">
+                                    <SelectValue placeholder="All Payment Status" />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-lg">
+                                    <SelectItem value="__clear__">All Payment Status</SelectItem>
+                                    <SelectItem value="Paid">Paid</SelectItem>
+                                    <SelectItem value="Unpaid">Unpaid</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-2.5">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-2 px-1">
+                                  <UserCheck className="h-3.5 w-3.5" />
+                                  Onboarding
+                                </label>
+                                <Select value={onboardingStatusFilter} onValueChange={(v) => setOnboardingStatusFilter(v === "__clear__" ? "" : (v as any))}>
+                                  <SelectTrigger className="h-10 bg-background border-muted-foreground/20 shadow-sm rounded-lg">
+                                    <SelectValue placeholder="All Onboarding" />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-lg">
+                                    <SelectItem value="__clear__">All Onboarding</SelectItem>
+                                    <SelectItem value="Onboarded">Onboarded</SelectItem>
+                                    <SelectItem value="Not onboarded">Not onboarded</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-2.5">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-2 px-1">
+                                  <Users className="h-3.5 w-3.5" />
+                                  Profile
+                                </label>
+                                <Select value={profileStatusFilter} onValueChange={(v) => setProfileStatusFilter(v === "__clear__" ? "" : (v as any))}>
+                                  <SelectTrigger className="h-10 bg-background border-muted-foreground/20 shadow-sm rounded-lg">
+                                    <SelectValue placeholder="All Profile Status" />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-lg">
+                                    <SelectItem value="__clear__">All Profile Status</SelectItem>
+                                    <SelectItem value="Complete">Profile Complete</SelectItem>
+                                    <SelectItem value="Incomplete">Incomplete Profile</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-2.5">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-2 px-1">
+                                  <Star className="h-3.5 w-3.5" />
+                                  Min Score
+                                </label>
+                                <div className="relative">
+                                  <Input
+                                    className="h-10 bg-background border-muted-foreground/20 shadow-sm rounded-lg pl-3 pr-10"
+                                    value={minFindternScore}
+                                    onChange={(e) => setMinFindternScore(e.target.value)}
+                                    placeholder="0-10"
+                                    inputMode="numeric"
+                                  />
+                                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground/50">/ 10</div>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2.5">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-2 px-1">
+                                  <ArrowDown className="h-3.5 w-3.5" />
+                                  Sort By
+                                </label>
+                                <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                                  <SelectTrigger className="h-10 bg-background border-muted-foreground/20 shadow-sm rounded-lg">
+                                    <SelectValue placeholder="Sort" />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-lg">
+                                    <SelectItem value="createdAt">Created On</SelectItem>
+                                    <SelectItem value="name">Name</SelectItem>
+                                    <SelectItem value="email">Email</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-2.5">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-2 px-1">
+                                  <ListFilter className="h-3.5 w-3.5" />
+                                  Order
+                                </label>
+                                <Select value={sortDir} onValueChange={(v) => setSortDir(v as any)}>
+                                  <SelectTrigger className="h-10 bg-background border-muted-foreground/20 shadow-sm rounded-lg">
+                                    <SelectValue placeholder="Order" />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-lg">
+                                    <SelectItem value="desc">DESC</SelectItem>
+                                    <SelectItem value="asc">ASC</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                      {hasActiveFilters && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleResetFilters}
+                          className="h-12 px-4 text-muted-foreground hover:text-destructive transition-colors rounded-xl"
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          <span className="font-medium">Clear</span>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {(uploadMessage || uploadError) && (
+              <div className="rounded-lg border bg-muted/50 px-4 py-2 text-sm">
+                {uploadError ? (
+                  <span className="font-medium text-destructive">Error: {uploadError}</span>
+                ) : (
+                  <span className="font-medium text-emerald-600">{uploadMessage}</span>
+                )}
+              </div>
             )}
-          </div>
-        )}
-        <div className="px-4 py-4">
-          <div className="relative w-full overflow-auto rounded-lg border">
-            <Table className="min-w-[1700px]">
-              <TableHeader className="sticky top-0 z-10 bg-background">
-                <TableRow className="bg-background">
+
+            <div className="relative w-full overflow-hidden rounded-xl border bg-card shadow-sm">
+              <div className="overflow-x-auto">
+                <Table className="min-w-[1700px]">
+                  <TableHeader className="bg-muted/50">
+                    <TableRow className="hover:bg-transparent">
                   {columnVisibility.sno && (
                     <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
                       <ColumnHeader col={columns[0]} />
@@ -1647,39 +1881,54 @@ export default function AdminInternsPage() {
               <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={visibleColumnCount} className="py-8 text-center text-sm text-muted-foreground">
-                    Loading interns...
+                  <TableCell colSpan={visibleColumnCount} className="py-12 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                      <p className="text-sm font-medium text-muted-foreground">Loading interns...</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={visibleColumnCount} className="py-8 text-center text-sm text-red-600">
-                    {error}
+                  <TableCell colSpan={visibleColumnCount} className="py-12 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <div className="rounded-full bg-destructive/10 p-3 text-destructive">
+                        <Activity className="h-6 w-6" />
+                      </div>
+                      <p className="text-sm font-medium text-destructive">{error}</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : sorted.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={visibleColumnCount} className="py-8 text-center text-sm text-muted-foreground">
-                    No interns found.
+                  <TableCell colSpan={visibleColumnCount} className="py-12 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <div className="rounded-full bg-muted p-3 text-muted-foreground">
+                        <Search className="h-6 w-6" />
+                      </div>
+                      <p className="text-sm font-medium text-muted-foreground">No interns found matching your criteria.</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 paginated.map((intern, index) => (
                   <TableRow
                     key={intern.id}
-                    className={
-                      (startIndex + index) % 2 === 0
-                        ? "bg-background hover:bg-muted/40"
-                        : "bg-muted/20 hover:bg-muted/40"
-                    }
+                    className="group border-b transition-colors hover:bg-muted/30"
                   >
-                    {columnVisibility.sno && <TableCell>{startIndex + index + 1}</TableCell>}
+                    {columnVisibility.sno && (
+                      <TableCell className="py-4 text-xs text-muted-foreground font-medium">
+                        {startIndex + index + 1}
+                      </TableCell>
+                    )}
                     {columnVisibility.name && (
-                      <TableCell className="font-medium whitespace-nowrap">
-                        <div className="flex flex-col">
-                          <span>{intern.name}</span>
+                      <TableCell className="py-4">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-semibold text-sm tracking-tight text-foreground group-hover:text-primary transition-colors">
+                            {intern.name}
+                          </span>
                           {intern.isFullTime && (
-                            <Badge className="mt-1 w-fit bg-indigo-100 text-indigo-700 border-indigo-200 text-[10px] font-semibold py-0 h-4">
+                            <Badge className="w-fit bg-indigo-50 text-indigo-700 border-indigo-100 text-[10px] font-bold py-0 h-4 uppercase tracking-wider">
                               Full Time
                             </Badge>
                           )}
@@ -1687,95 +1936,105 @@ export default function AdminInternsPage() {
                       </TableCell>
                     )}
                     {columnVisibility.email && (
-                      <TableCell className="whitespace-nowrap">{intern.email}</TableCell>
+                      <TableCell className="py-4 whitespace-nowrap text-sm text-muted-foreground">
+                        {intern.email}
+                      </TableCell>
                     )}
                     {columnVisibility.phone && (
-                      <TableCell className="whitespace-nowrap">{intern.phone}</TableCell>
+                      <TableCell className="py-4 whitespace-nowrap text-sm text-muted-foreground">
+                        {intern.phone}
+                      </TableCell>
                     )}
-                    {columnVisibility.createdAt && <TableCell>{intern.createdAt}</TableCell>}
+                    {columnVisibility.createdAt && (
+                      <TableCell className="py-4 whitespace-nowrap text-sm text-muted-foreground">
+                        {intern.createdAt}
+                      </TableCell>
+                    )}
                     {columnVisibility.interview && (
-                      <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <Badge
-                          variant="outline"
-                          className={
-                            intern.interview === "Scheduled"
-                              ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                              : intern.interview === "Sent"
-                                ? "border-blue-400 bg-blue-50 text-blue-700"
-                                : intern.interview === "Expired"
-                                  ? "border-red-400 bg-red-50 text-red-700"
-                                  : intern.interview === "Completed"
-                                    ? "border-sky-500 bg-sky-50 text-sky-700"
-                                    : intern.interview === "Applied"
-                                      ? "border-amber-400 bg-amber-50 text-amber-700"
-                                      : "border-slate-300 bg-slate-50 text-slate-700"
-                          }
-                        >
-                          {intern.interview}
-                        </Badge>
-                        {Number(intern.totalInterviewCount ?? 0) > 0 && (
-                          <span className="text-[10px] text-muted-foreground px-1">
-                            Total: {intern.totalInterviewCount}
-                          </span>
-                        )}
-                      </div>
+                      <TableCell className="py-4">
+                        <div className="flex flex-col gap-1.5">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "w-fit font-bold text-[10px] uppercase tracking-wider px-2 py-0.5",
+                              intern.interview === "Scheduled"
+                                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
+                                : intern.interview === "Sent"
+                                  ? "border-blue-500/20 bg-blue-500/10 text-blue-700"
+                                  : intern.interview === "Expired"
+                                    ? "border-destructive/20 bg-destructive/10 text-destructive"
+                                    : intern.interview === "Completed"
+                                      ? "border-sky-500/20 bg-sky-500/10 text-sky-700"
+                                      : intern.interview === "Applied"
+                                        ? "border-amber-500/20 bg-amber-500/10 text-amber-700"
+                                        : "border-muted-foreground/20 bg-muted/50 text-muted-foreground"
+                            )}
+                          >
+                            {intern.interview}
+                          </Badge>
+                          {Number(intern.totalInterviewCount ?? 0) > 0 && (
+                            <span className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-tighter">
+                              Total: {intern.totalInterviewCount}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                     )}
 
                     {columnVisibility.interviewSent && (
-                      <TableCell className="text-center">
+                      <TableCell className="py-4 text-center">
                         {Number(intern.interviewSentCount ?? 0) > 0 ? (
-                          <Badge className="bg-blue-50 text-blue-700 border-blue-400" variant="outline">
+                          <Badge className="bg-blue-50/50 text-blue-700 border-blue-200/50 font-bold" variant="outline">
                             {intern.interviewSentCount}
                           </Badge>
                         ) : (
-                          <span className="text-muted-foreground">-</span>
+                          <span className="text-muted-foreground/40">-</span>
                         )}
                       </TableCell>
                     )}
 
                     {columnVisibility.interviewScheduled && (
-                      <TableCell className="text-center">
+                      <TableCell className="py-4 text-center">
                         {Number(intern.interviewScheduledCount ?? 0) > 0 ? (
-                          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-500" variant="outline">
+                          <Badge className="bg-emerald-50/50 text-emerald-700 border-emerald-200/50 font-bold" variant="outline">
                             {intern.interviewScheduledCount}
                           </Badge>
                         ) : (
-                          <span className="text-muted-foreground">-</span>
+                          <span className="text-muted-foreground/40">-</span>
                         )}
                       </TableCell>
                     )}
 
                     {columnVisibility.interviewCompleted && (
-                      <TableCell className="text-center">
+                      <TableCell className="py-4 text-center">
                         {Number(intern.interviewCompletedCount ?? 0) > 0 ? (
-                          <Badge className="bg-sky-50 text-sky-700 border-sky-500" variant="outline">
+                          <Badge className="bg-sky-50/50 text-sky-700 border-sky-200/50 font-bold" variant="outline">
                             {intern.interviewCompletedCount}
                           </Badge>
                         ) : (
-                          <span className="text-muted-foreground">-</span>
+                          <span className="text-muted-foreground/40">-</span>
                         )}
                       </TableCell>
                     )}
 
                     {columnVisibility.findternScore && (
-                      <TableCell className="whitespace-nowrap">
+                      <TableCell className="py-4 whitespace-nowrap text-sm font-bold text-primary">
                         {typeof intern.findternScore === "number" && Number.isFinite(intern.findternScore)
                           ? formatRating(intern.findternScore)
-                          : "-"}
+                          : <span className="text-muted-foreground/40 font-normal">-</span>}
                       </TableCell>
                     )}
 
                     {columnVisibility.profileStatus && (
-                      <TableCell className="whitespace-nowrap">
+                      <TableCell className="py-4 whitespace-nowrap">
                         <Badge
                           variant="outline"
-                          className={
+                          className={cn(
+                            "font-bold text-[10px] uppercase tracking-wider px-2",
                             intern.isProfileComplete
-                              ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                              : "border-amber-400 bg-amber-50 text-amber-700"
-                          }
+                              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
+                              : "border-amber-500/20 bg-amber-500/10 text-amber-700"
+                          )}
                         >
                           {intern.isProfileComplete ? "Complete" : "Incomplete"}
                         </Badge>
@@ -1783,30 +2042,44 @@ export default function AdminInternsPage() {
                     )}
 
                     {columnVisibility.onboardingStatus && (
-                      <TableCell className="whitespace-nowrap">{intern.onboardingStatus ?? "Not onboarded"}</TableCell>
+                      <TableCell className="py-4 whitespace-nowrap text-sm text-muted-foreground">
+                        <span className={cn(
+                          "px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider",
+                          intern.onboardingStatus === "Onboarded" 
+                            ? "bg-emerald-100 text-emerald-700" 
+                            : "bg-muted text-muted-foreground"
+                        )}>
+                          {intern.onboardingStatus ?? "Not onboarded"}
+                        </span>
+                      </TableCell>
                     )}
 
                     {columnVisibility.pendingProposals && (
-                      <TableCell className="whitespace-nowrap">{Number(intern.pendingInterviewCount ?? 0) || 0}</TableCell>
+                      <TableCell className="py-4 whitespace-nowrap text-sm font-medium">
+                        {Number(intern.pendingInterviewCount ?? 0) || <span className="text-muted-foreground/40 font-normal">0</span>}
+                      </TableCell>
                     )}
 
                     {columnVisibility.toPay && (
-                      <TableCell className="whitespace-nowrap">
+                      <TableCell className="py-4 whitespace-nowrap">
                         {(() => {
                           const isOnboarded = String(intern.onboardingStatus ?? "").trim() === "Onboarded";
                           if (!isOnboarded) {
-                            return <span className="text-sm text-muted-foreground">-</span>;
+                            return <span className="text-xs text-muted-foreground/40 italic">Not Onboarded</span>;
                           }
                           const toPayMinor = Number(intern.toPayMinor ?? 0) || 0;
                           const hasUpcoming = Boolean(String(intern.upcomingPaymentDueAt ?? "").trim());
                           const isComplete = !hasUpcoming || toPayMinor <= 0;
                           if (isComplete) {
-                            return <span className="text-sm text-muted-foreground">Completed</span>;
+                            return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold uppercase tracking-wider">Completed</Badge>;
                           }
                           return (
-                            <div className="flex flex-col">
-                              <span>{formatPayoutInInrIfUsd(toPayMinor, intern.offerCurrency)}</span>
-                              <span className="text-xs text-muted-foreground">{formatDueDateOnly(intern.upcomingPaymentDueAt)}</span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-sm font-bold text-emerald-700 tracking-tight">{formatPayoutInInrIfUsd(toPayMinor, intern.offerCurrency)}</span>
+                              <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
+                                <Clock className="h-2.5 w-2.5" />
+                                {formatDueDateOnly(intern.upcomingPaymentDueAt)}
+                              </span>
                             </div>
                           );
                         })()}
@@ -1814,151 +2087,148 @@ export default function AdminInternsPage() {
                     )}
 
                     {columnVisibility.totalToPay && (
-                      <TableCell className="whitespace-nowrap">
+                      <TableCell className="py-4 whitespace-nowrap text-sm font-medium text-muted-foreground">
                         {intern.totalToPayMinor == null
-                          ? "-"
+                          ? <span className="text-muted-foreground/40">-</span>
                           : formatPayoutInInrIfUsd(Number(intern.totalToPayMinor), intern.offerCurrency)}
                       </TableCell>
                     )}
 
                     {columnVisibility.paidTillNow && (
-                      <TableCell className="whitespace-nowrap">
+                      <TableCell className="py-4 whitespace-nowrap text-sm font-medium text-emerald-600/80">
                         {formatPayoutInInrIfUsd(Number(intern.paidTillNowMinor ?? 0) || 0, intern.offerCurrency)}
                       </TableCell>
                     )}
 
                     {columnVisibility.leftToPay && (
-                      <TableCell className="whitespace-nowrap">
+                      <TableCell className="py-4 whitespace-nowrap text-sm font-medium text-amber-600/80">
                         {intern.leftToPayMinor == null
-                          ? "-"
+                          ? <span className="text-muted-foreground/40">-</span>
                           : formatPayoutInInrIfUsd(Number(intern.leftToPayMinor), intern.offerCurrency)}
                       </TableCell>
                     )}
 
                     {columnVisibility.liveStatus && (
-                      <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={
-                          intern.liveStatus === "Hidden"
-                            ? "border-slate-400 bg-slate-50 text-slate-700"
-                            : "border-emerald-500 bg-emerald-50 text-emerald-700"
-                        }
-                      >
-                        {intern.liveStatus ?? "Live"}
-                      </Badge>
+                      <TableCell className="py-4">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "font-bold text-[10px] uppercase tracking-wider px-2",
+                            intern.liveStatus === "Hidden"
+                              ? "border-muted-foreground/20 bg-muted text-muted-foreground"
+                              : "border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
+                          )}
+                        >
+                          {intern.liveStatus ?? "Live"}
+                        </Badge>
                       </TableCell>
                     )}
                     {columnVisibility.internshipStatus && (
-                      <TableCell>{intern.internshipStatus ?? "-"}</TableCell>
+                      <TableCell className="py-4 text-sm text-muted-foreground">
+                        {intern.internshipStatus ?? "-"}
+                      </TableCell>
                     )}
                     {columnVisibility.paymentStatus && (
-                      <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={
-                          String(intern.paymentStatus ?? "").toLowerCase() === "paid"
-                            ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                            : "border-amber-400 bg-amber-50 text-amber-700"
-                        }
-                      >
-                        {intern.paymentStatus ?? "-"}
-                      </Badge>
+                      <TableCell className="py-4">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "font-bold text-[10px] uppercase tracking-wider px-2",
+                            String(intern.paymentStatus ?? "").toLowerCase() === "paid"
+                              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
+                              : "border-amber-500/20 bg-amber-500/10 text-amber-700"
+                          )}
+                        >
+                          {intern.paymentStatus ?? "-"}
+                        </Badge>
                       </TableCell>
                     )}
 
                     {columnVisibility.offerStatus && (
-                      <TableCell className="whitespace-nowrap">
+                      <TableCell className="py-4 whitespace-nowrap">
                         <Badge
                           variant="outline"
-                          className={
+                          className={cn(
+                            "font-bold text-[10px] uppercase tracking-wider px-2",
                             String(intern.offerStatus ?? "").toLowerCase() === "rejected"
-                              ? "border-red-500 bg-red-50 text-red-700"
-                              : "border-slate-300 bg-slate-50 text-slate-700"
-                          }
+                              ? "border-destructive/20 bg-destructive/10 text-destructive"
+                              : "border-muted-foreground/20 bg-muted text-muted-foreground"
+                          )}
                         >
                           {intern.offerStatus ?? "-"}
                         </Badge>
                       </TableCell>
                     )}
                     {columnVisibility.accountNumber && (
-                      <TableCell className="whitespace-nowrap">{intern.bankDetails?.accountNumber ?? "-"}</TableCell>
+                      <TableCell className="py-4 whitespace-nowrap text-sm text-muted-foreground font-mono tracking-tighter">
+                        {intern.bankDetails?.accountNumber ?? "-"}
+                      </TableCell>
                     )}
                     {columnVisibility.ifsc && (
-                      <TableCell className="whitespace-nowrap">{intern.bankDetails?.ifscCode ?? "-"}</TableCell>
+                      <TableCell className="py-4 whitespace-nowrap text-sm text-muted-foreground font-mono tracking-tighter">
+                        {intern.bankDetails?.ifscCode ?? "-"}
+                      </TableCell>
                     )}
                     {columnVisibility.bankName && (
-                      <TableCell className="whitespace-nowrap">{intern.bankDetails?.bankName ?? "-"}</TableCell>
+                      <TableCell className="py-4 whitespace-nowrap text-sm text-muted-foreground">
+                        {intern.bankDetails?.bankName ?? "-"}
+                      </TableCell>
                     )}
                     {columnVisibility.upi && (
-                      <TableCell className="whitespace-nowrap">{intern.bankDetails?.upiId ?? "-"}</TableCell>
+                      <TableCell className="py-4 whitespace-nowrap text-sm text-muted-foreground">
+                        {intern.bankDetails?.upiId ?? "-"}
+                      </TableCell>
                     )}
 
-                    {/* {columnVisibility.approval && (
-                      <TableCell className="whitespace-nowrap">
-                        <Select
-                          value={intern.approvalStatus}
-                          onValueChange={(v) => void handleApprovalChange(intern.id, v as any)}
-                          disabled={Boolean(approvalSaving[intern.id])}
-                        >
-                          <SelectTrigger className="h-8 w-[140px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Pending">Pending</SelectItem>
-                            <SelectItem value="Approved">Approved</SelectItem>
-                            <SelectItem value="Rejected">Rejected</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                    )} */}
-                  
                     {columnVisibility.status && (
-                      <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={
-                          intern.status === "Active"
-                            ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                            : "border-slate-400 bg-slate-50 text-slate-700"
-                        }
-                      >
-                        {intern.status}
-                      </Badge>
+                      <TableCell className="py-4">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "font-bold text-[10px] uppercase tracking-wider px-2",
+                            intern.status === "Active"
+                              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
+                              : "border-destructive/20 bg-destructive/10 text-destructive"
+                          )}
+                        >
+                          {intern.status}
+                        </Badge>
                       </TableCell>
                     )}
-                    <TableCell className="text-right">
+                    <TableCell className="py-4 text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button size="sm" variant="outline">
-                            Actions
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-muted-foreground/10">
+                            <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem onClick={() => setLocation(`/admin/interns/${intern.id}`)}>
+                          <DropdownMenuItem onClick={() => setLocation(`/admin/interns/${intern.id}`)} className="gap-2">
+                            <Users className="h-4 w-4" />
                             View Profile
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleOpenRatingsModal(intern)}>
-                            <Star className="h-4 w-4" />
-                            Ratings
+                          <DropdownMenuItem onClick={() => handleOpenRatingsModal(intern)} className="gap-2 text-amber-600 focus:text-amber-600">
+                            <Star className="h-4 w-4 fill-amber-600/20" />
+                            Update Ratings
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleOpenLinksModal(intern)}>
+                          <DropdownMenuItem onClick={() => handleOpenLinksModal(intern)} className="gap-2 text-primary focus:text-primary">
                             <Link2 className="h-4 w-4" />
                             Interview Links
                           </DropdownMenuItem>
-                        
-                         
+                          
                           <DropdownMenuSeparator />
                           {intern.status === "Inactive" ? (
-                            <DropdownMenuItem onClick={() => void handleActivateIntern(intern.id)}>
-                              Activate
+                            <DropdownMenuItem onClick={() => void handleActivateIntern(intern.id)} className="gap-2 text-emerald-600 focus:text-emerald-600">
+                              <CheckCircle2 className="h-4 w-4" />
+                              Activate Intern
                             </DropdownMenuItem>
                           ) : (
                             <DropdownMenuItem
                               onClick={() => void handleDeactivateIntern(intern.id)}
-                              className="text-red-700"
+                              className="gap-2 text-destructive focus:text-destructive"
                             >
-                              Deactivate
+                              <Activity className="h-4 w-4" />
+                              Deactivate Intern
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
@@ -1970,113 +2240,67 @@ export default function AdminInternsPage() {
               </TableBody>
             </Table>
           </div>
+        </div>
 
-          <Dialog
-            open={openFilterFor !== null}
-            onOpenChange={(open) => {
-              if (open) return;
-              setOpenFilterFor(null);
-              setFilterDraft("");
-            }}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>
-                  {openFilterFor ? `Filter: ${columns.find((c) => c.key === openFilterFor)?.label ?? openFilterFor}` : "Filter"}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-3">
-                <Input
-                  placeholder="Type to filter..."
-                  value={filterDraft}
-                  onChange={(e) => setFilterDraft(e.target.value)}
-                />
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      if (!openFilterFor) return;
-                      setColumnFilters((prev) => {
-                        const next = { ...prev } as any;
-                        delete next[openFilterFor];
-                        return next;
-                      });
-                      setOpenFilterFor(null);
-                      setFilterDraft("");
-                    }}
-                  >
-                    Clear
-                  </Button>
-                  <Button
-                    className="flex-1"
-                    onClick={() => {
-                      if (!openFilterFor) return;
-                      setColumnFilters((prev) => ({
-                        ...prev,
-                        [openFilterFor]: filterDraft,
-                      }));
-                      setOpenFilterFor(null);
-                      setFilterDraft("");
-                    }}
-                  >
-                    Apply
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+        {/* Pagination Section */}
+        {!loading && !error && sorted.length > 0 && (
+          <div className="flex flex-col items-center justify-between gap-4 border-t px-6 py-4 md:flex-row">
+            <div className="text-sm text-muted-foreground">
+              Showing <span className="font-semibold text-foreground">{startIndex + 1}</span> to{" "}
+              <span className="font-semibold text-foreground">{Math.min(endIndex, total)}</span> of{" "}
+              <span className="font-semibold text-foreground">{total}</span> interns
+            </div>
 
-          {!loading && !error && sorted.length > 0 && (
-            <div className="mt-4 flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
-              <div className="text-sm text-muted-foreground">
-                Showing {startIndex + 1}-{Math.min(endIndex, total)} of {total}
-              </div>
-
-              <div className="flex flex-col gap-2 md:flex-row md:items-center">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-medium text-muted-foreground">Rows per page</p>
                 <Select
                   value={String(pageSize)}
                   onValueChange={(v) => setPageSize(Number(v) as 5 | 10 | 25 | 50)}
                 >
-                  <SelectTrigger className="w-full md:w-[140px]">
-                    <SelectValue placeholder="Rows" />
+                  <SelectTrigger className="h-8 w-[70px]">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="5">5 / page</SelectItem>
-                    <SelectItem value="10">10 / page</SelectItem>
-                    <SelectItem value="25">25 / page</SelectItem>
-                    <SelectItem value="50">50 / page</SelectItem>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={safePage <= 1}
-                  >
-                    Prev
-                  </Button>
-                  <div className="min-w-[110px] text-center text-sm text-muted-foreground">
-                    Page {safePage} / {totalPages}
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={safePage >= totalPages}
-                  >
-                    Next
-                  </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                >
+                  <ChevronRight className="h-4 w-4 rotate-180" />
+                </Button>
+                <div className="flex h-8 items-center justify-center rounded-md border bg-muted/50 px-3 text-xs font-bold">
+                  Page {safePage} of {totalPages}
                 </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
             </div>
-          )}
-        </div>
-      </Card>
+          </div>
+        )}
+      </div>
+    </Card>
+  </div>
 
-      {/* Interview Links Modal */}
+  {/* Interview Links Modal */}
       <Dialog
         open={openLinksModal}
         onOpenChange={(open) => {
@@ -2089,38 +2313,65 @@ export default function AdminInternsPage() {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Update Interview Links</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="h-5 w-5 text-primary" />
+              Interview Links
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Update the meeting, feedback, and recording links for {selectedIntern?.name}.
+            </p>
           </DialogHeader>
-          <div className="space-y-3">
-            <Input
-              placeholder="Interview Link"
-              value={meetingLinkInput}
-              onChange={(e) => setMeetingLinkInput(e.target.value)}
-            />
-            <Input
-              placeholder="Feedback Link"
-              value={feedbackLinkInput}
-              onChange={(e) => setFeedbackLinkInput(e.target.value)}
-            />
-            <Input
-              placeholder="Recording Link"
-              value={recordingLinkInput}
-              onChange={(e) => setRecordingLinkInput(e.target.value)}
-            />
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Meeting Link</label>
+              <Input
+                placeholder="https://zoom.us/j/..."
+                value={meetingLinkInput}
+                onChange={(e) => setMeetingLinkInput(e.target.value)}
+                className="h-10"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Feedback Link</label>
+              <Input
+                placeholder="https://forms.gle/..."
+                value={feedbackLinkInput}
+                onChange={(e) => setFeedbackLinkInput(e.target.value)}
+                className="h-10"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Recording Link</label>
+              <Input
+                placeholder="https://drive.google.com/..."
+                value={recordingLinkInput}
+                onChange={(e) => setRecordingLinkInput(e.target.value)}
+                className="h-10"
+              />
+            </div>
             <Button
-              className="mt-2 w-full bg-[#0E6049] hover:bg-[#0b4b3a]"
+              className="mt-2 w-full font-bold shadow-sm"
               disabled={savingLinks || !selectedIntern?.latestInterviewId || !meetingLinkInput.trim()}
               onClick={() => void handleSaveInterviewLinks()}
             >
-              <Link2 className="mr-2 h-4 w-4" />
-              {savingLinks ? "Saving..." : "Save Links"}
+              {savingLinks ? (
+                <>
+                  <Activity className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Update Links
+                </>
+              )}
             </Button>
             {!selectedIntern?.latestInterviewId && (
-              <p className="text-xs text-muted-foreground">
-                This intern has not applied for a Proposal vs Interview yet.
-              </p>
+              <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-700 border border-amber-200">
+                This intern has not applied for an interview yet. Links can only be updated for active applications.
+              </div>
             )}
           </div>
         </DialogContent>
@@ -2141,63 +2392,104 @@ export default function AdminInternsPage() {
           }
         }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Update Skill Ratings</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-amber-500" />
+              Skill Ratings
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Evaluate {selectedIntern?.name}'s performance across different categories (0-10).
+            </p>
           </DialogHeader>
-          <div className="grid gap-3">
-            <Input
-              placeholder="Communication"
-              type="number"
-              min={0}
-              max={10}
-              step="0.1"
-              value={communicationRating}
-              onChange={(e) => setCommunicationRating(e.target.value)}
-              onBlur={() => handleRatingBlur(communicationRating, setCommunicationRating)}
-            />
-            <Input
-              placeholder="Coding"
-              type="number"
-              min={0}
-              max={10}
-              step="0.1"
-              value={codingRating}
-              onChange={(e) => setCodingRating(e.target.value)}
-              onBlur={() => handleRatingBlur(codingRating, setCodingRating)}
-            />
-            <Input
-              placeholder="Aptitude"
-              type="number"
-              min={0}
-              max={10}
-              step="0.1"
-              value={aptitudeRating}
-              onChange={(e) => setAptitudeRating(e.target.value)}
-              onBlur={() => handleRatingBlur(aptitudeRating, setAptitudeRating)}
-            />
-            <Input
-              placeholder="AI Interview"
-              type="number"
-              min={0}
-              max={10}
-              step="0.1"
-              value={interviewRating}
-              onChange={(e) => setInterviewRating(e.target.value)}
-              onBlur={() => handleRatingBlur(interviewRating, setInterviewRating)}
-            />
-            <Input
-              placeholder="Findtern Score"
-              value={findternScore}
-              readOnly
-            />
+          <div className="grid gap-6 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Communication</label>
+                <Input
+                  placeholder="0.0"
+                  type="number"
+                  min={0}
+                  max={10}
+                  step="0.1"
+                  value={communicationRating}
+                  onChange={(e) => setCommunicationRating(e.target.value)}
+                  onBlur={() => handleRatingBlur(communicationRating, setCommunicationRating)}
+                  className="h-10 font-mono font-bold"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Coding</label>
+                <Input
+                  placeholder="0.0"
+                  type="number"
+                  min={0}
+                  max={10}
+                  step="0.1"
+                  value={codingRating}
+                  onChange={(e) => setCodingRating(e.target.value)}
+                  onBlur={() => handleRatingBlur(codingRating, setCodingRating)}
+                  className="h-10 font-mono font-bold"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Aptitude</label>
+                <Input
+                  placeholder="0.0"
+                  type="number"
+                  min={0}
+                  max={10}
+                  step="0.1"
+                  value={aptitudeRating}
+                  onChange={(e) => setAptitudeRating(e.target.value)}
+                  onBlur={() => handleRatingBlur(aptitudeRating, setAptitudeRating)}
+                  className="h-10 font-mono font-bold"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">AI Interview</label>
+                <Input
+                  placeholder="0.0"
+                  type="number"
+                  min={0}
+                  max={10}
+                  step="0.1"
+                  value={interviewRating}
+                  onChange={(e) => setInterviewRating(e.target.value)}
+                  onBlur={() => handleRatingBlur(interviewRating, setInterviewRating)}
+                  className="h-10 font-mono font-bold"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-primary/5 p-6 border border-primary/10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-primary/60">Calculated Findtern Score</p>
+                  <p className="text-sm text-muted-foreground">Average of all ratings</p>
+                </div>
+                <div className="text-4xl font-black text-primary tracking-tighter">
+                  {findternScore || "0.0"}
+                </div>
+              </div>
+            </div>
+
             <Button
-              className="mt-2 w-full bg-[#0E6049] hover:bg-[#0b4b3a]"
+              className="w-full font-bold shadow-md h-11"
               onClick={() => void handleSaveRatings()}
               disabled={savingRatings || !selectedIntern?.id}
             >
-              <Star className="mr-2 h-4 w-4" />
-              {savingRatings ? "Saving..." : "Save Ratings"}
+              {savingRatings ? (
+                <>
+                  <Activity className="mr-2 h-4 w-4 animate-spin" />
+                  Updating Ratings...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Save Changes
+                </>
+              )}
             </Button>
           </div>
         </DialogContent>
