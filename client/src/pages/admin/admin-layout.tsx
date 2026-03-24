@@ -76,7 +76,7 @@ import {
 
 } from "lucide-react";
 
-import findternLogo from "@assets/logo.png";
+import findternLogo from "@assets/logo-1.jpg";
 
 import React, { ReactNode } from "react";
 
@@ -424,12 +424,14 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
       <Sidebar className="border-r bg-white text-slate-900" collapsible="offcanvas">
 
         <SidebarHeader className="flex items-center gap-3 border-b px-4 py-4">
-
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 shadow-sm shrink-0">
-
-            <img src={findternLogo} alt="Findtern" className="h-7 w-7 rounded-md object-cover" />
-
-          </div>
+ <div className="flex justify-center" data-testid="logo-container">
+          <img
+            src={findternLogo}
+            alt="Findtern - Internship Simplified"
+            className=" w-auto"
+            data-testid="img-logo"
+          />
+        </div>
 
         </SidebarHeader>
 

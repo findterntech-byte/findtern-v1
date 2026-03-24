@@ -103,6 +103,7 @@ export default function AdminCompaniesPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<5 | 10 | 25 | 50>(10);
+  const [profileStatus, setProfileStatus] = useState<"all" | "complete" | "incomplete">("all");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -165,7 +166,7 @@ export default function AdminCompaniesPage() {
         },
         {
           key: "spocName" as const,
-          label: "SPOC Name",
+          label: "FPOC  Name",
           filterKey: "spocName" as const,
         },
         {
@@ -260,7 +261,7 @@ export default function AdminCompaniesPage() {
       try {
         setLoading(true);
         setError(null);
-        const res = await apiRequest("GET", "/api/admin/employers");
+        const res = await apiRequest("GET", `/api/admin/employers?profileStatus=${profileStatus}`);
         const json = await res.json();
         const list = (json?.employers ?? []) as any[];
 
@@ -330,7 +331,7 @@ export default function AdminCompaniesPage() {
     };
 
     void load();
-  }, []);
+  }, [profileStatus]);
 
   const formatDate = (raw: string | null) => {
     if (!raw) return "-";
@@ -692,6 +693,17 @@ export default function AdminCompaniesPage() {
                 className="h-10 pl-10"
               />
             </div>
+
+            <Select value={profileStatus} onValueChange={(v) => setProfileStatus(v as any)}>
+              <SelectTrigger className="h-10 w-full sm:w-[220px]">
+                <SelectValue placeholder="Filter by profile status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Profiles</SelectItem>
+                <SelectItem value="complete">Complete Profiles</SelectItem>
+                <SelectItem value="incomplete">Incomplete Profiles</SelectItem>
+              </SelectContent>
+            </Select>
 
             <Select
               value={sortBy}

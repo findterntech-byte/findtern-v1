@@ -11,9 +11,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
-import { ChevronDown, ChevronRight, Folder } from "lucide-react";
+import { ChevronDown, ChevronRight, Folder, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import logo from "@assets/logo-1.jpg";
 
 type Project = {
   id: string;
@@ -42,6 +44,7 @@ export default function AdminProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [employers, setEmployers] = useState<EmployerOption[]>([]);
   const [selectedEmployerId, setSelectedEmployerId] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [openCompanies, setOpenCompanies] = useState<Record<string, boolean>>({});
 
   const formatProjectLocation = (p: any) => {
@@ -128,9 +131,19 @@ export default function AdminProjectsPage() {
   }, []);
 
   const filtered = useMemo(() => {
-    if (selectedEmployerId === "all") return projects;
-    return projects.filter((p) => p.employerId === selectedEmployerId);
-  }, [projects, selectedEmployerId]);
+    let list = projects;
+    if (selectedEmployerId !== "all") {
+      list = list.filter((p) => p.employerId === selectedEmployerId);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter((p) => 
+        p.projectName.toLowerCase().includes(q) ||
+        p.skills.some(s => s.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [projects, selectedEmployerId, searchQuery]);
 
   const grouped = useMemo(() => {
     const groups = new Map<string, Project[]>();
@@ -158,27 +171,41 @@ export default function AdminProjectsPage() {
       title="Projects"
       description="View and filter all projects created by companies."
     >
+      <div className="mb-6 flex items-center gap-4">
+       
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Project Management</h1>
+          <p className="text-sm text-muted-foreground">Manage and track all internship projects</p>
+        </div>
+      </div>
+
       <Card className="border-none shadow-sm">
         <div className="flex flex-col gap-4 border-b px-6 py-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-sm font-medium text-muted-foreground">
-              All Projects
-            </h2>
-          </div>
-          <div className="w-full max-w-xs">
-            <Select value={selectedEmployerId} onValueChange={(v) => setSelectedEmployerId(v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select Company" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Companies</SelectItem>
-                {employers.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center flex-1">
+            <div className="relative w-full max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by project name or skills..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="w-full max-w-xs">
+              <Select value={selectedEmployerId} onValueChange={(v) => setSelectedEmployerId(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Companies" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Companies</SelectItem>
+                  {employers.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
         <div className="overflow-x-auto px-4 py-4">

@@ -495,6 +495,7 @@ export default function AdminDashboardPage() {
                 <Users className="h-6 w-6 text-primary" />
               </div>
             </div>
+            
           </Card>
 
           <Card className="p-6 cursor-pointer" onClick={() => setLocation("/admin/companies")}>

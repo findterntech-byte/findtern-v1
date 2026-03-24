@@ -19,7 +19,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { FileText } from "lucide-react";
+import { FileText, ExternalLink, TrendingUp, Users, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -64,6 +64,7 @@ type LoadedEmployer = {
   ifscCode?: string | null;
   swiftCode?: string | null;
   gstNumber?: string | null;
+  logoUrl?: string | null;
   setupCompleted?: boolean | null;
   onboardingCompleted?: boolean | null;
   isActive?: boolean | null;
@@ -75,9 +76,10 @@ export default function AdminCompanyDetailPage() {
   const [, params] = useRoute("/admin/companies/:id");
   const companyId = params?.id;
 
-  type TabKey = "projects" | "proposals" | "interviews" | "payments" | "upcomingPayments" | "hired";
-  const [activeTab, setActiveTab] = useState<TabKey>("projects");
+  type TabKey = "profile" | "projects" | "proposals" | "interviews" | "payments" | "upcomingPayments" | "hired";
+  const [activeTab, setActiveTab] = useState<TabKey>("profile");
   const [tabSearch, setTabSearch] = useState<Record<TabKey, string>>({
+    profile: "",
     projects: "",
     proposals: "",
     interviews: "",
@@ -86,6 +88,7 @@ export default function AdminCompanyDetailPage() {
     hired: "",
   });
   const [tabStatus, setTabStatus] = useState<Record<TabKey, string>>({
+    profile: "",
     projects: "",
     proposals: "",
     interviews: "",
@@ -94,6 +97,7 @@ export default function AdminCompanyDetailPage() {
     hired: "",
   });
   const [tabPage, setTabPage] = useState<Record<TabKey, number>>({
+    profile: 1,
     projects: 1,
     proposals: 1,
     interviews: 1,
@@ -123,6 +127,7 @@ export default function AdminCompanyDetailPage() {
   const [orders, setOrders] = useState<any[]>([]);
 
   const [markingReceivedId, setMarkingReceivedId] = useState<string>("");
+  const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -135,6 +140,7 @@ export default function AdminCompanyDetailPage() {
       try {
         setLoading(true);
         setError(null);
+        setLogoError(false);
 
         const [employerRes, projectsRes, proposalsRes, interviewsRes, ordersRes] = await Promise.all([
           apiRequest("GET", `/api/admin/employers/${companyId}`),
@@ -258,6 +264,7 @@ export default function AdminCompanyDetailPage() {
       setupCompleted: !!e.setupCompleted,
       onboardingCompleted: !!e.onboardingCompleted,
       isActive: (e as any)?.isActive !== false,
+      logoUrl: String(e.logoUrl ?? ""),
       gstNumber: String(e.gstNumber ?? ""),
       activeInternships,
       hiredResourcesCount,
@@ -480,6 +487,7 @@ export default function AdminCompanyDetailPage() {
   const toDisplayUrl = (raw: string) => {
     const v = String(raw ?? "").trim();
     if (!v) return "";
+    if (v.startsWith("/")) return v;
     if (/^https?:\/\//i.test(v)) return v;
     return `https://${v}`;
   };
@@ -549,275 +557,469 @@ export default function AdminCompanyDetailPage() {
 
   return (
     <AdminLayout
-      title="Company"
-      description="Complete record of a company's documents, projects, and interns."
+      title="Company Details"
+      description="Complete profile and history of the employer."
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.7fr),minmax(0,1.1fr)]">
-        <Card className="p-6">
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div className="min-w-0">
-                <h2 className="text-xl font-semibold truncate">{summary.companyName}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Contact: {summary.contactName}{summary.contactRole ? ` (${summary.contactRole})` : ""}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">Created: {summary.createdAt}</p>
+      <div className="flex flex-col gap-6">
+        {/* Top Header Card */}
+        <Card className="overflow-hidden border-none shadow-sm bg-gradient-to-br from-white to-slate-50">
+          <div className="p-6 md:p-8">
+            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <a
+                    href={summary.logoUrl ? toDisplayUrl(summary.logoUrl) : "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`h-16 w-16 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden border border-slate-100 transition-transform hover:scale-105 ${!summary.logoUrl ? "pointer-events-none" : "cursor-zoom-in"}`}
+                    title={summary.logoUrl ? "Click to preview logo" : ""}
+                  >
+                    {summary.logoUrl && !logoError ? (
+                      <img
+                        src={toDisplayUrl(summary.logoUrl)}
+                        alt={summary.companyName}
+                        className="h-full w-full object-contain"
+                        onError={() => setLogoError(true)}
+                      />
+                    ) : (
+                      <span className="text-primary font-bold text-2xl">{summary.companyName.charAt(0)}</span>
+                    )}
+                  </a>
+                  <div>
+                    <h1 className="text-2xl font-bold text-slate-900">{summary.companyName}</h1>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-none font-medium">
+                        ID: {companyId?.slice(0, 8)}...
+                      </Badge>
+                      {summary.onboardingCompleted ? (
+                        <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white border-none">
+                          Onboarding Completed
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
+                          Onboarding Pending
+                        </Badge>
+                      )}
+                      {summary.isActive ? (
+                        <Badge className="bg-blue-500 hover:bg-blue-600 text-white border-none">
+                          Active
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive" className="border-none">
+                          Deactivated
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <div className="flex items-center gap-1.5 text-slate-600">
+                    <FileText className="w-4 h-4" />
+                    <span>Projects: {projects.length}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-600">
+                    <TrendingUp className="w-4 h-4" />
+                    <span>Active Projects: {summary.activeInternships}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-600">
+                    <Users className="w-4 h-4" />
+                    <span>Hired: {summary.hiredResourcesCount}</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid gap-3 text-sm md:min-w-[320px] md:grid-cols-2">
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Email</p>
-                  <p className="break-words">{summary.email || "-"}</p>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Phone</p>
-                  <p className="break-words">{summary.phone || "-"}</p>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Location</p>
-                  <p className="break-words">{summary.location || "-"}</p>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Website</p>
-                  <p className="break-words">{summary.websiteUrl || "-"}</p>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Company size</p>
-                  <p className="break-words">{summary.companySize || "-"}</p>
+              <div className="flex flex-wrap gap-3">
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center min-w-[140px]">
+                  <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">Last Payment</p>
+                  <p className="text-lg font-bold text-slate-800 mt-1">
+                    {summary.lastPaymentAt ? formatDate(summary.lastPaymentAt) : "N/A"}
+                  </p>
+                  <Badge variant="outline" className="mt-1 text-[10px] text-emerald-600 border-emerald-100 bg-emerald-50">
+                    Setup Completed
+                  </Badge>
                 </div>
               </div>
             </div>
+          </div>
+        </Card>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border bg-background p-3">
-                <p className="text-xs text-muted-foreground">Active Projects</p>
-                <p className="mt-1 text-lg font-semibold">{summary.activeInternships}</p>
-              </div>
-              
-              <div className="rounded-lg border bg-background p-3">
-                <p className="text-xs text-muted-foreground">Conversion rate</p>
-                <p className="mt-1 text-lg font-semibold">{formatPercent(summary.conversionRate)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {summary.hiredResourcesCount} hired / {summary.totalProposals} proposals
-                </p>
+        {/* Charts Row */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card className="p-6 border-none shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">Projects split</h3>
+                <p className="text-xs text-slate-500">Active vs inactive projects</p>
               </div>
             </div>
-
-            <div className="flex flex-wrap gap-2">
-              {!summary.isActive && (
-                <Badge variant="outline" className="border-slate-400 bg-slate-50 text-slate-700">
-                  Deactivated
-                </Badge>
-              )}
-              <Badge variant="outline" className="border-emerald-500 bg-emerald-50 text-emerald-700">
-                {summary.onboardingCompleted ? "Onboarding Completed" : "Onboarding Pending"}
-              </Badge>
-              <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-700">
-                Projects: {projects.length}
-              </Badge>
-              <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-700">
-                Active Projects: {summary.activeInternships}
-              </Badge>
-              <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-700">
-                Hired resources: {summary.hiredResourcesCount}
-              </Badge>
-              <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-700">
-                Last payment: {formatDate(summary.lastPaymentAt)}
-              </Badge>
-              <Badge
-                variant="outline"
-                className={
-                  summary.setupCompleted
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                    : "border-amber-400 bg-amber-50 text-amber-700"
-                }
-              >
-                {summary.setupCompleted ? "Setup Completed" : "Setup Pending"}
-              </Badge>
+            <div className="h-[240px] w-full">
+              <ChartContainer config={charts.projectConfig as any} className="h-full w-full">
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent nameKey="key" />} />
+                  <Pie
+                    data={charts.projectSeries}
+                    dataKey="value"
+                    nameKey="key"
+                    innerRadius={65}
+                    outerRadius={95}
+                    paddingAngle={4}
+                    strokeWidth={0}
+                  >
+                    {charts.projectSeries.map((entry) => (
+                      <Cell key={entry.key} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <ChartLegend content={<ChartLegendContent nameKey="key" />} />
+                </PieChart>
+              </ChartContainer>
             </div>
-          </div>
-        </Card>
-      </div>
+          </Card>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <Card className="p-6">
-          <p className="text-sm font-medium text-muted-foreground">Projects split</p>
-          <p className="mt-1 text-xs text-muted-foreground">Active vs inactive projects</p>
-          <div className="mt-4">
-            <ChartContainer config={charts.projectConfig as any} className="h-[220px] w-full">
-              <PieChart>
-                <ChartTooltip content={<ChartTooltipContent nameKey="key" />} />
-                <Pie
-                  data={charts.projectSeries}
-                  dataKey="value"
-                  nameKey="key"
-                  innerRadius={55}
-                  outerRadius={85}
-                  paddingAngle={2}
+          <Card className="p-6 border-none shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">Payments split</h3>
+                <p className="text-xs text-slate-500">Paid vs pending vs failed</p>
+              </div>
+            </div>
+            <div className="h-[240px] w-full">
+              <ChartContainer config={charts.paymentConfig as any} className="h-full w-full">
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent nameKey="key" />} />
+                  <Pie
+                    data={charts.paymentSeries}
+                    dataKey="value"
+                    nameKey="key"
+                    innerRadius={65}
+                    outerRadius={95}
+                    paddingAngle={4}
+                    strokeWidth={0}
+                  >
+                    {charts.paymentSeries.map((entry) => (
+                      <Cell key={entry.key} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <ChartLegend content={<ChartLegendContent nameKey="key" />} />
+                </PieChart>
+              </ChartContainer>
+            </div>
+          </Card>
+        </div>
+
+        {/* Main Content Tabs */}
+        <Card className="border-none shadow-sm">
+          <Tabs
+            defaultValue="profile"
+            className="w-full"
+            onValueChange={(v) => setActiveTab(v as TabKey)}
+          >
+            <div className="border-b px-6 pt-4 bg-slate-50/50">
+              <TabsList className="flex w-fit bg-transparent gap-2 h-auto p-0">
+                <TabsTrigger
+                  value="profile"
+                  className="px-4 py-3 border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none transition-all"
                 >
-                  {charts.projectSeries.map((entry) => (
-                    <Cell key={entry.key} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <ChartLegend content={<ChartLegendContent nameKey="key" />} />
-              </PieChart>
-            </ChartContainer>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <p className="text-sm font-medium text-muted-foreground">Payments split</p>
-          <p className="mt-1 text-xs text-muted-foreground">Paid vs pending vs failed</p>
-          <div className="mt-4">
-            <ChartContainer config={charts.paymentConfig as any} className="h-[220px] w-full">
-              <PieChart>
-                <ChartTooltip content={<ChartTooltipContent nameKey="key" />} />
-                <Pie
-                  data={charts.paymentSeries}
-                  dataKey="value"
-                  nameKey="key"
-                  innerRadius={55}
-                  outerRadius={85}
-                  paddingAngle={2}
+                  Profile
+                </TabsTrigger>
+                <TabsTrigger
+                  value="projects"
+                  className="px-4 py-3 border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none transition-all"
                 >
-                  {charts.paymentSeries.map((entry) => (
-                    <Cell key={entry.key} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <ChartLegend content={<ChartLegendContent nameKey="key" />} />
-              </PieChart>
-            </ChartContainer>
-          </div>
-        </Card>
-      </div>
-
-      <Card className="mt-4">
-        <Tabs
-          defaultValue="projects"
-          className="w-full"
-          onValueChange={(v) => setActiveTab(v as TabKey)}
-        >
-          <TabsList className="mx-6 mt-4 flex w-fit flex-wrap bg-muted">
-            <TabsTrigger value="projects">Projects</TabsTrigger>
-            <TabsTrigger value="proposals">Proposals</TabsTrigger>
-            <TabsTrigger value="interviews">Interviews</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="upcomingPayments">Upcoming payments</TabsTrigger>
-            <TabsTrigger value="hired">Hired resources</TabsTrigger>
-          </TabsList>
-
-          <div className="mx-6 mt-4 flex flex-col gap-2 border-b pb-4 md:flex-row md:items-center md:justify-between">
-            <div className="text-sm font-medium text-muted-foreground capitalize">{activeTab} list</div>
-            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end md:w-auto">
-              <Input
-                className="h-10 w-full sm:w-[320px]"
-                placeholder={`Search ${activeTab}...`}
-                value={tabSearch[activeTab]}
-                onChange={(e) =>
-                  setTabSearch((prev) => ({
-                    ...prev,
-                    [activeTab]: e.target.value,
-                  }))
-                }
-              />
-
-              {activeTab === "projects" && (
-                <Input
-                  type="date"
-                  className="h-10 w-full sm:w-[170px]"
-                  value={projectsCreatedDate}
-                  onChange={(e) => setProjectsCreatedDate(e.target.value)}
-                />
-              )}
-
-              {activeTab !== "hired" && activeTab !== "upcomingPayments" && (
-                <Select
-                  value={tabStatus[activeTab] || "__all__"}
-                  onValueChange={(v) =>
-                    setTabStatus((prev) => ({
-                      ...prev,
-                      [activeTab]: v === "__all__" ? "" : v,
-                    }))
-                  }
+                  Projects
+                </TabsTrigger>
+                <TabsTrigger
+                  value="proposals"
+                  className="px-4 py-3 border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none transition-all"
                 >
-                  <SelectTrigger className="h-10 w-full sm:w-[180px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All status</SelectItem>
+                  Proposals
+                </TabsTrigger>
+                <TabsTrigger
+                  value="interviews"
+                  className="px-4 py-3 border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none transition-all"
+                >
+                  Interviews
+                </TabsTrigger>
+                <TabsTrigger
+                  value="payments"
+                  className="px-4 py-3 border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none transition-all"
+                >
+                  Payments
+                </TabsTrigger>
+                <TabsTrigger
+                  value="upcomingPayments"
+                  className="px-4 py-3 border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none transition-all"
+                >
+                  Upcoming payments
+                </TabsTrigger>
+                <TabsTrigger
+                  value="hired"
+                  className="px-4 py-3 border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none transition-all"
+                >
+                  Hired resources
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <div className="p-6">
+              {activeTab !== "profile" && (
+                <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
+                  <div className="text-lg font-bold text-slate-800 capitalize">
+                    {activeTab === "upcomingPayments" ? "Upcoming Payments" : activeTab} List
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative w-full sm:w-[320px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <Input
+                        className="h-10 pl-9 bg-white border-slate-200"
+                        placeholder={`Search ${activeTab}...`}
+                        value={tabSearch[activeTab]}
+                        onChange={(e) =>
+                          setTabSearch((prev) => ({
+                            ...prev,
+                            [activeTab]: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+
                     {activeTab === "projects" && (
-                      <>
-                        <SelectItem value="active">active</SelectItem>
-                        <SelectItem value="inactive">inactive</SelectItem>
-                        <SelectItem value="draft">draft</SelectItem>
-                      </>
+                      <Input
+                        type="date"
+                        className="h-10 w-full sm:w-[170px] bg-white border-slate-200"
+                        value={projectsCreatedDate}
+                        onChange={(e) => setProjectsCreatedDate(e.target.value)}
+                      />
                     )}
-                    {activeTab === "proposals" && (
-                      <>
-                        <SelectItem value="sent">sent</SelectItem>
-                        <SelectItem value="accepted">accepted</SelectItem>
-                        <SelectItem value="rejected">rejected</SelectItem>
-                        <SelectItem value="hired">hired</SelectItem>
-                      </>
+
+                    {activeTab !== "hired" && activeTab !== "upcomingPayments" && (
+                      <Select
+                        value={tabStatus[activeTab] || "__all__"}
+                        onValueChange={(v) =>
+                          setTabStatus((prev) => ({
+                            ...prev,
+                            [activeTab]: v === "__all__" ? "" : v,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-10 w-full sm:w-[180px] bg-white border-slate-200">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">All Status</SelectItem>
+                          {activeTab === "projects" && (
+                            <>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="inactive">Inactive</SelectItem>
+                              <SelectItem value="draft">Draft</SelectItem>
+                            </>
+                          )}
+                          {activeTab === "proposals" && (
+                            <>
+                              <SelectItem value="sent">Sent</SelectItem>
+                              <SelectItem value="accepted">Accepted</SelectItem>
+                              <SelectItem value="rejected">Rejected</SelectItem>
+                              <SelectItem value="hired">Hired</SelectItem>
+                            </>
+                          )}
+                          {activeTab === "interviews" && (
+                            <>
+                              <SelectItem value="scheduled">Scheduled</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </>
+                          )}
+                          {activeTab === "payments" && (
+                            <>
+                              <SelectItem value="paid">Paid</SelectItem>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="created">Created</SelectItem>
+                              <SelectItem value="failed">Failed</SelectItem>
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
                     )}
-                    {activeTab === "interviews" && (
-                      <>
-                        <SelectItem value="scheduled">scheduled</SelectItem>
-                        <SelectItem value="completed">completed</SelectItem>
-                        <SelectItem value="cancelled">cancelled</SelectItem>
-                      </>
-                    )}
-                    {activeTab === "payments" && (
-                      <>
-                        <SelectItem value="paid">paid</SelectItem>
-                        <SelectItem value="pending">pending</SelectItem>
-                        <SelectItem value="created">created</SelectItem>
-                        <SelectItem value="failed">failed</SelectItem>
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
+
+                    <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v) as 5 | 10 | 25 | 50)}>
+                      <SelectTrigger className="h-10 w-full sm:w-[140px] bg-white border-slate-200">
+                        <SelectValue placeholder="Rows" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5 / Page</SelectItem>
+                        <SelectItem value="10">10 / Page</SelectItem>
+                        <SelectItem value="25">25 / Page</SelectItem>
+                        <SelectItem value="50">50 / Page</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               )}
 
-              {activeTab === "upcomingPayments" && (
-                <Select
-                  value={tabStatus.upcomingPayments || "__all__"}
-                  onValueChange={(v) =>
-                    setTabStatus((prev) => ({
-                      ...prev,
-                      upcomingPayments: v === "__all__" ? "" : v,
-                    }))
-                  }
-                >
-                  <SelectTrigger className="h-10 w-full sm:w-[180px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All status</SelectItem>
-                    <SelectItem value="pending">pending</SelectItem>
-                    <SelectItem value="created">created</SelectItem>
-                    <SelectItem value="failed">failed</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
+              <TabsContent value="profile" className="m-0">
+                <div className="grid gap-8">
+                  {/* Company Info Section */}
+                  <div className="grid gap-6">
+                    <div className="flex items-center gap-2 border-b pb-2">
+                      <div className="w-1.5 h-6 bg-primary rounded-full" />
+                      <h4 className="text-lg font-bold text-slate-800">Company Information</h4>
+                    </div>
+                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
+                      <div className="space-y-1 sm:col-span-2">
+                        <p className="text-xs text-slate-500 font-medium">Company Logo</p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <a
+                            href={summary.logoUrl ? toDisplayUrl(summary.logoUrl) : "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`h-16 w-16 shrink-0 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden transition-transform hover:scale-105 ${!summary.logoUrl ? "pointer-events-none" : "cursor-zoom-in"}`}
+                            title={summary.logoUrl ? "Click to preview logo" : ""}
+                          >
+                            {summary.logoUrl && !logoError ? (
+                              <img
+                                src={toDisplayUrl(summary.logoUrl)}
+                                alt={summary.companyName}
+                                className="h-full w-full object-contain p-1"
+                                onError={() => setLogoError(true)}
+                              />
+                            ) : (
+                              <span className="text-slate-400 font-bold text-xl">{summary.companyName.charAt(0)}</span>
+                            )}
+                          </a>
+                          {summary.logoUrl && (
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Preview Link</p>
+                              <a
+                                href={toDisplayUrl(summary.logoUrl)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-primary hover:underline break-all flex items-center gap-1 font-medium mt-0.5"
+                              >
+                                {summary.logoUrl}
+                                <ExternalLink className="w-3 h-3 shrink-0" />
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-slate-500 font-medium">Company Name</p>
+                        <p className="font-semibold text-slate-900">{summary.companyName}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-slate-500 font-medium">Company Email</p>
+                        <p className="font-semibold text-slate-900">{summary.email || "-"}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-slate-500 font-medium">Website</p>
+                        {summary.websiteUrl ? (
+                          <a
+                            href={toDisplayUrl(summary.websiteUrl)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-semibold text-primary hover:underline flex items-center gap-1"
+                          >
+                            {summary.websiteUrl}
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <p className="font-semibold text-slate-900">-</p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-slate-500 font-medium">Company Size</p>
+                        <p className="font-semibold text-slate-900">{summary.companySize || "-"}</p>
+                      </div>
+                     
+                      <div className="space-y-1">
+                        <p className="text-xs text-slate-500 font-medium">Location</p>
+                        <p className="font-semibold text-slate-900">{summary.location || "-"}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-slate-500 font-medium">Country</p>
+                        <p className="font-semibold text-slate-900">{summary.country || "-"}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-slate-500 font-medium">Member Since</p>
+                        <p className="font-semibold text-slate-900">{summary.createdAt}</p>
+                      </div>
+                    </div>
+                  </div>
 
-              <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v) as 5 | 10 | 25 | 50)}>
-                <SelectTrigger className="h-10 w-full sm:w-[140px]">
-                  <SelectValue placeholder="Rows" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5">5 / page</SelectItem>
-                  <SelectItem value="10">10 / page</SelectItem>
-                  <SelectItem value="25">25 / page</SelectItem>
-                  <SelectItem value="50">50 / page</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+                  {/* Contacts Section */}
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {/* First Point of Contact */}
+                    <Card className="p-6 bg-slate-50/50 border-slate-100">
+                      <div className="flex items-center gap-2 mb-6">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                          <Users className="w-4 h-4" />
+                        </div>
+                        <h4 className="font-bold text-slate-800">First Point of Contact</h4>
+                      </div>
+                      <div className="grid gap-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Full Name</p>
+                            <p className="font-semibold text-slate-700 mt-0.5">{employer?.primaryContactName || "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Position / Role</p>
+                            <p className="font-semibold text-slate-700 mt-0.5">{employer?.primaryContactRole || "-"}</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Country Code</p>
+                            <p className="font-semibold text-slate-700 mt-0.5">{employer?.countryCode || "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Contact Number</p>
+                            <p className="font-semibold text-slate-700 mt-0.5">{employer?.phoneNumber || "-"}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
 
-          <TabsContent value="projects" className="px-6 pb-6 pt-4">
-            <div className="relative w-full overflow-auto rounded-lg border">
-              <Table className="min-w-[1100px]">
+                    {/* Escalation Contact */}
+                    <Card className="p-6 bg-slate-50/50 border-slate-100">
+                      <div className="flex items-center gap-2 mb-6">
+                        <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                          <Users className="w-4 h-4" />
+                        </div>
+                        <h4 className="font-bold text-slate-800">Escalation Contact <span className="text-xs font-normal text-slate-500">(Second Contact)</span></h4>
+                      </div>
+                      <div className="grid gap-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Name</p>
+                            <p className="font-semibold text-slate-700 mt-0.5">{employer?.escalationContactName || "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Email</p>
+                            <p className="font-semibold text-slate-700 mt-0.5 break-all">{employer?.escalationContactEmail || "-"}</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Position / Role</p>
+                            <p className="font-semibold text-slate-700 mt-0.5">{employer?.escalationContactRole || "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Phone</p>
+                            <p className="font-semibold text-slate-700 mt-0.5">{employer?.escalationContactPhone || "-"}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+
+                
+                </div>
+              </TabsContent>
+
+              <TabsContent value="projects" className="px-6 pb-6 pt-4">
+                <div className="relative w-full overflow-auto rounded-lg border">
+                  <Table className="min-w-[1100px]">
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow className="bg-background">
                   <TableHead>Project</TableHead>
@@ -1770,8 +1972,9 @@ export default function AdminCompanyDetailPage() {
               </Table>
             </div>
           </TabsContent>
+        </div>
 
-          <div className="px-6 pb-6">
+        <div className="px-6 pb-6">
             {!loading && (
               <div className="mt-4 flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
                 <div className="text-sm text-muted-foreground">
@@ -1813,6 +2016,7 @@ export default function AdminCompanyDetailPage() {
           </div>
         </Tabs>
       </Card>
+      </div>
     </AdminLayout>
   );
 }

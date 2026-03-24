@@ -5767,8 +5767,11 @@ export async function registerRoutes(
           const t = toMs((e as any)?.createdAt);
           return t != null && t >= start.getTime() && t < end.getTime();
         }).length;
-        const internshipsCount = Array.from(proposalPaidAtById.entries()).filter(([, paidAtMs]) => {
-          return paidAtMs >= start.getTime() && paidAtMs < end.getTime();
+        const internshipsCount = proposals.filter((p: any) => {
+          const status = String((p as any)?.status ?? "").trim().toLowerCase();
+          if (status !== "hired") return false;
+          const t = toMs((p as any)?.createdAt);
+          return t != null && t >= start.getTime() && t < end.getTime();
         }).length;
 
         const revenueEmployerMajor = (payments as any[])
@@ -9044,8 +9047,10 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/employers", requirePermission("companies:read"), async (_req, res) => {
+  app.get("/api/admin/employers", requirePermission("companies:read"), async (req, res) => {
     try {
+      const profileStatus = String(req.query.profileStatus ?? "all").trim().toLowerCase();
+
       const [employers, projects, payments, proposals] = await Promise.all([
         storage.getEmployers(),
         storage.getAllProjects().catch(() => [] as any[]),
@@ -9064,8 +9069,17 @@ export async function registerRoutes(
         const email = String((e as any)?.companyEmail ?? "").trim().toLowerCase();
         if (id === "admin") return false;
         if (email === "ai-interview@findtern.ai") return false;
+
+        if (profileStatus !== "all") {
+          const isComplete = e.onboardingCompleted;
+          if (profileStatus === "complete" && !isComplete) return false;
+          if (profileStatus === "incomplete" && isComplete) return false;
+        }
+
         return true;
       });
+
+      console.log("Visible Employers:", visibleEmployers);
 
       const activeInternshipsByEmployerId = new Map<string, number>();
       const projectById = new Map<string, any>();

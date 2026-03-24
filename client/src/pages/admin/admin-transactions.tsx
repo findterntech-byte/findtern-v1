@@ -106,6 +106,8 @@ export default function AdminTransactionsPage() {
   const [dateFilter, setDateFilter] = useState("all");
   const [currencyFilter, setCurrencyFilter] = useState("INR");
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   const downloadCsv = (rows: Transaction[], fileName: string) => {
@@ -170,7 +172,7 @@ export default function AdminTransactionsPage() {
   const { data, isLoading, error } = useQuery<AdminTransactionsResponse>({
     queryKey: [
       "/api/admin/transactions",
-      `?currency=${encodeURIComponent(currencyFilter)}&status=${encodeURIComponent(statusFilter)}&source=${encodeURIComponent(sourceFilter)}&q=${encodeURIComponent(searchQuery)}`,
+      `?currency=${encodeURIComponent(currencyFilter)}&status=${encodeURIComponent(statusFilter)}&source=${encodeURIComponent(sourceFilter)}&q=${encodeURIComponent(searchQuery)}&from=${encodeURIComponent(fromDate)}&to=${encodeURIComponent(toDate)}`,
     ],
   });
 
@@ -408,6 +410,39 @@ export default function AdminTransactionsPage() {
                   className="pl-10 text-sm h-9"
                 />
               </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">From</span>
+                  <Input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="h-9 w-[120px] sm:w-[140px] text-xs sm:text-sm"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">To</span>
+                  <Input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="h-9 w-[120px] sm:w-[140px] text-xs sm:text-sm"
+                  />
+                </div>
+                {(fromDate || toDate) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 px-2 text-muted-foreground"
+                    onClick={() => {
+                      setFromDate("");
+                      setToDate("");
+                    }}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
               <div className="flex gap-2 sm:gap-3">
                 <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
                   <SelectTrigger className="w-[105px] sm:w-[120px] h-9 text-xs sm:text-sm">
@@ -459,6 +494,7 @@ export default function AdminTransactionsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="text-xs whitespace-nowrap">S.No</TableHead>
                     <TableHead className="text-xs whitespace-nowrap">ID</TableHead>
                     <TableHead className="text-xs whitespace-nowrap">Date</TableHead>
                     <TableHead className="text-xs whitespace-nowrap hidden sm:table-cell">Description</TableHead>
@@ -469,13 +505,21 @@ export default function AdminTransactionsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTransactions.map((transaction) => (
+                  {filteredTransactions.map((transaction, index) => (
                     <TableRow key={transaction.id}>
+                      <TableCell className="text-xs py-2">{index + 1}</TableCell>
                       <TableCell className="font-mono text-xs py-2">{transaction.id}</TableCell>
                       <TableCell className="py-2">
                         <div>
                           <p className="text-xs sm:text-sm">{transaction.date}</p>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">{transaction.time}</p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">
+                            {new Date(transaction.createdAt).toLocaleTimeString("en-IN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                              hour12: true,
+                            })}
+                          </p>
                         </div>
                       </TableCell>
                       <TableCell className="py-2 hidden sm:table-cell max-w-[150px]">

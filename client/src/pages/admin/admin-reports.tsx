@@ -753,7 +753,7 @@ export default function AdminReportsPage() {
                       {employerBehaviorAnalytics?.avgHireTimeDays == null ? "-" : `${employerBehaviorAnalytics.avgHireTimeDays}d`}
                     </p>
                   </div>
-                  <div className="p-3 rounded-lg bg-muted/50">
+                  {/* <div className="p-3 rounded-lg bg-muted/50">
                     <p className="text-[10px] sm:text-xs text-muted-foreground">Drop-off Rate</p>
                     <p className="text-sm sm:text-base md:text-lg font-bold">
                       {employerBehaviorAnalytics ? `${employerBehaviorAnalytics.dropOffRate}%` : "-"}
@@ -763,7 +763,7 @@ export default function AdminReportsPage() {
                         {employerBehaviorAnalytics.dropOffEmployers}/{employerBehaviorAnalytics.activeEmployers}
                       </p>
                     ) : null}
-                  </div>
+                  </div> */}
                   <div className="p-3 rounded-lg bg-muted/50">
                     <p className="text-[10px] sm:text-xs text-muted-foreground">Repeat Employers</p>
                     <p className="text-sm sm:text-base md:text-lg font-bold">
@@ -873,7 +873,7 @@ export default function AdminReportsPage() {
                   <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Avg. Proposals/Intern</p>
                   <p className="text-lg sm:text-xl md:text-3xl font-bold mt-1 sm:mt-2 text-primary">{derived.avgAppsPerUser}</p>
                   <p className="text-[9px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
-                    Internship: {Number(derived.internshipProposalCount ?? 0).toLocaleString()} | Full-time: {Number(derived.fullTimeProposalCount ?? 0).toLocaleString()}
+                    Proposals: {Number(derived.internshipProposalCount ?? 0).toLocaleString()} | Full-time: {Number(derived.fullTimeProposalCount ?? 0).toLocaleString()}
                   </p>
                 </div>
               </Card>
@@ -1073,15 +1073,15 @@ export default function AdminReportsPage() {
               </Card>
               <Card className="p-3 sm:p-4 md:p-6">
                 <div className="text-center">
-                  <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Projects/Co.</p>
-                  <p className="text-lg sm:text-xl md:text-3xl font-bold mt-1 sm:mt-2 text-primary">{derived.projectsPerCompany}</p>
+                  <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Total Projects</p>
+                  <p className="text-lg sm:text-xl md:text-3xl font-bold mt-1 sm:mt-2 text-primary">{platformMetrics.activeProjects}</p>
                   <p className="text-[9px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">&nbsp;</p>
                 </div>
               </Card>
               <Card className="p-3 sm:p-4 md:p-6">
                 <div className="text-center">
-                  <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Hires/Co.</p>
-                  <p className="text-lg sm:text-xl md:text-3xl font-bold mt-1 sm:mt-2 text-purple-600">{derived.hiresPerCompany}</p>
+                  <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Total Hires</p>
+                  <p className="text-lg sm:text-xl md:text-3xl font-bold mt-1 sm:mt-2 text-purple-600">{platformMetrics.completedInternships}</p>
                   <p className="text-[9px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">&nbsp;</p>
                 </div>
               </Card>
