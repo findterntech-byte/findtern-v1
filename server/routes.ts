@@ -7058,6 +7058,48 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/proposals-tracker", requirePermission("interns:read"), async (_req, res) => {
+    try {
+      const [proposals, interviews, users, projects, employers] = await Promise.all([
+        storage.getAllProposals(),
+        storage.getAllInterviews(),
+        storage.getUsers(),
+        storage.getAllProjects(),
+        storage.getEmployers(),
+      ]);
+
+      const internUsersById = new Map<string, any>();
+      for (const u of users as any[]) {
+        if (String(u?.role ?? "").toLowerCase() === "intern") {
+          const { password, ...safeUser } = u;
+          internUsersById.set(String(u.id), safeUser);
+        }
+      }
+
+      const employersById = new Map<string, any>();
+      for (const e of employers as any[]) {
+        const { password, ...safeEmployer } = e;
+        employersById.set(String(e.id), safeEmployer);
+      }
+
+      const projectsById = new Map<string, any>();
+      for (const p of projects as any[]) {
+        projectsById.set(String(p.id), p);
+      }
+
+      return res.json({
+        proposals,
+        interviews,
+        interns: Array.from(internUsersById.values()),
+        employers: Array.from(employersById.values()),
+        projects: Array.from(projectsById.values()),
+      });
+    } catch (e: any) {
+      console.error("Failed to load proposals tracker data", e);
+      return res.status(500).json({ message: e.message || "Failed to load tracker data" });
+    }
+  });
+
   app.get("/api/admin/interns", requirePermission("interns:read"), async (_req, res) => {
     try {
       const [onboardingList, users, interviews, proposals, projects, payouts] = await Promise.all([

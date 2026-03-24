@@ -35,6 +35,16 @@ import {
   TrendingUp,
   Search,
   Filter,
+  ArrowUpRight,
+  ArrowDownRight,
+  UserPlus,
+  CheckCircle2,
+  Clock,
+  Download,
+  Calendar,
+  Building2,
+  ExternalLink,
+  ChevronRight,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -45,7 +55,10 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Area, AreaChart, Tooltip } from "recharts";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { AnimatedEmptyStateCard } from "../not-found";
 
 type AdminMetrics = {
   projects: {
@@ -463,776 +476,727 @@ export default function AdminDashboardPage() {
     URL.revokeObjectURL(url);
   };
 
+  const StatCard = ({
+    title,
+    value,
+    subValue,
+    icon: Icon,
+    onClick,
+    color,
+    trend,
+  }: {
+    title: string;
+    value: string | number;
+    subValue?: string;
+    icon: any;
+    onClick: () => void;
+    color: "blue" | "green" | "orange" | "purple" | "rose" | "emerald";
+    trend?: { value: string; positive: boolean };
+  }) => {
+    const colorClasses = {
+      blue: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 border-blue-100 dark:border-blue-800",
+      green: "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400 border-green-100 dark:border-green-800",
+      orange: "bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400 border-orange-100 dark:border-orange-800",
+      purple: "bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400 border-purple-100 dark:border-purple-800",
+      rose: "bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400 border-rose-100 dark:border-rose-800",
+      emerald: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800",
+    };
+
+    const iconClasses = {
+      blue: "bg-blue-100 text-blue-700 dark:bg-blue-800/40 dark:text-blue-300",
+      green: "bg-green-100 text-green-700 dark:bg-green-800/40 dark:text-green-300",
+      orange: "bg-orange-100 text-orange-700 dark:bg-orange-800/40 dark:text-orange-300",
+      purple: "bg-purple-100 text-purple-700 dark:bg-purple-800/40 dark:text-purple-300",
+      rose: "bg-rose-100 text-rose-700 dark:bg-rose-800/40 dark:text-rose-300",
+      emerald: "bg-emerald-100 text-emerald-700 dark:bg-emerald-800/40 dark:text-emerald-300",
+    };
+
+    return (
+      <Card
+        className={cn(
+          "relative overflow-hidden border p-5 transition-all duration-200 hover:shadow-lg group cursor-pointer",
+          "before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-gradient-to-r",
+          color === "blue" && "before:from-blue-500 before:to-blue-600",
+          color === "green" && "before:from-green-500 before:to-green-600",
+          color === "orange" && "before:from-orange-500 before:to-orange-600",
+          color === "purple" && "before:from-purple-500 before:to-purple-600",
+          color === "rose" && "before:from-rose-500 before:to-rose-600",
+          color === "emerald" && "before:from-emerald-500 before:to-emerald-600"
+        )}
+        onClick={onClick}
+      >
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-2xl font-bold tracking-tight">{value}</h3>
+              {trend && (
+                <span className={cn(
+                  "flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+                  trend.positive ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                )}>
+                  {trend.positive ? <ArrowUpRight className="h-2.5 w-2.5 mr-0.5" /> : <ArrowDownRight className="h-2.5 w-2.5 mr-0.5" />}
+                  {trend.value}
+                </span>
+              )}
+            </div>
+            {subValue && <p className="text-[11px] text-muted-foreground font-medium">{subValue}</p>}
+          </div>
+          <div className={cn("p-2.5 rounded-xl transition-transform duration-300 group-hover:scale-110", iconClasses[color])}>
+            <Icon className="h-5 w-5" />
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
+  const formatSafeDate = (dateStr: any) => {
+    if (!dateStr) return "-";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return String(dateStr);
+    return format(d, 'MMM dd, yyyy');
+  };
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-lg shadow-xl">
+          <p className="text-xs font-bold text-slate-500 mb-2">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <div key={index} className="flex items-center gap-2 mt-1">
+              <div className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+              <p className="text-xs font-medium">
+                <span className="text-muted-foreground">{entry.name}:</span> {entry.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <AdminLayout
       title="Dashboard"
       description="Monitor key metrics across interns, companies, and projects."
     >
-      <div className="py-2 space-y-6">
-        <div className="flex items-center justify-end">
-          <Button variant="outline" onClick={() => setLocation("/admin/reports")}>Reports</Button>
+      <div className="py-4 space-y-8 max-w-[1600px] mx-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Overview Statistics</h2>
+            <p className="text-sm text-muted-foreground">Detailed performance metrics of the platform</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" className="h-9 gap-2" onClick={() => setLocation("/admin/reports")}>
+              <Download className="h-4 w-4" />
+              Reports
+            </Button>
+            <Button size="sm" className="h-9 gap-2 bg-primary hover:bg-primary/90" onClick={() => setLocation("/admin/proposal-tracker")}>
+              <Calendar className="h-4 w-4" />
+              Activity Tracker
+            </Button>
+          </div>
         </div>
+
         {!dashboardLoading && !!dashboardError && (
-          <Card className="p-6">
-            <p className="text-sm text-red-600">{dashboardError}</p>
-          </Card>
-        )}
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="p-6 cursor-pointer" onClick={() => setLocation("/admin/interns")}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Interns</p>
-                <p className="text-2xl font-bold mt-1">
-                  {dashboardLoading ? "-" : stats.totalUsers}
-                </p>
-                {!dashboardLoading && stats.totalUsers !== totalSignups && totalSignups > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">of {totalSignups} signups</p>
-                )}
-              </div>
-              <div className="h-12 w-12 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
-                <Users className="h-6 w-6 text-primary" />
-              </div>
-            </div>
-            
-          </Card>
-
-          <Card className="p-6 cursor-pointer" onClick={() => setLocation("/admin/companies")}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Active Companies</p>
-                <p className="text-2xl font-bold mt-1">
-                  {dashboardLoading ? "-" : activeCompanies}
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
-                <Briefcase className="h-6 w-6 text-green-600 dark:text-green-400" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 cursor-pointer" onClick={() => setLocation("/admin/interns")}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Employer Scheduled Interviews</p>
-                <p className="text-2xl font-bold mt-1">
-                  {dashboardLoading ? "-" : stats.pendingApplications}
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-yellow-100 dark:bg-yellow-900/20 flex items-center justify-center">
-                <FileText className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 cursor-pointer" onClick={() => setLocation("/admin/interns")}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">AI Interviews Completed</p>
-                <p className="text-2xl font-bold mt-1">
-                  {dashboardLoading ? "-" : stats.completedInterviews}
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Selected interns</p>
-              <p className="text-xs text-muted-foreground">{selectedInternsFiltered.length} total</p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => exportHiredCsv(selectedInternsFiltered, "selected-interns.csv")}
-              >
-                Export
-              </Button>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <Input
-              value={selectedInternsQ}
-              onChange={(e) => setSelectedInternsQ(e.target.value)}
-              placeholder="Filter by intern / company / project / email"
-              className="h-10 sm:max-w-[360px]"
-            />
-            <Select
-              value={String(hiredPageSize)}
-              onValueChange={(v) => setHiredPageSize(Math.max(1, Math.floor(Number(v) || 10)))}
-            >
-              <SelectTrigger className="h-10 w-full sm:w-[140px]">
-                <SelectValue placeholder="Page size" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">5 / page</SelectItem>
-                <SelectItem value="10">10 / page</SelectItem>
-                <SelectItem value="20">20 / page</SelectItem>
-                <SelectItem value="50">50 / page</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="mt-4 overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Intern</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Offer</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {selectedInternsPaged.items.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
-                      No selected interns found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  selectedInternsPaged.items.map((row: any) => (
-                    <TableRow key={row.proposalId}>
-                      <TableCell className="whitespace-nowrap">
-                        <div className="font-medium">{row.internName}</div>
-                        <div className="text-xs text-muted-foreground">{row.internEmail}</div>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">{row.companyName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{row.projectName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{String(row.status ?? "-")}</TableCell>
-                      <TableCell className="whitespace-nowrap text-xs">{normalizeOfferSummary(row) || "-"}</TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setLocation(`/admin/interns/${encodeURIComponent(row.internId)}`)}
-                          >
-                            View intern
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => setLocation(`/admin/companies/${encodeURIComponent(row.employerId)}`)}
-                            style={{ backgroundColor: "#0E6049" }}
-                          >
-                            View company
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          <div className="mt-4 flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              Page {selectedInternsPaged.page} of {selectedInternsPaged.pageCount}
+          <Card className="p-6 border-red-100 bg-red-50 dark:bg-red-950/10">
+            <p className="text-sm text-red-600 flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-red-600" />
+              {dashboardError}
             </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedInternsPage((p) => Math.max(1, p - 1))}
-                disabled={selectedInternsPaged.page <= 1}
-              >
-                Prev
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedInternsPage((p) => Math.min(selectedInternsPaged.pageCount, p + 1))}
-                disabled={selectedInternsPaged.page >= selectedInternsPaged.pageCount}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        </Card> */}
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Full-time hired interns</p>
-                <p className="text-xs text-muted-foreground">{hiredFullTimeFiltered.length} total</p>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => exportHiredCsv(hiredFullTimeFiltered, "full-time-hired-interns.csv")}
-                >
-                  Export
-                </Button>
-              </div>
-            </div>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <Input
-                value={hiredFullTimeQ}
-                onChange={(e) => setHiredFullTimeQ(e.target.value)}
-                placeholder="Filter by intern / company / project / email"
-                className="h-10 sm:max-w-[360px]"
-              />
-              <Select
-                value={String(hiredPageSize)}
-                onValueChange={(v) => setHiredPageSize(Math.max(1, Math.floor(Number(v) || 10)))}
-              >
-                <SelectTrigger className="h-10 w-full sm:w-[140px]">
-                  <SelectValue placeholder="Page size" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5">5 / page</SelectItem>
-                  <SelectItem value="10">10 / page</SelectItem>
-                  <SelectItem value="20">20 / page</SelectItem>
-                  <SelectItem value="50">50 / page</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="mt-4 overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Intern</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Project</TableHead>
-                    <TableHead>Offer</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {hiredFullTimePaged.items.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
-                        No full-time hires found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    hiredFullTimePaged.items.map((row) => {
-                      const offerText = normalizeOfferSummary(row);
-                      return (
-                        <TableRow key={row.proposalId}>
-                          <TableCell className="whitespace-nowrap">
-                            <div className="font-medium">{row.internName}</div>
-                            <div className="text-xs text-muted-foreground">{row.internEmail}</div>
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">{row.companyName}</TableCell>
-                          <TableCell className="whitespace-nowrap">{row.projectName}</TableCell>
-                          <TableCell className="whitespace-nowrap text-xs">
-                            {offerText || "-"}
-                          </TableCell>
-                          <TableCell className="text-right whitespace-nowrap">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setLocation(`/admin/interns/${encodeURIComponent(row.internId)}`)}
-                              >
-                                View intern
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => setLocation(`/admin/companies/${encodeURIComponent(row.employerId)}`)}
-                                style={{ backgroundColor: "#0E6049" }}
-                              >
-                                View company
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                Page {hiredFullTimePaged.page} of {hiredFullTimePaged.pageCount}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setHiredFullTimePage((p) => Math.max(1, p - 1))}
-                  disabled={hiredFullTimePaged.page <= 1}
-                >
-                  Prev
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setHiredFullTimePage((p) => Math.min(hiredFullTimePaged.pageCount, p + 1))}
-                  disabled={hiredFullTimePaged.page >= hiredFullTimePaged.pageCount}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Internship hired interns</p>
-                <p className="text-xs text-muted-foreground">{hiredInternshipFiltered.length} total</p>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => exportHiredCsv(hiredInternshipFiltered, "internship-hired-interns.csv")}
-                >
-                  Export
-                </Button>
-              </div>
-            </div>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <Input
-                value={hiredInternshipQ}
-                onChange={(e) => setHiredInternshipQ(e.target.value)}
-                placeholder="Filter by intern / company / project / email"
-                className="h-10 sm:max-w-[360px]"
-              />
-              <Select
-                value={String(hiredPageSize)}
-                onValueChange={(v) => setHiredPageSize(Math.max(1, Math.floor(Number(v) || 10)))}
-              >
-                <SelectTrigger className="h-10 w-full sm:w-[140px]">
-                  <SelectValue placeholder="Page size" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5">5 / page</SelectItem>
-                  <SelectItem value="10">10 / page</SelectItem>
-                  <SelectItem value="20">20 / page</SelectItem>
-                  <SelectItem value="50">50 / page</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="mt-4 overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Intern</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Project</TableHead>
-                    <TableHead>Offer</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {hiredInternshipPaged.items.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
-                        No internship hires found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    hiredInternshipPaged.items.map((row) => {
-                      const offerText = normalizeOfferSummary(row);
-                      return (
-                        <TableRow key={row.proposalId}>
-                          <TableCell className="whitespace-nowrap">
-                            <div className="font-medium">{row.internName}</div>
-                            <div className="text-xs text-muted-foreground">{row.internEmail}</div>
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">{row.companyName}</TableCell>
-                          <TableCell className="whitespace-nowrap">{row.projectName}</TableCell>
-                          <TableCell className="whitespace-nowrap text-xs">
-                            {offerText || "-"}
-                          </TableCell>
-                          <TableCell className="text-right whitespace-nowrap">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setLocation(`/admin/interns/${encodeURIComponent(row.internId)}`)}
-                              >
-                                View intern
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => setLocation(`/admin/companies/${encodeURIComponent(row.employerId)}`)}
-                                style={{ backgroundColor: "#0E6049" }}
-                              >
-                                View company
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                Page {hiredInternshipPaged.page} of {hiredInternshipPaged.pageCount}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setHiredInternshipPage((p) => Math.max(1, p - 1))}
-                  disabled={hiredInternshipPaged.page <= 1}
-                >
-                  Prev
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setHiredInternshipPage((p) => Math.min(hiredInternshipPaged.pageCount, p + 1))}
-                  disabled={hiredInternshipPaged.page >= hiredInternshipPaged.pageCount}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Card className="p-6 cursor-pointer" onClick={() => setLocation("/admin/projects")}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Projects Offering Full-Time</p>
-                <p className="text-2xl font-bold mt-1">
-                  {metricsLoading ? "-" : String(metrics?.projects?.fullTimeOfferCount ?? 0)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  of {metricsLoading ? "-" : String(metrics?.projects?.total ?? 0)} total projects
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center">
-                <Briefcase className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Hiring Duration</p>
-                <p className="text-2xl font-bold mt-1">
-                  {metricsLoading
-                    ? "-"
-                    : metrics?.hiring?.overallAverageDays == null
-                      ? "-"
-                      : `${metrics.hiring.overallAverageDays} days`}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">From proposal sent to accepted</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-sky-100 dark:bg-sky-900/20 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-sky-600 dark:text-sky-400" />
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {!metricsLoading && !!metricsError && (
-          <Card className="p-6">
-            <p className="text-sm text-red-600">{metricsError}</p>
           </Card>
         )}
 
-       
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Total Interns"
+            value={dashboardLoading ? "..." : stats.totalUsers}
+            subValue={!dashboardLoading && totalSignups > 0 ? `Total signups: ${totalSignups}` : undefined}
+            icon={Users}
+            color="blue"
+            onClick={() => setLocation("/admin/interns")}
+          />
+
+          <StatCard
+            title="Active Companies"
+            value={dashboardLoading ? "..." : activeCompanies}
+            subValue="Actively hiring"
+            icon={Building2}
+            color="emerald"
+            onClick={() => setLocation("/admin/companies")}
+          />
+
+          <StatCard
+            title="Scheduled Interviews"
+            value={dashboardLoading ? "..." : stats.pendingApplications}
+            subValue="Employer scheduled"
+            icon={Clock}
+            color="orange"
+            onClick={() => setLocation("/admin/interns")}
+          />
+
+          <StatCard
+            title="AI Interviews"
+            value={dashboardLoading ? "..." : stats.completedInterviews}
+            subValue="Successfully completed"
+            icon={CheckCircle2}
+            color="purple"
+            onClick={() => setLocation("/admin/interns")}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <StatCard
+            title="Full-Time Opportunities"
+            value={metricsLoading ? "..." : metrics?.projects?.fullTimeOfferCount ?? 0}
+            subValue={`of ${metricsLoading ? "..." : metrics?.projects?.total ?? 0} total projects`}
+            icon={Briefcase}
+            color="green"
+            onClick={() => setLocation("/admin/projects")}
+          />
+
+          <StatCard
+            title="Avg Hiring Speed"
+            value={metricsLoading ? "..." : metrics?.hiring?.overallAverageDays == null ? "-" : `${metrics.hiring.overallAverageDays} days`}
+            subValue="Proposal to acceptance"
+            icon={TrendingUp}
+            color="rose"
+            onClick={() => {}}
+          />
+        </div>
 
         {/* Analytics row */}
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr),minmax(0,1.3fr)]">
-          <Card className="p-6">
-            <div className="flex items-center justify-between gap-2">
+        <div className="grid gap-5 lg:grid-cols-3">
+          <Card className="p-6 lg:col-span-2 shadow-sm border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between mb-8">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Total Proposals vs AI Interviews
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Last 6 months
-                </p>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Activity Trends</h3>
+                <p className="text-2xl font-bold tracking-tight mt-1">Proposals vs AI Interviews</p>
               </div>
+              <Badge variant="outline" className="px-2 py-1 text-[10px] font-bold">LAST 6 MONTHS</Badge>
             </div>
-            <div className="h-64 sm:h-72">
-              <ChartContainer config={trendConfig}>
-                <ResponsiveContainer>
-                  <LineChart data={applicationsTrendData} margin={{ left: 10, right: 10 }}>
-                    <XAxis
-                      dataKey="month"
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                      tick={{ fontSize: 10 }}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                      tickFormatter={(v) => `${v}`}
-                      tick={{ fontSize: 10 }}
-                    />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <ChartLegend content={<ChartLegendContent />} />
-                    <Line
-                      type="monotone"
-                      dataKey="applications"
-                      stroke="var(--color-applications)"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="interviews"
-                      stroke="var(--color-interviews)"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </ChartContainer>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={applicationsTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorApps" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorInts" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis 
+                    dataKey="month" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }}
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area 
+                    type="monotone" 
+                    dataKey="applications" 
+                    name="Proposals"
+                    stroke="#3b82f6" 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#colorApps)" 
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="interviews" 
+                    name="AI Interviews"
+                    stroke="#8b5cf6" 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#colorInts)" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex items-center justify-center gap-6 mt-6">
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 rounded-full bg-blue-500" />
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Proposals</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 rounded-full bg-purple-500" />
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-400">AI Interviews</span>
+              </div>
             </div>
           </Card>
 
-          <Card className="p-6">
-            <div className="flex items-center justify-between gap-2">
+          <Card className="p-6 shadow-sm border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between mb-8">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Intern Conversion Funnel
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  From signup to selection (Unique interns)
-                </p>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">User Flow</h3>
+                <p className="text-2xl font-bold tracking-tight mt-1">Conversion Funnel</p>
+              </div>
+              <div className="p-2 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                <TrendingUp className="h-4 w-4 text-slate-400" />
               </div>
             </div>
-            <div className="mt-4 h-64 sm:h-72">
-              <ChartContainer config={funnelConfig}>
-                <ResponsiveContainer>
-                  <BarChart data={funnelDataDisplay} layout="vertical" margin={{ left: 10, right: 20 }}>
-                    <XAxis type="number" hide />
-                    <YAxis
-                      dataKey="stage"
-                      type="category"
-                      tickLine={false}
-                      axisLine={false}
-                      width={100}
-                      tick={{ fontSize: 10 }}
-                    />
-                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                    <Bar
-                      dataKey="value"
-                      radius={[0, 4, 4, 0]}
-                      fill="var(--color-value)"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
+            <div className="space-y-6">
+              {funnelDataDisplay.map((item, idx) => {
+                const maxValue = Math.max(...funnelDataDisplay.map(d => d.value));
+                const percentage = (item.value / maxValue) * 100;
+                const colors = ["bg-blue-500", "bg-indigo-500", "bg-purple-500", "bg-pink-500", "bg-rose-500"];
+                
+                return (
+                  <div key={idx} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-tight">{item.stage}</span>
+                      <span className="text-sm font-bold">{item.value}</span>
+                    </div>
+                    <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className={cn("h-full rounded-full transition-all duration-1000", colors[idx % colors.length])}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Tracking unique interns progressing through each stage from initial signup to final selection.
+              </p>
+            </div>
+          </Card>
+        </div>
+
+        {/* Hired Interns Sections */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card className="shadow-sm border-slate-200 dark:border-slate-800">
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Placement Success</h3>
+                <p className="text-lg font-bold mt-1">Full-time Hires</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-2 text-xs font-bold"
+                onClick={() => exportHiredCsv(hiredFullTimeFiltered, "full-time-hired-interns.csv")}
+              >
+                <Download className="h-3 w-3" />
+                CSV
+              </Button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    value={hiredFullTimeQ}
+                    onChange={(e) => setHiredFullTimeQ(e.target.value)}
+                    placeholder="Search by intern, company..."
+                    className="h-9 pl-8 text-xs"
+                  />
+                </div>
+                <Select
+                  value={String(hiredPageSize)}
+                  onValueChange={(v) => setHiredPageSize(Number(v))}
+                >
+                  <SelectTrigger className="h-9 w-[80px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="rounded-lg border border-slate-100 dark:border-slate-800 overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="h-9 text-[10px] font-bold uppercase">Intern</TableHead>
+                      <TableHead className="h-9 text-[10px] font-bold uppercase">Company</TableHead>
+                      <TableHead className="h-9 text-[10px] font-bold uppercase text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {hiredFullTimePaged.items.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="h-24 text-center text-xs text-muted-foreground">
+                          No records found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      hiredFullTimePaged.items.map((row) => (
+                        <TableRow key={row.proposalId} className="group">
+                          <TableCell className="py-3">
+                            <div className="font-bold text-xs">{row.internName}</div>
+                            <div className="text-[10px] text-muted-foreground">{row.projectName}</div>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <div className="text-xs font-medium">{row.companyName}</div>
+                            <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                              {row.currency} {row.offerDetails?.monthlyAmount || row.offerDetails?.monthly_amount || "-"}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3 text-right">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 group-hover:bg-slate-100 dark:group-hover:bg-slate-800"
+                              onClick={() => setLocation(`/admin/interns/${encodeURIComponent(row.internId)}`)}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase">
+                  Page {hiredFullTimePaged.page} / {hiredFullTimePaged.pageCount}
+                </p>
+                <div className="flex gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={() => setHiredFullTimePage(p => Math.max(1, p - 1))}
+                    disabled={hiredFullTimePaged.page <= 1}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5 rotate-180" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={() => setHiredFullTimePage(p => Math.min(hiredFullTimePaged.pageCount, p + 1))}
+                    disabled={hiredFullTimePaged.page >= hiredFullTimePaged.pageCount}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="shadow-sm border-slate-200 dark:border-slate-800">
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Internship Program</h3>
+                <p className="text-lg font-bold mt-1">Internship Hires</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-2 text-xs font-bold"
+                onClick={() => exportHiredCsv(hiredInternshipFiltered, "internship-hired-interns.csv")}
+              >
+                <Download className="h-3 w-3" />
+                CSV
+              </Button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    value={hiredInternshipQ}
+                    onChange={(e) => setHiredInternshipQ(e.target.value)}
+                    placeholder="Search by intern, company..."
+                    className="h-9 pl-8 text-xs"
+                  />
+                </div>
+                <Select
+                  value={String(hiredPageSize)}
+                  onValueChange={(v) => setHiredPageSize(Number(v))}
+                >
+                  <SelectTrigger className="h-9 w-[80px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="rounded-lg border border-slate-100 dark:border-slate-800 overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="h-9 text-[10px] font-bold uppercase">Intern</TableHead>
+                      <TableHead className="h-9 text-[10px] font-bold uppercase">Company</TableHead>
+                      <TableHead className="h-9 text-[10px] font-bold uppercase text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {hiredInternshipPaged.items.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="h-24 text-center text-xs text-muted-foreground">
+                          No records found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      hiredInternshipPaged.items.map((row) => (
+                        <TableRow key={row.proposalId} className="group">
+                          <TableCell className="py-3">
+                            <div className="font-bold text-xs">{row.internName}</div>
+                            <div className="text-[10px] text-muted-foreground">{row.projectName}</div>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <div className="text-xs font-medium">{row.companyName}</div>
+                            <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold">
+                              {row.offerDetails?.duration || row.offerDetails?.internshipDuration || "-"} Months
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3 text-right">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 group-hover:bg-slate-100 dark:group-hover:bg-slate-800"
+                              onClick={() => setLocation(`/admin/interns/${encodeURIComponent(row.internId)}`)}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase">
+                  Page {hiredInternshipPaged.page} / {hiredInternshipPaged.pageCount}
+                </p>
+                <div className="flex gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={() => setHiredInternshipPage(p => Math.max(1, p - 1))}
+                    disabled={hiredInternshipPaged.page <= 1}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5 rotate-180" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={() => setHiredInternshipPage(p => Math.min(hiredInternshipPaged.pageCount, p + 1))}
+                    disabled={hiredInternshipPaged.page >= hiredInternshipPaged.pageCount}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
             </div>
           </Card>
         </div>
 
         {/* Users Management */}
-        <Card>
-          <div className="p-6 border-b">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Intern Management</h2>
-              <Button
-                style={{ backgroundColor: '#0E6049' }}
-                onClick={() => setLocation("/admin/interns")}
-              >
-                View All
-              </Button>
+        <Card className="shadow-sm border-slate-200 dark:border-slate-800 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">Intern Management</h2>
+              <p className="text-sm text-muted-foreground mt-1">Manage all registered interns and their application status</p>
             </div>
+            <Button
+              className="h-9 bg-[#0E6049] hover:bg-[#0E6049]/90 font-bold"
+              onClick={() => setLocation("/admin/interns")}
+            >
+              Full Directory
+            </Button>
           </div>
           <div className="p-6">
-            <div className="flex gap-4 mb-4">
-              <div className="relative flex-1">
+            <div className="flex flex-wrap gap-3 mb-6">
+              <div className="relative flex-1 min-w-[240px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search interns..."
+                  placeholder="Search by name, email, phone..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-10 shadow-sm"
                 />
               </div>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[180px]">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-wrap gap-2">
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="w-[140px] h-10 shadow-sm">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              <Select value={filterProfile} onValueChange={(v) => setFilterProfile(v as any)}>
-                <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder="Profile status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Profiles</SelectItem>
-                  <SelectItem value="complete">Profile Complete</SelectItem>
-                  <SelectItem value="incomplete">Profile Incomplete</SelectItem>
-                </SelectContent>
-              </Select>
+                <Select value={filterProfile} onValueChange={(v) => setFilterProfile(v as any)}>
+                  <SelectTrigger className="w-[160px] h-10 shadow-sm">
+                    <SelectValue placeholder="Profile" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Profiles</SelectItem>
+                    <SelectItem value="complete">Complete</SelectItem>
+                    <SelectItem value="incomplete">Incomplete</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              <Select value={filterLive} onValueChange={(v) => setFilterLive(v as any)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Live status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All (Live/Hidden)</SelectItem>
-                  <SelectItem value="live">Live</SelectItem>
-                  <SelectItem value="hidden">Hidden</SelectItem>
-                </SelectContent>
-              </Select>
+                <Select value={filterLive} onValueChange={(v) => setFilterLive(v as any)}>
+                  <SelectTrigger className="w-[140px] h-10 shadow-sm">
+                    <SelectValue placeholder="Visibility" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All (Live/Hidden)</SelectItem>
+                    <SelectItem value="live">Live</SelectItem>
+                    <SelectItem value="hidden">Hidden</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              <Select value={filterOnboardingStatus} onValueChange={(v) => setFilterOnboardingStatus(v as any)}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Onboarding status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All onboarding</SelectItem>
-                  <SelectItem value="onboarded">Onboarded</SelectItem>
-                  <SelectItem value="not_onboarded">Not onboarded</SelectItem>
-                </SelectContent>
-              </Select>
+                <Select value={filterOnboardingStatus} onValueChange={(v) => setFilterOnboardingStatus(v as any)}>
+                  <SelectTrigger className="w-[160px] h-10 shadow-sm">
+                    <SelectValue placeholder="Onboarding" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All onboarding</SelectItem>
+                    <SelectItem value="onboarded">Onboarded</SelectItem>
+                    <SelectItem value="not_onboarded">Not onboarded</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {!dashboardLoading && filterProfile === "all" && (incompleteProfiles > 0 || totalSignups > stats.totalUsers) && (
-              <p className="mb-3 text-xs text-muted-foreground">
-                Total signups: {totalSignups}. Profile incomplete: {incompleteProfiles}.
-              </p>
+              <div className="mb-4 flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-lg">
+                <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300 uppercase tracking-wider">
+                  Attention: {incompleteProfiles} interns have incomplete profiles out of {totalSignups} total signups.
+                </p>
+              </div>
             )}
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>SR No</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Created On</TableHead>
-                  <TableHead>Onboarding</TableHead>
-                  <TableHead>Live/Hidden</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>My Proposals</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user, idx) => (
-                  <TableRow key={user.id}>
-                    <TableCell>{internFrom + idx}</TableCell>
-                    <TableCell className="font-medium">{user.name}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {user.phoneNumber ? `${user.countryCode || "+91"} ${user.phoneNumber}` : "-"}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">{String((user as any)?.createdAt ?? user.joined ?? "-")}</TableCell>
-                    <TableCell className="whitespace-nowrap">{String((user as any)?.onboardingStatus ?? "-")}</TableCell>
-                    <TableCell className="whitespace-nowrap">{String((user as any)?.liveStatus ?? "-")}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={user.status === "active" ? "default" : "secondary"}
-                      >
-                        {user.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{user.applications}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {/* <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedIntern(user);
-                            setInternDialogOpen(true);
-                          }}
-                        >
-                          View
-                        </Button> */}
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            if (!user.id) return;
-                            setLocation(`/admin/interns/${encodeURIComponent(user.id)}`);
-                          }}
-                          style={{ backgroundColor: "#0E6049" }}
-                        >
-                          view
-                        </Button>
-                      </div>
-                    </TableCell>
+            <div className="rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
+              <Table>
+                <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
+                  <TableRow>
+                    <TableHead className="font-bold uppercase text-[10px]">Intern</TableHead>
+                    <TableHead className="font-bold uppercase text-[10px]">Contact Info</TableHead>
+                    <TableHead className="font-bold uppercase text-[10px]">Activity</TableHead>
+                    <TableHead className="font-bold uppercase text-[10px]">Status</TableHead>
+                    <TableHead className="font-bold uppercase text-[10px] text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {users.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-32 text-center text-sm text-muted-foreground">
+                        No interns found matching your criteria
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    users.map((user) => (
+                      <TableRow key={user.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-sm">{user.name}</span>
+                            <span className="text-[11px] text-muted-foreground">Joined: {formatSafeDate((user as any)?.createdAt || user.joined)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs font-medium">{user.email}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {user.phoneNumber ? `${user.countryCode || "+91"} ${user.phoneNumber}` : "No phone"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-4">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold">{user.applications}</span>
+                              <span className="text-[10px] text-muted-foreground uppercase font-medium">Proposals</span>
+                            </div>
+                            <div className="h-8 w-[1px] bg-slate-100 dark:bg-slate-800" />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold">{(user as any)?.onboardingStatus === 'onboarded' ? 'Yes' : 'No'}</span>
+                              <span className="text-[10px] text-muted-foreground uppercase font-medium">Onboarded</span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1.5">
+                            <Badge
+                              className={cn(
+                                "w-fit text-[10px] font-bold px-2 py-0.5 uppercase",
+                                user.status === "active" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                              )}
+                            >
+                              {user.status}
+                            </Badge>
+                            <span className={cn(
+                              "text-[10px] font-bold uppercase",
+                              (user as any)?.liveStatus === 'live' ? "text-blue-600 dark:text-blue-400" : "text-slate-400"
+                            )}>
+                              • {(user as any)?.liveStatus || 'hidden'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            className="h-8 bg-slate-900 dark:bg-slate-100 dark:text-slate-900 hover:bg-slate-800 gap-2 font-bold text-[11px]"
+                            onClick={() => setLocation(`/admin/interns/${encodeURIComponent(user.id)}`)}
+                          >
+                            View Profile
+                            <ChevronRight className="h-3 w-3" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
 
-            <Dialog
-              open={internDialogOpen}
-              onOpenChange={(open) => {
-                setInternDialogOpen(open);
-                if (!open) setSelectedIntern(null);
-              }}
-            >
-              <DialogContent className="max-w-[900px]">
-                <DialogHeader>
-                  <DialogTitle>Intern details</DialogTitle>
-                </DialogHeader>
-                <ScrollArea className="h-[60vh] w-full rounded-md border bg-muted/10 p-3">
-                  <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
-                    {selectedIntern ? JSON.stringify(selectedIntern, null, 2) : "-"}
-                  </pre>
-                </ScrollArea>
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      if (!selectedIntern) return;
-                      try {
-                        await navigator.clipboard.writeText(JSON.stringify(selectedIntern, null, 2));
-                      } catch {
-                        // ignore
-                      }
-                    }}
-                    disabled={!selectedIntern}
-                  >
-                    Copy
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs text-muted-foreground">
-                Showing {internFrom}-{internTo} of {internsTotal}
+            <div className="mt-6 flex items-center justify-between">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-tight">
+                Showing {internFrom}-{internTo} <span className="mx-1 text-slate-300">/</span> {internsTotal} Total Interns
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-8 px-3 font-bold text-[11px]"
                   onClick={() => setInternPage((p) => Math.max(1, p - 1))}
                   disabled={dashboardLoading || internsPage <= 1}
                 >
-                  Prev
+                  Previous
                 </Button>
-                <p className="text-xs text-muted-foreground">
-                  Page {internsPage} of {internPageCount}
-                </p>
+                <div className="flex items-center justify-center h-8 px-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-[11px] font-bold">
+                  {internsPage} / {internPageCount}
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-8 px-3 font-bold text-[11px]"
                   onClick={() => setInternPage((p) => Math.min(internPageCount, p + 1))}
                   disabled={dashboardLoading || internsPage >= internPageCount}
                 >
@@ -1243,161 +1207,114 @@ export default function AdminDashboardPage() {
           </div>
         </Card>
 
-        {/* Internships Management */}
-        <Card>
-          <div className="p-6 border-b">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Project Management</h2>
-              <Button
-                style={{ backgroundColor: '#0E6049' }}
-                onClick={() => setLocation("/admin/projects")}
-              >
-                View All
-              </Button>
+        {/* Project Management */}
+        <Card className="shadow-sm border-slate-200 dark:border-slate-800 overflow-hidden mb-8">
+          <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">Project Management</h2>
+              <p className="text-sm text-muted-foreground mt-1">Monitor active projects and internship opportunities</p>
             </div>
+            <Button
+              className="h-9 bg-[#0E6049] hover:bg-[#0E6049]/90 font-bold"
+              onClick={() => setLocation("/admin/projects")}
+            >
+              All Projects
+            </Button>
           </div>
           <div className="p-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Projects</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Proposals</TableHead>
-                  <TableHead>Posted</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {internships.map((internship) => (
-                  <TableRow key={internship.id}>
-                    <TableCell className="font-medium">{internship.title}</TableCell>
-                    <TableCell>{internship.company}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={internship.status === "active" ? "default" : "secondary"}
-                      >
-                        {internship.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{internship.applications}</TableCell>
-                    <TableCell>{internship.posted}</TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedProject(internship);
-                          setProjectDialogOpen(true);
-                        }}
-                      >
-                        View
-                      </Button>
-                    </TableCell>
+            <div className="rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
+              <Table>
+                <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
+                  <TableRow>
+                    <TableHead className="font-bold uppercase text-[10px]">Project Details</TableHead>
+                    <TableHead className="font-bold uppercase text-[10px]">Employer</TableHead>
+                    <TableHead className="font-bold uppercase text-[10px]">Stats</TableHead>
+                    <TableHead className="font-bold uppercase text-[10px]">Status</TableHead>
+                    <TableHead className="font-bold uppercase text-[10px] text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            <Dialog
-              open={projectDialogOpen}
-              onOpenChange={(open) => {
-                setProjectDialogOpen(open);
-                if (!open) setSelectedProject(null);
-              }}
-            >
-              <DialogContent className="max-w-[900px]">
-                <DialogHeader>
-                  <DialogTitle>Project details</DialogTitle>
-                </DialogHeader>
-                <div className="w-full rounded-md border bg-muted/10 p-4">
-                  {selectedProject ? (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Project</p>
-                        <p className="text-sm font-medium">
-                          {String((selectedProject as any)?.title ?? "-")}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Company</p>
-                        <p className="text-sm font-medium">
-                          {String((selectedProject as any)?.company ?? "-")}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Status</p>
-                        <p className="text-sm font-medium">
-                          {String((selectedProject as any)?.status ?? "-")}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Proposals</p>
-                        <p className="text-sm font-medium">
-                          {String((selectedProject as any)?.applications ?? "-")}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Posted</p>
-                        <p className="text-sm font-medium">
-                          {String((selectedProject as any)?.posted ?? "-")}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Project ID</p>
-                        <p className="text-xs font-mono break-all">
-                          {String((selectedProject as any)?.id ?? "-")}
-                        </p>
-                      </div>
-                    </div>
+                </TableHeader>
+                <TableBody>
+                  {internships.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-32 text-center text-sm text-muted-foreground">
+                        No projects available
+                      </TableCell>
+                    </TableRow>
                   ) : (
-                    <p className="text-sm text-muted-foreground">-</p>
+                    internships.map((internship) => (
+                      <TableRow key={internship.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-sm">{internship.title}</span>
+                            <span className="text-[10px] text-muted-foreground mt-0.5">Posted: {internship.posted}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="h-7 w-7 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                              <Building2 className="h-3.5 w-3.5 text-slate-500" />
+                            </div>
+                            <span className="text-xs font-medium">{internship.company}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold">{internship.applications}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase font-medium">Proposals Received</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={cn(
+                              "text-[10px] font-bold px-2 py-0.5 uppercase",
+                              internship.status === "active" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                            )}
+                          >
+                            {internship.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 font-bold text-[11px] gap-2 border-slate-200 hover:bg-slate-50"
+                            onClick={() => {
+                              setSelectedProject(internship);
+                              setProjectDialogOpen(true);
+                            }}
+                          >
+                            Quick View
+                            <Search className="h-3 w-3" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
                   )}
-                </div>
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      if (!selectedProject) return;
-                      try {
-                        await navigator.clipboard.writeText(JSON.stringify(selectedProject, null, 2));
-                      } catch {
-                        // ignore
-                      }
-                    }}
-                    disabled={!selectedProject}
-                  >
-                    Copy
-                  </Button>
-                  <Button
-                    onClick={() => setLocation("/admin/projects")}
-                    style={{ backgroundColor: "#0E6049" }}
-                  >
-                    View all projects
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </TableBody>
+              </Table>
+            </div>
 
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs text-muted-foreground">
-                Showing {projectFrom}-{projectTo} of {projectsTotal}
+            <div className="mt-6 flex items-center justify-between">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-tight">
+                Showing {projectFrom}-{projectTo} <span className="mx-1 text-slate-300">/</span> {projectsTotal} Projects
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-8 px-3 font-bold text-[11px]"
                   onClick={() => setProjectPage((p) => Math.max(1, p - 1))}
                   disabled={dashboardLoading || projectsPage <= 1}
                 >
-                  Prev
+                  Previous
                 </Button>
-                <p className="text-xs text-muted-foreground">
-                  Page {projectsPage} of {projectPageCount}
-                </p>
+                <div className="flex items-center justify-center h-8 px-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-[11px] font-bold">
+                  {projectsPage} / {projectPageCount}
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-8 px-3 font-bold text-[11px]"
                   onClick={() => setProjectPage((p) => Math.min(projectPageCount, p + 1))}
                   disabled={dashboardLoading || projectsPage >= projectPageCount}
                 >
@@ -1407,6 +1324,118 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         </Card>
+
+        {/* Dialogs */}
+        <Dialog
+          open={internDialogOpen}
+          onOpenChange={(open) => {
+            setInternDialogOpen(open);
+            if (!open) setSelectedIntern(null);
+          }}
+        >
+          <DialogContent className="max-w-[900px]">
+            <DialogHeader>
+              <DialogTitle>Intern Details</DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="h-[60vh] w-full rounded-md border bg-muted/10 p-3">
+              <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
+                {selectedIntern ? JSON.stringify(selectedIntern, null, 2) : "-"}
+              </pre>
+            </ScrollArea>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  if (!selectedIntern) return;
+                  try {
+                    await navigator.clipboard.writeText(JSON.stringify(selectedIntern, null, 2));
+                  } catch {
+                    // ignore
+                  }
+                }}
+                disabled={!selectedIntern}
+              >
+                Copy Data
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={projectDialogOpen}
+          onOpenChange={(open) => {
+            setProjectDialogOpen(open);
+            if (!open) setSelectedProject(null);
+          }}
+        >
+          <DialogContent className="max-w-[800px]">
+            <DialogHeader>
+              <DialogTitle>Project Quick View</DialogTitle>
+            </DialogHeader>
+            <div className="w-full rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-6 shadow-sm">
+              {selectedProject ? (
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Project Title</p>
+                    <p className="text-sm font-bold">{selectedProject.title}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Company Name</p>
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                      <p className="text-sm font-medium">{selectedProject.company}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Current Status</p>
+                    <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 font-bold uppercase text-[10px]">
+                      {selectedProject.status}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total Proposals</p>
+                    <p className="text-sm font-bold">{selectedProject.applications}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Date Posted</p>
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{selectedProject.posted}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Unique ID</p>
+                    <p className="text-[10px] font-mono bg-white dark:bg-slate-800 px-2 py-1 rounded border border-slate-100 dark:border-slate-700 break-all">
+                      {selectedProject.id}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-12 text-center text-sm text-muted-foreground">No project data selected</div>
+              )}
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                className="font-bold text-xs"
+                onClick={async () => {
+                  if (!selectedProject) return;
+                  try {
+                    await navigator.clipboard.writeText(JSON.stringify(selectedProject, null, 2));
+                  } catch {
+                    // ignore
+                  }
+                }}
+                disabled={!selectedProject}
+              >
+                Copy Raw Data
+              </Button>
+              <Button
+                className="bg-[#0E6049] hover:bg-[#0E6049]/90 font-bold text-xs"
+                onClick={() => setLocation("/admin/projects")}
+              >
+                Go to Project Manager
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   );

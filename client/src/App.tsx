@@ -59,6 +59,7 @@ import AdminReportsPage from "@/pages/admin/admin-reports";
 import AdminUsersPage from "@/pages/admin/admin-users";
 import AdminInternDetailPage from "@/pages/admin/admin-intern-detail";
 import AdminCompanyDetailPage from "@/pages/admin/admin-company-detail";
+import AdminProposalTrackerPage from "@/pages/admin/admin-proposal-tracker";
 import AdminTransactionsPage from "@/pages/admin/admin-transactions";
 import AdminWebsitePage from "@/pages/admin/admin-website";
 import AdminContactMessagesPage from "@/pages/admin/admin-contact-messages";
@@ -748,6 +749,11 @@ function Router() {
           <Route path="/admin/interns">
             <AdminRouteGuard>
               <AdminInternsPage />
+            </AdminRouteGuard>
+          </Route>
+          <Route path="/admin/proposal-tracker">
+            <AdminRouteGuard>
+              <AdminProposalTrackerPage />
             </AdminRouteGuard>
           </Route>
           <Route path="/admin/interns/:id">
