@@ -114,6 +114,12 @@ const navItems: NavItem[] = [
 
   { label: "Dashboard", icon: LayoutDashboard, href: "/admin/dashboard", required: "dashboard:read" },
 
+  {
+    label: "Proposal Tracker",
+    icon: FolderKanban,
+    href: "/admin/proposal-tracker",
+    required: ["interns:read", "companies:read"],
+  },
 
   { label: "Notifications", icon: Bell, href: "/admin/notifications", required: "notifications:read" },
 

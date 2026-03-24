@@ -7097,20 +7097,39 @@ export async function registerRoutes(
       for (const i of interviews as any[]) {
         const internId = String(i?.internId ?? i?.intern_id ?? "").trim();
         if (!internId) continue;
-        const employerId = String(i?.employerId ?? i?.employer_id ?? "").trim().toLowerCase();
-        if (employerId !== "admin") continue;
         const existing = latestInterviewByInternId.get(internId);
         latestInterviewByInternId.set(internId, existing ? pickNewer(existing, i) : i);
       }
 
       const pendingInterviewCountByInternId = new Map<string, number>();
+      const totalInterviewCountByInternId = new Map<string, number>();
+      const interviewSentCountByInternId = new Map<string, number>();
+      const interviewScheduledCountByInternId = new Map<string, number>();
+      const interviewCompletedCountByInternId = new Map<string, number>();
+      const interviewExpiredCountByInternId = new Map<string, number>();
+
       for (const i of interviews as any[]) {
         const internId = String(i?.internId ?? i?.intern_id ?? "").trim();
         if (!internId) continue;
         const status = String(i?.status ?? "").trim().toLowerCase();
-        const isPending = status === "pending";
-        if (!isPending) continue;
-        pendingInterviewCountByInternId.set(internId, (pendingInterviewCountByInternId.get(internId) ?? 0) + 1);
+        
+        totalInterviewCountByInternId.set(internId, (totalInterviewCountByInternId.get(internId) ?? 0) + 1);
+
+        if (status === "pending") {
+          pendingInterviewCountByInternId.set(internId, (pendingInterviewCountByInternId.get(internId) ?? 0) + 1);
+        }
+        if (status === "sent") {
+          interviewSentCountByInternId.set(internId, (interviewSentCountByInternId.get(internId) ?? 0) + 1);
+        }
+        if (status === "scheduled") {
+          interviewScheduledCountByInternId.set(internId, (interviewScheduledCountByInternId.get(internId) ?? 0) + 1);
+        }
+        if (status === "completed") {
+          interviewCompletedCountByInternId.set(internId, (interviewCompletedCountByInternId.get(internId) ?? 0) + 1);
+        }
+        if (status === "expired") {
+          interviewExpiredCountByInternId.set(internId, (interviewExpiredCountByInternId.get(internId) ?? 0) + 1);
+        }
       }
 
       const pendingProposalCountByInternId = new Map<string, number>();
@@ -7168,9 +7187,15 @@ export async function registerRoutes(
         if (!internId) continue;
 
         const status = String(row?.status ?? "").trim().toLowerCase();
+        const currency = String(row?.currency ?? "INR").trim().toUpperCase();
 
         const amountMinor = Number(row?.amountMinor ?? row?.amount_minor ?? 0);
         const safeAmount = Number.isFinite(amountMinor) ? Math.max(0, Math.floor(amountMinor)) : 0;
+        
+        // Convert to INR minor (paise) for consistent aggregation.
+        // Assuming USD_TO_INR_RATE = 100 as per common practice in this file.
+        const inrAmountMinor = currency === "USD" ? safeAmount * 100 : safeAmount;
+
         const createdRaw = row?.createdAt ?? row?.created_at ?? null;
         const createdAt = createdRaw ? new Date(createdRaw) : null;
         const createdIso = createdAt && Number.isFinite(createdAt.getTime()) ? createdAt.toISOString() : null;
@@ -7187,18 +7212,18 @@ export async function registerRoutes(
         existing.totalCount += 1;
 
         if (status === "paid") {
-          existing.paidSumMinor += safeAmount;
+          existing.paidSumMinor += inrAmountMinor;
         }
 
         if (status === "pending") {
-          existing.pendingSumMinor += safeAmount;
+          existing.pendingSumMinor += inrAmountMinor;
           existing.pendingCount += 1;
 
           const existingUpcomingT = existing.upcomingCreatedAt ? new Date(existing.upcomingCreatedAt).getTime() : null;
           const thisT = createdAt && Number.isFinite(createdAt.getTime()) ? createdAt.getTime() : null;
 
           if (existingUpcomingT === null || (thisT !== null && thisT < existingUpcomingT)) {
-            existing.upcomingAmountMinor = safeAmount;
+            existing.upcomingAmountMinor = inrAmountMinor;
             existing.upcomingCreatedAt = createdIso;
           }
         }
@@ -7230,18 +7255,53 @@ export async function registerRoutes(
         return new Date(Date.UTC(firstOfTarget.getUTCFullYear(), firstOfTarget.getUTCMonth(), safeDay, 0, 0, 0));
       };
 
-      const enriched = (onboardingList as any[])
-        .map((onboarding) => {
-          const internId = String(onboarding?.userId ?? onboarding?.user_id ?? "").trim();
+      const isMeaningfulOnboarding = (o: any) => {
+        if (!o) return false;
+        const linkedinUrl = String(o?.linkedinUrl ?? o?.linkedin_url ?? "").trim();
+        if (linkedinUrl) return true;
+        const bio = String(o?.bio ?? "").trim();
+        if (bio) return true;
+        const previewSummary = String(o?.previewSummary ?? o?.preview_summary ?? "").trim();
+        if (previewSummary) return true;
+        const city = String(o?.city ?? "").trim();
+        const state = String(o?.state ?? "").trim();
+        const pinCode = String(o?.pinCode ?? o?.pin_code ?? "").trim();
+        if (city || state || pinCode) return true;
+        const skills = Array.isArray(o?.skills) ? o.skills : [];
+        if (skills.length > 0) return true;
+        const locationTypes = Array.isArray(o?.locationTypes) ? o.locationTypes : [];
+        const preferredLocations = Array.isArray(o?.preferredLocations) ? o.preferredLocations : [];
+        if (locationTypes.length > 0 || preferredLocations.length > 0) return true;
+        const experienceJson = Array.isArray(o?.experienceJson) ? o.experienceJson : [];
+        if (experienceJson.length > 0) return true;
+        if (typeof o?.hasLaptop === "boolean") return true;
+        const extra = o?.extraData ?? o?.extra_data ?? {};
+        const bankDetails = extra?.bankDetails ?? extra?.bank_details ?? {};
+        const hasBank =
+          Boolean(String(bankDetails?.accountNumber ?? "").trim()) ||
+          Boolean(String(bankDetails?.upiId ?? "").trim());
+        if (hasBank) return true;
+        return false;
+      };
+
+      const onboardingByUserId = new Map<string, any>();
+      for (const o of onboardingList as any[]) {
+        const id = String(o?.userId ?? o?.user_id ?? "").trim();
+        if (id) onboardingByUserId.set(id, o);
+      }
+
+      const enriched = Array.from(internUsersById.values())
+        .map((user) => {
+          const internId = String(user?.id ?? "").trim();
           if (!internId) return null;
 
-          const user = internUsersById.get(internId) ?? null;
-          if (!user) return null;
+          const onboarding = onboardingByUserId.get(internId) ?? null;
 
           const latestInterviewRaw = latestInterviewByInternId.get(internId) ?? null;
           const latestInterview = latestInterviewRaw ? serializeInterview(latestInterviewRaw) : null;
 
           const extra = (onboarding as any)?.extraData ?? {};
+          const isProfileComplete = isMeaningfulOnboarding(onboarding);
           const openToWork = extra?.openToWork;
           const liveStatus = typeof openToWork === "boolean" ? (openToWork ? "Live" : "Hidden") : "Live";
 
@@ -7298,8 +7358,15 @@ export async function registerRoutes(
           };
           const monthlyMajorRaw = Number((offerDetails as any)?.monthlyAmount ?? (offerDetails as any)?.monthly_amount ?? 0);
           const monthlyMajor = Number.isFinite(monthlyMajorRaw) ? Math.max(0, monthlyMajorRaw) : 0;
-          const employerMonthlyMinor = Math.round(monthlyMajor * 100);
-          const internMonthlyMinor = Math.round(employerMonthlyMinor * 0.5);
+          let employerMonthlyMinor = Math.round(monthlyMajor * 100);
+          let internMonthlyMinor = Math.round(employerMonthlyMinor * 0.5);
+
+          // Convert to INR paise if the offer is in USD
+          if (offerCurrency === "USD") {
+            employerMonthlyMinor = Math.round(employerMonthlyMinor * 100);
+            internMonthlyMinor = Math.round(internMonthlyMinor * 100);
+          }
+
           const totalPlannedMinor = (() => {
             if (!offerSource || !Number.isFinite(internMonthlyMinor) || internMonthlyMinor <= 0) return null;
             const totalMonths = Math.max(1, monthsFromDuration((offerDetails as any)?.duration));
@@ -7417,6 +7484,7 @@ export async function registerRoutes(
             onboarding,
             latestInterview,
             liveStatus,
+            isProfileComplete,
             paymentStatus,
             internshipStatus,
             onboardingStatus,
@@ -7429,6 +7497,11 @@ export async function registerRoutes(
             },
             pendingProposalCount: pendingProposalCountByInternId.get(internId) ?? 0,
             pendingInterviewCount: pendingInterviewCountByInternId.get(internId) ?? 0,
+            totalInterviewCount: totalInterviewCountByInternId.get(internId) ?? 0,
+            interviewSentCount: interviewSentCountByInternId.get(internId) ?? 0,
+            interviewScheduledCount: interviewScheduledCountByInternId.get(internId) ?? 0,
+            interviewCompletedCount: interviewCompletedCountByInternId.get(internId) ?? 0,
+            interviewExpiredCount: interviewExpiredCountByInternId.get(internId) ?? 0,
           };
         })
         .filter(Boolean);
@@ -8324,11 +8397,9 @@ export async function registerRoutes(
         const employerId = String(i?.employerId ?? i?.employer_id ?? "").trim().toLowerCase();
 
         if (effective === "completed") {
-          // Only count AI interviews for the "AI Interviews Completed" stat
-          if (employerId === "admin") {
-            const internId = String(i?.internId ?? i?.intern_id ?? "").trim();
-            if (internId) completedInternIds.add(internId);
-          }
+          // Count all completed interviews for the "Interviews Completed" stats
+          const internId = String(i?.internId ?? i?.intern_id ?? "").trim();
+          if (internId) completedInternIds.add(internId);
         }
         // Only count interviews that are actually scheduled by employers (not AI)
         const isEmployerScheduled = employerId !== "admin" && effective === "scheduled";
@@ -8576,8 +8647,8 @@ export async function registerRoutes(
 
       const interviewCountByMonth = new Map<string, number>();
       for (const i of interviews as any[]) {
-        const employerId = String(i?.employerId ?? i?.employer_id ?? "").trim().toLowerCase();
-        if (employerId !== "admin") continue; // Only count AI interviews (admin)
+        const effective = getInterviewEffectiveStatus(i);
+        if (effective !== "completed") continue; // Only count completed interviews
 
         const raw = i?.createdAt ?? i?.created_at ?? null;
         if (!raw) continue;
@@ -15373,10 +15444,13 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           const createdAtIso = createdAt ? String(createdAt).slice(0, 10) : "";
           const dateKey = scheduledFor || paidAtIso || createdAtIso;
           const proposalId = String(raw?.proposalId ?? raw?.proposal_id ?? "").trim();
+          const cur = String((row as any)?.currency ?? "INR").trim().toUpperCase();
+          const amt = Number((row as any)?.amountMinor ?? (row as any)?.amount_minor ?? 0) || 0;
+          const inrAmt = cur === "USD" ? Math.round(amt * 100) : amt;
           return {
             id: String((row as any)?.id ?? ""),
             proposalId,
-            amountMinor: Number((row as any)?.amountMinor ?? (row as any)?.amount_minor ?? 0) || 0,
+            amountMinor: inrAmt,
             dateKey,
           };
         })
@@ -15457,12 +15531,18 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
               ? totalPriceMajor / Math.max(1, totalMonths)
               : 0;
 
-        const monthlyAmountMinor = hasFullTimeOffer ? 0 : Math.round(Math.max(0, effectiveMonthlyMajor) * 100);
-        const totalAmountMinorRaw = hasFullTimeOffer
+        let monthlyAmountMinor = hasFullTimeOffer ? 0 : Math.round(Math.max(0, effectiveMonthlyMajor) * 100);
+        let totalAmountMinorRaw = hasFullTimeOffer
           ? Math.round(fullTimeFeeMajor * 100)
           : totalPriceMajor > 0
             ? Math.round(Math.max(0, totalPriceMajor) * 100)
             : monthlyAmountMinor * totalMonths;
+
+        // Convert to INR paise if the offer is in USD
+        if (currency === "USD") {
+          monthlyAmountMinor = Math.round(monthlyAmountMinor * 100);
+          totalAmountMinorRaw = Math.round(totalAmountMinorRaw * 100);
+        }
 
         const internMonthlyAmountMinorBase = Math.floor(monthlyAmountMinor / 2);
         const internMonthlyAmountMinor = isLowScore ? 0 : internMonthlyAmountMinorBase;
@@ -15492,7 +15572,9 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
             if (purpose !== "employer_checkout") return sum;
           }
           const amt = Number((o as any)?.amountMinor ?? (o as any)?.amount_minor ?? 0);
-          return sum + (Number.isFinite(amt) ? Math.max(0, amt) : 0);
+          const payCur = String((o as any)?.currency ?? "INR").trim().toUpperCase();
+          const inrAmt = payCur === "USD" ? Math.round(amt * 100) : amt;
+          return sum + (Number.isFinite(inrAmt) ? Math.max(0, inrAmt) : 0);
         }, 0);
 
         const paidMonths = hasFullTimeOffer

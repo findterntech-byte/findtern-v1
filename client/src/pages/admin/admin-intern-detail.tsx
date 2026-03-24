@@ -196,12 +196,6 @@ export default function AdminInternDetailPage() {
     [internId],
   );
 
-  const USD_TO_INR_RATE = useMemo(() => {
-    const raw = (import.meta as any)?.env?.VITE_USD_TO_INR_RATE;
-    const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : 100;
-  }, []);
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [intern, setIntern] = useState<LoadedIntern | null>(null);
@@ -245,9 +239,10 @@ export default function AdminInternDetailPage() {
 
     if (!base) return;
 
+    // Use intern monthly payout times number of months.
     const amountMinor = Math.min(due || Number.MAX_SAFE_INTEGER, base * monthsNum);
-    const amountMajor = amountMinor / 100;
-    setCreateAmountMajor(amountMajor ? String(amountMajor) : "");
+    const amountMajor = Math.floor(amountMinor / 100);
+    setCreateAmountMajor(amountMajor > 0 ? String(amountMajor) : "");
   }, [createSource, createMonths, createBaseMonthlyMinor, createInternDueMinor]);
 
   const [openMarkPaid, setOpenMarkPaid] = useState(false);
@@ -622,9 +617,9 @@ export default function AdminInternDetailPage() {
     const joinedAtRaw = onboarding?.createdAt ?? null;
     const joinedAt = joinedAtRaw
       ? (() => {
-          const d = new Date(joinedAtRaw);
-          return Number.isNaN(d.getTime()) ? String(joinedAtRaw) : d.toISOString().slice(0, 10);
-        })()
+        const d = new Date(joinedAtRaw);
+        return Number.isNaN(d.getTime()) ? String(joinedAtRaw) : d.toISOString().slice(0, 10);
+      })()
       : "-";
 
     const ratings = extra?.ratings ?? {};
@@ -813,12 +808,8 @@ export default function AdminInternDetailPage() {
   };
 
   const formatMoneyInInrIfUsd = (amountMinor: number, currency: string) => {
-    const cur = String(currency || "INR").toUpperCase();
-    if (cur !== "USD") return formatMoney(amountMinor, cur);
-    const majorUsd = Number.isFinite(amountMinor) ? amountMinor / 100 : 0;
-    const majorInr = majorUsd * USD_TO_INR_RATE;
-    const minorInr = Math.round(majorInr * 100);
-    return formatMoney(minorInr, "INR");
+    // Backend now returns all amounts in INR paise for consistency in admin views.
+    return formatMoney(amountMinor, "INR");
   };
 
   const handleCreatePayout = async () => {
@@ -846,7 +837,7 @@ export default function AdminInternDetailPage() {
         `/api/admin/interns/${encodeURIComponent(internId)}/payouts`,
         {
           amountMinor,
-          currency: createCurrency,
+          currency: "INR",
           status: "pending",
           method: "bank",
           scheduledFor: createScheduledFor,
@@ -855,12 +846,12 @@ export default function AdminInternDetailPage() {
           employerId: createEmployerId || null,
           cycle: hasCycle
             ? {
-                remaining: Math.floor(monthsNum),
-                monthsStep: 1,
-                amountMinor,
-                currency: createCurrency,
-                method: "bank",
-              }
+              remaining: Math.floor(monthsNum),
+              monthsStep: 1,
+              amountMinor,
+              currency: "INR",
+              method: "bank",
+            }
             : null,
         },
       );
@@ -931,11 +922,11 @@ export default function AdminInternDetailPage() {
           prev.map((p) =>
             p.id === payoutId
               ? {
-                  ...p,
-                  status: String(updated?.status ?? "paid").toLowerCase(),
-                  referenceId: referenceId,
-                  paidAt: (updated?.paidAt ?? updated?.paid_at ?? new Date().toISOString()) as any,
-                }
+                ...p,
+                status: String(updated?.status ?? "paid").toLowerCase(),
+                referenceId: referenceId,
+                paidAt: (updated?.paidAt ?? updated?.paid_at ?? new Date().toISOString()) as any,
+              }
               : p,
           ),
         );
@@ -1784,15 +1775,15 @@ export default function AdminInternDetailPage() {
         <Tabs defaultValue="documents" className="w-full">
           <div className="mx-6 mt-4 overflow-x-auto custom-scrollbar-horizontal pb-2">
             <TabsList className="flex w-fit bg-muted whitespace-nowrap">
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="interviews">Interviews</TabsTrigger>
-            <TabsTrigger value="proposals">Proposals</TabsTrigger>
-            <TabsTrigger value="timesheets">Timesheet</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="bank">Bank Details</TabsTrigger>
-          </TabsList>
-        </div>
+              <TabsTrigger value="documents">Documents</TabsTrigger>
+              <TabsTrigger value="profile">Profile</TabsTrigger>
+              <TabsTrigger value="interviews">Interviews</TabsTrigger>
+              <TabsTrigger value="proposals">Proposals</TabsTrigger>
+              <TabsTrigger value="timesheets">Timesheet</TabsTrigger>
+              <TabsTrigger value="payments">Payments</TabsTrigger>
+              <TabsTrigger value="bank">Bank Details</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="documents" className="px-6 pb-6 pt-4">
             <ScrollArea className="h-[600px] pr-4">
@@ -1829,8 +1820,8 @@ export default function AdminInternDetailPage() {
                               doc.status === "Uploaded"
                                 ? "border-emerald-500 bg-emerald-50 text-emerald-700"
                                 : doc.status === "Pending"
-                                ? "border-amber-400 bg-amber-50 text-amber-700"
-                                : "border-slate-300 bg-slate-50 text-slate-700"
+                                  ? "border-amber-400 bg-amber-50 text-amber-700"
+                                  : "border-slate-300 bg-slate-50 text-slate-700"
                             }
                           >
                             {doc.status}
@@ -1862,2062 +1853,1984 @@ export default function AdminInternDetailPage() {
           <TabsContent value="payments" className="px-6 pb-6 pt-4">
             <div className="h-[700px] overflow-y-auto pr-2 custom-scrollbar-horizontal">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Payout schedule</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Create pending payouts with a scheduled date. Marking as paid requires a reference ID.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="outline"
-                  disabled={loadingPayouts}
-                  onClick={() => {
-                    if (!internId) return;
-                    setLoadingPayouts(true);
-                    void (async () => {
-                      try {
-                        const res = await apiRequest(
-                          "GET",
-                          `/api/admin/interns/${encodeURIComponent(internId)}/payouts`,
-                        );
-                        const json = await res.json().catch(() => null);
-                        const items = Array.isArray(json?.items) ? json.items : [];
-                        const mapped: PayoutRow[] = items.map((p: any) => ({
-                          id: String(p?.id ?? p?.referenceId ?? p?.reference_id ?? ""),
-                          amountMinor: (() => {
-                            const raw = p?.amountMinor ?? p?.amount_minor ?? p?.amount ?? 0;
-                            const n = Number(raw);
-                            return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;
-                          })(),
-                          currency: String(p?.currency ?? "INR").toUpperCase(),
-                          status: String(p?.status ?? "-").toLowerCase(),
-                          method: String(p?.method ?? "-").toLowerCase(),
-                          referenceId: (p?.referenceId ?? p?.reference_id ?? null) as any,
-                          scheduledFor: (p?.raw?.scheduledFor ?? p?.raw?.scheduled_for ?? null) as any,
-                          paidAt: (p?.paidAt ?? p?.paid_at ?? null) as any,
-                          createdAt: (p?.createdAt ?? p?.created_at ?? null) as any,
-                        }));
-                        setPayouts(mapped);
-                      } catch {
-                        setPayouts([]);
-                      } finally {
-                        setLoadingPayouts(false);
-                      }
-                    })();
-                  }}
-                >
-                  {loadingPayouts ? "Refreshing..." : "Refresh"}
-                </Button>
-
-                <Button
-                  onClick={() => {
-                    setCreatePayoutError("");
-                    setOpenCreatePayout(true);
-                  }}
-                >
-                  Create payout
-                </Button>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <Card className="p-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-semibold">Employer dues</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Shows how much the employer still needs to pay for this intern (monthly cycle). Use this to decide payouts.
-                    </p>
-                    {employerDuesError ? (
-                      <p className="text-xs text-red-600">{employerDuesError}</p>
-                    ) : null}
-                  </div>
-                  <Button
-                    variant="outline"
-                    disabled={loadingEmployerDues}
-                    onClick={() => {
-                      if (!internId) return;
-                      void refreshEmployerDues();
-                    }}
-                  >
-                    {loadingEmployerDues ? "Refreshing..." : "Refresh"}
-                  </Button>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Payout schedule</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Create pending payouts with a scheduled date. Marking as paid requires a reference ID.
+                  </p>
                 </div>
 
-                <div className="mt-3 relative w-full overflow-x-auto rounded-lg border custom-scrollbar-horizontal pb-4">
-                  <table className="w-full min-w-[1400px] border-collapse text-sm">
+                
+              </div>
+
+              <div className="mt-4">
+                <Card className="p-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold">Employer dues</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Shows how much the employer still needs to pay for this intern (monthly cycle). Use this to decide payouts.
+                      </p>
+                      {employerDuesError ? (
+                        <p className="text-xs text-red-600">{employerDuesError}</p>
+                      ) : null}
+                    </div>
+                    <Button
+                      variant="outline"
+                      disabled={loadingEmployerDues}
+                      onClick={() => {
+                        if (!internId) return;
+                        void refreshEmployerDues();
+                      }}
+                    >
+                      {loadingEmployerDues ? "Refreshing..." : "Refresh"}
+                    </Button>
+                  </div>
+
+                  <div className="mt-3 relative w-full overflow-x-auto rounded-lg border custom-scrollbar-horizontal pb-4">
+                    <table className="w-full min-w-[1400px] border-collapse text-sm">
+                      <thead className="sticky top-0 z-30 bg-white">
+                        <tr className="bg-white border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                          <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground sticky left-0 z-40 bg-white border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] min-w-[150px]">Employer</th>
+                          <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[150px]">Project</th>
+                          <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[100px]">Start</th>
+                          <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[100px]">Duration</th>
+                          <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[150px]">Upcoming payment date</th>
+                          <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[140px]">Employer monthly</th>
+                          <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[160px]">Employer total amount</th>
+                          <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[120px]">Employer due</th>
+                          <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[140px]">Intern payout (50%)</th>
+                          <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[120px]">Intern due</th>
+                          <th className="h-12 px-4 align-middle font-medium text-muted-foreground sticky right-0 z-40 bg-white border-l shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] text-right min-w-[120px]">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="[&_tr:last-child]:border-0">
+                        {(() => {
+                          if (loadingEmployerDues && employerDues.length === 0) {
+                            return (
+                              <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                                <td colSpan={11} className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-sm text-muted-foreground text-center">
+                                  Loading employer dues...
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          if (employerDues.length === 0) {
+                            return (
+                              <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                                <td colSpan={11} className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-sm text-muted-foreground text-center">
+                                  No dues found.
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return employerDues
+                            .slice()
+                            .sort((a, b) => {
+                              const dateA = String(a.upcomingPaymentDate ?? "").trim();
+                              const dateB = String(b.upcomingPaymentDate ?? "").trim();
+                              if (!dateA && !dateB) return 0;
+                              if (!dateA) return 1;
+                              if (!dateB) return -1;
+                              return dateA.localeCompare(dateB);
+                            })
+                            .map((r) => {
+                              const employerDueMinor = Number(r.dueAmountMinor ?? 0) || 0;
+                              const internMonthlyMinor = Number(r.internMonthlyAmountMinor ?? 0) || 0;
+                              const internDueMinor = Number(r.internDueAmountMinor ?? 0) || 0;
+                              const canPay = internMonthlyMinor > 0 && internDueMinor > 0;
+
+                              const scheduledFor = String(r.upcomingPaymentDate ?? "").trim();
+                              const cyclePayout = payouts.find((p) => {
+                                const pid = String(p.proposalId ?? "").trim();
+                                const sf = String(p.scheduledFor ?? "").trim();
+                                if (!pid || !scheduledFor) return false;
+                                if (pid !== String(r.proposalId ?? "").trim()) return false;
+                                return sf === scheduledFor;
+                              });
+                              const cyclePayoutStatus = String((cyclePayout as any)?.status ?? "").toLowerCase();
+                              const hasPendingPayoutForCycle = cyclePayoutStatus === "pending";
+                              const hasPaidPayoutForCycle = cyclePayoutStatus === "paid";
+
+                              const isComplete = internDueMinor <= 0;
+
+                              const advanceIsoMonth = (iso: string, months: number) => {
+                                const s = String(iso ?? "").trim();
+                                if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+                                const dt = new Date(`${s}T00:00:00`);
+                                if (Number.isNaN(dt.getTime())) return "";
+                                dt.setMonth(dt.getMonth() + Math.max(0, months));
+                                return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+                              };
+
+                              const effectiveScheduledFor =
+                                hasPaidPayoutForCycle && scheduledFor ? advanceIsoMonth(scheduledFor, 1) : scheduledFor;
+
+                              return (
+                                <tr key={`${r.employerId}_${r.proposalId}`}
+                                  className={cn(
+                                    "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+                                    canPay
+                                      ? "bg-white"
+                                      : "bg-slate-50 hover:bg-slate-100"
+                                  )}
+                                >
+                                  <td className="p-4 align-middle sticky left-0 z-10 bg-inherit border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap font-medium min-w-[150px]">
+                                    {String(r.employerCompanyName ?? r.employerId ?? "-")}
+                                  </td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{String(r.projectName ?? "-")}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">{String(r.startDate ?? "-")}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">{String(r.duration ?? "-")}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{String(r.upcomingPaymentDate ?? "-")}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[140px]">{formatMoneyInInrIfUsd(employerDueMinor <= 0 ? 0 : (r.monthlyAmountMinor ?? 0), r.currency)}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[160px]">{formatMoneyInInrIfUsd(r.totalAmountMinor ?? 0, r.currency)}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap font-medium min-w-[120px]">{formatMoneyInInrIfUsd(employerDueMinor, r.currency)}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[140px]">{formatMoneyInInrIfUsd(internMonthlyMinor, r.currency)}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap font-medium min-w-[120px]">{formatMoneyInInrIfUsd(internDueMinor, r.currency)}</td>
+                                  <td className="p-4 align-middle sticky right-0 z-10 bg-inherit border-l shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] text-right min-w-[120px]">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={!canPay || hasPendingPayoutForCycle || isComplete}
+                                      onClick={() => {
+                                        setCreatePayoutError("");
+                                        setCreateCurrency("INR");
+                                        setCreateScheduledFor(String(effectiveScheduledFor ?? ""));
+                                        const maxMonths = Math.max(1, Number(r.internRemainingMonths ?? r.remainingMonths ?? 1) || 1);
+                                        setCreateMaxMonths(maxMonths);
+                                        setCreateMonths("1");
+                                        setCreateSource("employer_due");
+                                        setCreateProposalId(String(r.proposalId ?? ""));
+                                        setCreateEmployerId(String(r.employerId ?? ""));
+
+                                        setCreateInternDueMinor(Number(r.internDueAmountMinor ?? 0) || 0);
+                                        setCreateBaseMonthlyMinor(internMonthlyMinor);
+
+                                        const major = Math.floor(internMonthlyMinor / 100);
+                                        setCreateAmountMajor(major > 0 ? String(major) : "");
+                                        setOpenCreatePayout(true);
+                                      }}
+                                    >
+                                      {isComplete
+                                        ? "Completed"
+                                        : hasPendingPayoutForCycle
+                                          ? "Payout pending"
+                                          : hasPaidPayoutForCycle
+                                            ? "Create next payout"
+                                            : "Create payout"}
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </div>
+
+              <div className="mt-4">
+                <div className="relative w-full overflow-x-auto rounded-lg border custom-scrollbar-horizontal pb-3">
+                  <table className="w-full min-w-[1100px] border-collapse text-sm">
                     <thead className="sticky top-0 z-30 bg-white">
-                      <tr className="bg-white border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground sticky left-0 z-40 bg-white border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] min-w-[150px]">Employer</th>
+                      <tr className="bg-white border-b transition-colors hover:bg-muted/50">
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground sticky left-0 z-40 bg-white border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] min-w-[120px]">Payout date</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[100px]">Status</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[150px]">Company</th>
                         <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[150px]">Project</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[100px]">Start</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[100px]">Duration</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[150px]">Upcoming payment date</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[140px]">Employer monthly</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[160px]">Employer total amount</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[120px]">Employer due</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[140px]">Intern payout (50%)</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[120px]">Intern due</th>
-                        <th className="h-12 px-4 align-middle font-medium text-muted-foreground sticky right-0 z-40 bg-white border-l shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] text-right min-w-[120px]">Action</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[120px]">Amount</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[100px]">Method</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[150px]">Reference ID</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[120px]">Paid at</th>
+                        <th className="h-12 px-4 align-middle font-medium text-muted-foreground sticky right-0 z-40 bg-white border-l shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] text-right min-w-[150px]">Action</th>
                       </tr>
                     </thead>
                     <tbody className="[&_tr:last-child]:border-0">
-                      {(() => {
-                        if (loadingEmployerDues && employerDues.length === 0) {
-                          return (
-                            <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                              <td colSpan={11} className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-sm text-muted-foreground text-center">
-                                Loading employer dues...
-                              </td>
-                            </tr>
-                          );
-                        }
-
-                        if (employerDues.length === 0) {
-                          return (
-                            <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                              <td colSpan={11} className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-sm text-muted-foreground text-center">
-                                No dues found.
-                              </td>
-                            </tr>
-                          );
-                        }
-
-                        return employerDues
+                      {payouts.length === 0 ? (
+                        <tr className="border-b transition-colors hover:bg-muted/50">
+                          <td colSpan={9} className="p-8 text-center text-sm text-muted-foreground">
+                            {loadingPayouts ? "Loading payouts..." : "No payouts created yet."}
+                          </td>
+                        </tr>
+                      ) : (
+                        payouts
+                          .filter((p, idx, self) => self.findIndex((x) => x.id === p.id) === idx)
                           .slice()
                           .sort((a, b) => {
-                            const dateA = String(a.upcomingPaymentDate ?? "").trim();
-                            const dateB = String(b.upcomingPaymentDate ?? "").trim();
-                            if (!dateA && !dateB) return 0;
-                            if (!dateA) return 1;
-                            if (!dateB) return -1;
-                            return dateA.localeCompare(dateB);
+                            const da = String(a.scheduledFor ?? "").trim();
+                            const db = String(b.scheduledFor ?? "").trim();
+                            if (da && db) return da.localeCompare(db);
+                            if (da) return -1;
+                            if (db) return 1;
+                            return String(a.createdAt ?? "").localeCompare(String(b.createdAt ?? ""));
                           })
-                          .map((r) => {
-                            const employerDueMinor = Number(r.dueAmountMinor ?? 0) || 0;
-                            const internMonthlyMinor = Number(r.internMonthlyAmountMinor ?? 0) || 0;
-                            const internDueMinor = Number(r.internDueAmountMinor ?? 0) || 0;
-                            const canPay = internMonthlyMinor > 0 && internDueMinor > 0;
+                          .map((p) => {
+                            const status = String(p.status ?? "-").toLowerCase();
+                            const isPaid = status === "paid";
+                            const isPending = status === "pending";
 
-                            const scheduledFor = String(r.upcomingPaymentDate ?? "").trim();
-                            const cyclePayout = payouts.find((p) => {
-                              const pid = String(p.proposalId ?? "").trim();
-                              const sf = String(p.scheduledFor ?? "").trim();
-                              if (!pid || !scheduledFor) return false;
-                              if (pid !== String(r.proposalId ?? "").trim()) return false;
-                              return sf === scheduledFor;
-                            });
-                            const cyclePayoutStatus = String((cyclePayout as any)?.status ?? "").toLowerCase();
-                            const hasPendingPayoutForCycle = cyclePayoutStatus === "pending";
-                            const hasPaidPayoutForCycle = cyclePayoutStatus === "paid";
+                            const employerId = String(p.employerId ?? "").trim();
+                            const employerName = String(
+                              (employersById as any)?.[employerId]?.companyName ??
+                              (employersById as any)?.[employerId]?.name ??
+                              "",
+                            ).trim();
+                            const companyLabel = employerName || employerId || "-";
 
-                            const isComplete = internDueMinor <= 0;
+                            const proposalId = String(p.proposalId ?? "").trim();
+                            const proposal = proposalId ? (proposals ?? []).find((x: any) => String(x?.id ?? "").trim() === proposalId) : null;
+                            const projName = String(
+                              (proposal as any)?.projectName ??
+                              (proposal as any)?.project_name ??
+                              "",
+                            ).trim();
 
-                            const advanceIsoMonth = (iso: string, months: number) => {
-                              const s = String(iso ?? "").trim();
-                              if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
-                              const dt = new Date(`${s}T00:00:00`);
-                              if (Number.isNaN(dt.getTime())) return "";
-                              dt.setMonth(dt.getMonth() + Math.max(0, months));
-                              return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-                            };
-
-                            const effectiveScheduledFor =
-                              hasPaidPayoutForCycle && scheduledFor ? advanceIsoMonth(scheduledFor, 1) : scheduledFor;
+                            const projectLabel = projName || "-";
 
                             return (
-                              <tr key={`${r.employerId}_${r.proposalId}`}
-                                className={cn(
-                                  "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
-                                  canPay
-                                    ? "bg-white"
-                                    : "bg-slate-50 hover:bg-slate-100"
-                                )}
-                              >
-                                <td className="p-4 align-middle sticky left-0 z-10 bg-inherit border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap font-medium min-w-[150px]">
-                                  {String(r.employerCompanyName ?? r.employerId ?? "-")}
+                              <tr key={p.id} className="bg-white border-b transition-colors hover:bg-muted/50">
+                                <td className="p-4 align-middle sticky left-0 z-10 bg-inherit border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap min-w-[120px]">
+                                  {formatIsoDate(p.scheduledFor ?? p.createdAt)}
                                 </td>
-                                <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{String(r.projectName ?? "-")}</td>
-                                <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">{String(r.startDate ?? "-")}</td>
-                                <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">{String(r.duration ?? "-")}</td>
-                                <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{String(r.upcomingPaymentDate ?? "-")}</td>
-                                <td className="p-4 align-middle whitespace-nowrap min-w-[140px]">{formatMoneyInInrIfUsd(employerDueMinor <= 0 ? 0 : (r.monthlyAmountMinor ?? 0), r.currency)}</td>
-                                <td className="p-4 align-middle whitespace-nowrap min-w-[160px]">{formatMoneyInInrIfUsd(r.totalAmountMinor ?? 0, r.currency)}</td>
-                                <td className="p-4 align-middle whitespace-nowrap font-medium min-w-[120px]">{formatMoneyInInrIfUsd(employerDueMinor, r.currency)}</td>
-                                <td className="p-4 align-middle whitespace-nowrap min-w-[140px]">{formatMoneyInInrIfUsd(internMonthlyMinor, r.currency)}</td>
-                                <td className="p-4 align-middle whitespace-nowrap font-medium min-w-[120px]">{formatMoneyInInrIfUsd(internDueMinor, r.currency)}</td>
-                                <td className="p-4 align-middle sticky right-0 z-10 bg-inherit border-l shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] text-right min-w-[120px]">
-                                  <Button
-                                    size="sm"
+                                <td className="p-4 align-middle min-w-[100px]">
+                                  <Badge
                                     variant="outline"
-                                    disabled={!canPay || hasPendingPayoutForCycle || isComplete}
-                                    onClick={() => {
-                                      setCreatePayoutError("");
-                                      setCreateCurrency((String(r.currency ?? "INR").toUpperCase() as any) || "INR");
-                                      setCreateScheduledFor(String(effectiveScheduledFor ?? ""));
-                                      const maxMonths = Math.max(1, Number(r.internRemainingMonths ?? r.remainingMonths ?? 1) || 1);
-                                      setCreateMaxMonths(maxMonths);
-                                      setCreateMonths("1");
-                                      setCreateSource("employer_due");
-                                      setCreateProposalId(String(r.proposalId ?? ""));
-                                      setCreateEmployerId(String(r.employerId ?? ""));
-
-                                      setCreateInternDueMinor(Number(r.internDueAmountMinor ?? 0) || 0);
-                                      setCreateBaseMonthlyMinor(internMonthlyMinor);
-
-                                      const major = internMonthlyMinor / 100;
-                                      setCreateAmountMajor(major ? String(major) : "");
-                                      setOpenCreatePayout(true);
-                                    }}
+                                    className={cn(
+                                      isPaid
+                                        ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                                        : isPending
+                                          ? "border-amber-400 bg-amber-50 text-amber-700"
+                                          : "border-slate-300 bg-slate-50 text-slate-700"
+                                    )}
                                   >
-                                    {isComplete
-                                      ? "Completed"
-                                      : hasPendingPayoutForCycle
-                                        ? "Payout pending"
-                                        : hasPaidPayoutForCycle
-                                          ? "Create next payout"
-                                          : "Create payout"}
-                                  </Button>
+                                    {status || "-"}
+                                  </Badge>
+                                </td>
+                                <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{companyLabel}</td>
+                                <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{projectLabel}</td>
+                                <td className="p-4 align-middle whitespace-nowrap font-medium min-w-[120px]">
+                                  {formatMoney(p.amountMinor ?? 0, p.currency)}
+                                </td>
+                                <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">{String(p.method ?? "-")}</td>
+                                <td className="p-4 align-middle whitespace-nowrap font-mono text-xs min-w-[150px]">
+                                  {String(p.referenceId ?? "-")}
+                                </td>
+                                <td className="p-4 align-middle whitespace-nowrap min-w-[120px]">{formatIsoDate(p.paidAt)}</td>
+                                <td className="p-4 align-middle sticky right-0 z-10 bg-inherit border-l shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] text-right min-w-[150px]">
+                                  <div className="flex items-center justify-end gap-2">
+                                    {isPaid ? (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => void sendStipendTransferredEmail(String(p.id))}
+                                        title="Send stipend transferred email"
+                                      >
+                                        <Mail className="h-4 w-4" />
+                                      </Button>
+                                    ) : null}
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={!isPending}
+                                      onClick={() => {
+                                        setMarkPaidError("");
+                                        setMarkPaidPayoutId(String(p.id));
+                                        setMarkPaidReferenceId("");
+                                        setOpenMarkPaid(true);
+                                      }}
+                                    >
+                                      Mark as paid
+                                    </Button>
+                                  </div>
                                 </td>
                               </tr>
                             );
                           })
-                      })()}
+                      )}
                     </tbody>
                   </table>
                 </div>
-              </Card>
-            </div>
-
-            <div className="mt-4">
-              <div className="relative w-full overflow-x-auto rounded-lg border custom-scrollbar-horizontal pb-3">
-                <table className="w-full min-w-[1100px] border-collapse text-sm">
-                  <thead className="sticky top-0 z-30 bg-white">
-                    <tr className="bg-white border-b transition-colors hover:bg-muted/50">
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground sticky left-0 z-40 bg-white border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] min-w-[120px]">Payout date</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[100px]">Status</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[150px]">Company</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[150px]">Project</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[120px]">Amount</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[100px]">Method</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[150px]">Reference ID</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[120px]">Paid at</th>
-                      <th className="h-12 px-4 align-middle font-medium text-muted-foreground sticky right-0 z-40 bg-white border-l shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] text-right min-w-[150px]">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="[&_tr:last-child]:border-0">
-                    {payouts.length === 0 ? (
-                      <tr className="border-b transition-colors hover:bg-muted/50">
-                        <td colSpan={9} className="p-8 text-center text-sm text-muted-foreground">
-                          {loadingPayouts ? "Loading payouts..." : "No payouts created yet."}
-                        </td>
-                      </tr>
-                    ) : (
-                      payouts
-                        .filter((p, idx, self) => self.findIndex((x) => x.id === p.id) === idx)
-                        .slice()
-                        .sort((a, b) => {
-                          const da = String(a.scheduledFor ?? "").trim();
-                          const db = String(b.scheduledFor ?? "").trim();
-                          if (da && db) return da.localeCompare(db);
-                          if (da) return -1;
-                          if (db) return 1;
-                          return String(a.createdAt ?? "").localeCompare(String(b.createdAt ?? ""));
-                        })
-                        .map((p) => {
-                          const status = String(p.status ?? "-").toLowerCase();
-                          const isPaid = status === "paid";
-                          const isPending = status === "pending";
-
-                          const employerId = String(p.employerId ?? "").trim();
-                          const employerName = String(
-                            (employersById as any)?.[employerId]?.companyName ??
-                              (employersById as any)?.[employerId]?.name ??
-                              "",
-                          ).trim();
-                          const companyLabel = employerName || employerId || "-";
-
-                          const proposalId = String(p.proposalId ?? "").trim();
-                          const proposal = proposalId ? (proposals ?? []).find((x: any) => String(x?.id ?? "").trim() === proposalId) : null;
-                          const projName = String(
-                            (proposal as any)?.projectName ??
-                              (proposal as any)?.project_name ??
-                              "",
-                          ).trim();
-
-                          const projectLabel = projName || "-";
-
-                          return (
-                            <tr key={p.id} className="bg-white border-b transition-colors hover:bg-muted/50">
-                              <td className="p-4 align-middle sticky left-0 z-10 bg-inherit border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap min-w-[120px]">
-                                {formatIsoDate(p.scheduledFor ?? p.createdAt)}
-                              </td>
-                              <td className="p-4 align-middle min-w-[100px]">
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    isPaid
-                                      ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                                      : isPending
-                                        ? "border-amber-400 bg-amber-50 text-amber-700"
-                                        : "border-slate-300 bg-slate-50 text-slate-700"
-                                  )}
-                                >
-                                  {status || "-"}
-                                </Badge>
-                              </td>
-                              <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{companyLabel}</td>
-                              <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{projectLabel}</td>
-                              <td className="p-4 align-middle whitespace-nowrap font-medium min-w-[120px]">
-                                {formatMoney(p.amountMinor ?? 0, p.currency)}
-                              </td>
-                              <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">{String(p.method ?? "-")}</td>
-                              <td className="p-4 align-middle whitespace-nowrap font-mono text-xs min-w-[150px]">
-                                {String(p.referenceId ?? "-")}
-                              </td>
-                              <td className="p-4 align-middle whitespace-nowrap min-w-[120px]">{formatIsoDate(p.paidAt)}</td>
-                              <td className="p-4 align-middle sticky right-0 z-10 bg-inherit border-l shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] text-right min-w-[150px]">
-                                <div className="flex items-center justify-end gap-2">
-                                  {isPaid ? (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => void sendStipendTransferredEmail(String(p.id))}
-                                      title="Send stipend transferred email"
-                                    >
-                                      <Mail className="h-4 w-4" />
-                                    </Button>
-                                  ) : null}
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={!isPending}
-                                    onClick={() => {
-                                      setMarkPaidError("");
-                                      setMarkPaidPayoutId(String(p.id));
-                                      setMarkPaidReferenceId("");
-                                      setOpenMarkPaid(true);
-                                    }}
-                                  >
-                                    Mark as paid
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                    )}
-                  </tbody>
-                </table>
               </div>
-            </div>
 
-            <Dialog
-              open={openCreatePayout}
-              onOpenChange={(open) => {
-                setOpenCreatePayout(open);
-                if (!open) {
-                  setCreatePayoutError("");
-                  setCreateSource("");
-                  setCreateProposalId("");
-                  setCreateEmployerId("");
-                  setCreateMaxMonths(0);
-                  setCreateInternDueMinor(0);
-                  setCreateBaseMonthlyMinor(0);
-                }
-              }}
-            >
-              <DialogContent className="sm:max-w-xl">
-                <DialogHeader>
-                  <DialogTitle>Create payout</DialogTitle>
-                </DialogHeader>
+              <Dialog
+                open={openCreatePayout}
+                onOpenChange={(open) => {
+                  setOpenCreatePayout(open);
+                  if (!open) {
+                    setCreatePayoutError("");
+                    setCreateSource("");
+                    setCreateProposalId("");
+                    setCreateEmployerId("");
+                    setCreateMaxMonths(0);
+                    setCreateInternDueMinor(0);
+                    setCreateBaseMonthlyMinor(0);
+                  }
+                }}
+              >
+                <DialogContent className="sm:max-w-xl">
+                  <DialogHeader>
+                    <DialogTitle>Create payout</DialogTitle>
+                  </DialogHeader>
 
-                <div className="grid gap-4">
-                  {createInternDueMinor > 0 ? (
-                    <div className="rounded-md border bg-muted/10 px-3 py-2 text-sm">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-muted-foreground">Current intern due</span>
-                        {String(createCurrency || "INR").toUpperCase() === "USD" ? (
-                          <span className="font-medium">
-                            {formatMoney(createInternDueMinor, "USD")} ({formatMoneyInInrIfUsd(createInternDueMinor, "USD")})
-                          </span>
-                        ) : (
-                          <span className="font-medium">{formatMoney(createInternDueMinor, createCurrency)}</span>
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  <div className="grid gap-2">
-                    <Label>Amount (major)</Label>
-                    <Input
-                      inputMode="decimal"
-                      placeholder={createCurrency === "INR" ? "e.g. 8000" : "e.g. 100"}
-                      value={createAmountMajor}
-                      onChange={(e) => setCreateAmountMajor(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Enter amount in {createCurrency === "INR" ? "rupees" : "dollars"}. It will be stored in minor units.
-                    </p>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label>Currency</Label>
-                    <Select value={createCurrency} onValueChange={(v) => setCreateCurrency(v as any)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Currency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="INR">INR</SelectItem>
-                        <SelectItem value="USD">USD</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label>Payout date</Label>
-                    <Input
-                      type="date"
-                      value={createScheduledFor}
-                      onChange={(e) => setCreateScheduledFor(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label>Months (optional)</Label>
-                    {createMaxMonths > 0 ? (
-                      <Select value={createMonths || "1"} onValueChange={(v) => setCreateMonths(v)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Months" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: createMaxMonths }, (_, i) => {
-                            const n = i + 1;
-                            return (
-                              <SelectItem key={String(n)} value={String(n)}>
-                                {n} month{n === 1 ? "" : "s"}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                    ) : (
+                  <div className="grid gap-4">
+                    <div className="grid gap-2">
+                      <Label>Amount (major)</Label>
                       <Input
-                        inputMode="numeric"
-                        placeholder="e.g. 3"
-                        value={createMonths}
-                        onChange={(e) => setCreateMonths(e.target.value)}
+                        inputMode="decimal"
+                        placeholder="e.g. 8000"
+                        value={createAmountMajor}
+                        onChange={(e) => setCreateAmountMajor(e.target.value)}
                       />
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      If you enter more than 1, each time you mark a payout paid, the next month payout will be auto-created.
-                    </p>
+                      <p className="text-xs text-muted-foreground">
+                        Enter amount in INR. It will be stored in minor units.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label>Payout date</Label>
+                      <Input
+                        type="date"
+                        value={createScheduledFor}
+                        onChange={(e) => setCreateScheduledFor(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label>Months (optional)</Label>
+                      {createMaxMonths > 0 ? (
+                        <Select value={createMonths || "1"} onValueChange={(v) => setCreateMonths(v)}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Months" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: createMaxMonths }, (_, i) => {
+                              const n = i + 1;
+                              return (
+                                <SelectItem key={String(n)} value={String(n)}>
+                                  {n} month{n === 1 ? "" : "s"}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          inputMode="numeric"
+                          placeholder="e.g. 3"
+                          value={createMonths}
+                          onChange={(e) => setCreateMonths(e.target.value)}
+                        />
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        If you enter more than 1, each time you mark a payout paid, the next month payout will be auto-created.
+                      </p>
+                    </div>
+
+                    {createPayoutError ? <p className="text-sm text-red-600">{createPayoutError}</p> : null}
+
+                    <div className="flex items-center justify-end gap-2">
+                      <Button variant="outline" onClick={() => setOpenCreatePayout(false)} disabled={creatingPayout}>
+                        Cancel
+                      </Button>
+                      <Button onClick={() => void handleCreatePayout()} disabled={creatingPayout}>
+                        {creatingPayout ? "Creating..." : "Create"}
+                      </Button>
+                    </div>
                   </div>
+                </DialogContent>
+              </Dialog>
 
-                  {createPayoutError ? <p className="text-sm text-red-600">{createPayoutError}</p> : null}
+              <Dialog
+                open={openMarkPaid}
+                onOpenChange={(open) => {
+                  setOpenMarkPaid(open);
+                  if (!open) {
+                    setMarkPaidError("");
+                    setMarkPaidPayoutId("");
+                    setMarkPaidReferenceId("");
+                  }
+                }}
+              >
+                <DialogContent className="sm:max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Mark payout as paid</DialogTitle>
+                  </DialogHeader>
 
-                  <div className="flex items-center justify-end gap-2">
-                    <Button variant="outline" onClick={() => setOpenCreatePayout(false)} disabled={creatingPayout}>
-                      Cancel
-                    </Button>
-                    <Button onClick={() => void handleCreatePayout()} disabled={creatingPayout}>
-                      {creatingPayout ? "Creating..." : "Create"}
-                    </Button>
+                  <div className="grid gap-4">
+                    <div className="grid gap-2">
+                      <Label>Payment reference ID</Label>
+                      <Input
+                        placeholder="Enter transaction / reference id"
+                        value={markPaidReferenceId}
+                        onChange={(e) => setMarkPaidReferenceId(e.target.value)}
+                      />
+                    </div>
+
+                    {markPaidError ? <p className="text-sm text-red-600">{markPaidError}</p> : null}
+
+                    <div className="flex items-center justify-end gap-2">
+                      <Button variant="outline" onClick={() => setOpenMarkPaid(false)} disabled={markingPaid}>
+                        Cancel
+                      </Button>
+                      <Button onClick={() => void handleMarkPaid()} disabled={markingPaid}>
+                        {markingPaid ? "Saving..." : "Mark paid"}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog
-              open={openMarkPaid}
-              onOpenChange={(open) => {
-                setOpenMarkPaid(open);
-                if (!open) {
-                  setMarkPaidError("");
-                  setMarkPaidPayoutId("");
-                  setMarkPaidReferenceId("");
-                }
-              }}
-            >
-              <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Mark payout as paid</DialogTitle>
-                </DialogHeader>
-
-                <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <Label>Payment reference ID</Label>
-                    <Input
-                      placeholder="Enter transaction / reference id"
-                      value={markPaidReferenceId}
-                      onChange={(e) => setMarkPaidReferenceId(e.target.value)}
-                    />
-                  </div>
-
-                  {markPaidError ? <p className="text-sm text-red-600">{markPaidError}</p> : null}
-
-                  <div className="flex items-center justify-end gap-2">
-                    <Button variant="outline" onClick={() => setOpenMarkPaid(false)} disabled={markingPaid}>
-                      Cancel
-                    </Button>
-                    <Button onClick={() => void handleMarkPaid()} disabled={markingPaid}>
-                      {markingPaid ? "Saving..." : "Mark paid"}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </TabsContent>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </TabsContent>
 
           <TabsContent value="timesheets" className="px-6 pb-6 pt-4">
             <ScrollArea className="h-[600px] pr-4">
               <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-sm text-muted-foreground">Only approved timesheets are shown here.</p>
-                {timesheetsError ? <p className="text-xs text-rose-600 mt-1">{timesheetsError}</p> : null}
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={loadingTimesheets}
-                onClick={() => {
-                  if (!internId) return;
-                  setLoadingTimesheets(true);
-                  setTimesheetsError("");
-                  void (async () => {
-                    try {
-                      const res = await apiRequest(
-                        "GET",
-                        `/api/intern/${encodeURIComponent(String(internId))}/timesheets?limit=500`,
-                      );
-                      const json = await res.json().catch(() => null);
-                      const list = Array.isArray(json?.timesheets) ? (json.timesheets as any[]) : [];
-                      setTimesheets(list);
-                    } catch (e: any) {
-                      setTimesheets([]);
-                      setTimesheetsError(String(e?.message ?? "Failed to fetch timesheets"));
-                    } finally {
-                      setLoadingTimesheets(false);
-                    }
-                  })();
-                }}
-              >
-                {loadingTimesheets ? "Loading..." : "Refresh"}
-              </Button>
-            </div>
-
-            <div className="grid gap-3 mt-4 md:grid-cols-2 lg:grid-cols-4">
-              <div className="relative lg:col-span-2">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={timesheetSearch}
-                  onChange={(e) => setTimesheetSearch(e.target.value)}
-                  placeholder="Search project / company / role / duration"
-                  className="pl-9"
-                />
-              </div>
-
-              <Select value={timesheetProjectFilter} onValueChange={(v) => setTimesheetProjectFilter(v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Project" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All projects</SelectItem>
-                  {timesheetProjectOptions.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={timesheetCompanyFilter} onValueChange={(v) => setTimesheetCompanyFilter(v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Company" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All companies</SelectItem>
-                  {timesheetCompanyOptions.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="mt-4">
-              {loadingTimesheets ? (
-                <Card className="p-6">
-                  <p className="text-sm text-muted-foreground">Loading timesheets...</p>
-                </Card>
-              ) : approvedTimesheets.length === 0 ? (
-                <Card className="p-6">
-                  <p className="text-sm text-muted-foreground">No approved timesheets found.</p>
-                </Card>
-              ) : filteredApprovedTimesheets.length === 0 ? (
-                <Card className="p-6">
-                  <p className="text-sm text-muted-foreground">No approved timesheets match your filters.</p>
-                </Card>
-              ) : (
-                <div className="grid gap-3">
-                  {filteredApprovedTimesheets.map((t: any) => {
-                    const tid = String(t?.id ?? "").trim();
-                    const pmeta = getTimesheetProposalMeta(t);
-                    const periodStart = formatIsoDate(t?.periodStart);
-                    const periodEnd = formatIsoDate(t?.periodEnd);
-                    const summary = timesheetAttendanceSummary(t);
-                    const managerNote = String(t?.managerNote ?? t?.manager_note ?? "").trim();
-                    const approvedAt = formatIsoDate(t?.approvedAt ?? t?.approved_at ?? null);
-                    return (
-                      <Card key={tid || Math.random()} className="p-5">
-                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                          <div className="min-w-0 space-y-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <div className="text-sm font-semibold truncate">
-                                {periodStart} → {periodEnd}
-                              </div>
-                              <Badge className="bg-emerald-600">Approved</Badge>
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              <span className="font-medium text-slate-700">{pmeta.projectName}</span>
-                              {pmeta.companyName && pmeta.companyName !== "-" ? ` • ${pmeta.companyName}` : ""}
-                              {pmeta.roleTitle && pmeta.roleTitle !== "-" ? ` • ${pmeta.roleTitle}` : ""}
-                              {pmeta.duration && pmeta.duration !== "-" ? ` • ${pmeta.duration}` : ""}
-                              {approvedAt && approvedAt !== "-" ? ` • Approved: ${approvedAt}` : ""}
-                            </div>
-                            <div className="grid gap-2 md:grid-cols-5 text-xs text-muted-foreground">
-                              <div className="rounded-md border bg-muted/20 p-2">
-                                <div className="font-medium text-slate-700">Present</div>
-                                <div className="mt-0.5">{summary.present}</div>
-                              </div>
-                              <div className="rounded-md border bg-muted/20 p-2">
-                                <div className="font-medium text-slate-700">Absent</div>
-                                <div className="mt-0.5">{summary.absent}</div>
-                              </div>
-                              <div className="rounded-md border bg-muted/20 p-2">
-                                <div className="font-medium text-slate-700">Fixed off</div>
-                                <div className="mt-0.5">{summary.fixedOff}</div>
-                              </div>
-                              <div className="rounded-md border bg-muted/20 p-2">
-                                <div className="font-medium text-slate-700">Holiday</div>
-                                <div className="mt-0.5">{summary.holiday}</div>
-                              </div>
-                              <div className="rounded-md border bg-muted/20 p-2">
-                                <div className="font-medium text-slate-700">Days</div>
-                                <div className="mt-0.5">
-                                  {summary.filled}/{summary.total}
-                                </div>
-                              </div>
-                            </div>
-                            {managerNote ? (
-                              <div className="rounded-md border bg-muted/20 p-3 text-sm whitespace-pre-wrap">
-                                <span className="text-xs font-medium text-muted-foreground">Manager note</span>
-                                <div className="mt-1">{managerNote}</div>
-                              </div>
-                            ) : null}
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedTimesheet(t);
-                                setOpenTimesheetDetails(true);
-                              }}
-                            >
-                              <Clock className="h-4 w-4 mr-2" />
-                              View
-                            </Button>
-                            {pmeta.projectId ? (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setLocation(`/admin/projects?projectId=${encodeURIComponent(pmeta.projectId)}`);
-                                }}
-                              >
-                                View Project Details
-                              </Button>
-                            ) : null}
-                          </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
+                <div>
+                  <p className="text-sm text-muted-foreground">Only approved timesheets are shown here.</p>
+                  {timesheetsError ? <p className="text-xs text-rose-600 mt-1">{timesheetsError}</p> : null}
                 </div>
-              )}
-            </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={loadingTimesheets}
+                  onClick={() => {
+                    if (!internId) return;
+                    setLoadingTimesheets(true);
+                    setTimesheetsError("");
+                    void (async () => {
+                      try {
+                        const res = await apiRequest(
+                          "GET",
+                          `/api/intern/${encodeURIComponent(String(internId))}/timesheets?limit=500`,
+                        );
+                        const json = await res.json().catch(() => null);
+                        const list = Array.isArray(json?.timesheets) ? (json.timesheets as any[]) : [];
+                        setTimesheets(list);
+                      } catch (e: any) {
+                        setTimesheets([]);
+                        setTimesheetsError(String(e?.message ?? "Failed to fetch timesheets"));
+                      } finally {
+                        setLoadingTimesheets(false);
+                      }
+                    })();
+                  }}
+                >
+                  {loadingTimesheets ? "Loading..." : "Refresh"}
+                </Button>
+              </div>
 
-            <Dialog
-              open={openTimesheetDetails}
-              onOpenChange={(open) => {
-                setOpenTimesheetDetails(open);
-                if (!open) setSelectedTimesheet(null);
-              }}
-            >
-              <DialogContent className="max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>Timesheet details</DialogTitle>
-                </DialogHeader>
+              <div className="grid gap-3 mt-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="relative lg:col-span-2">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={timesheetSearch}
+                    onChange={(e) => setTimesheetSearch(e.target.value)}
+                    placeholder="Search project / company / role / duration"
+                    className="pl-9"
+                  />
+                </div>
 
-                <ScrollArea className="max-h-[70vh] pr-3">
-                  {!selectedTimesheet ? (
-                    <p className="text-sm text-muted-foreground">No timesheet selected.</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {(() => {
-                        const t = selectedTimesheet;
-                        const pmeta = getTimesheetProposalMeta(t);
-                        const periodStart = formatIsoDate(t?.periodStart);
-                        const periodEnd = formatIsoDate(t?.periodEnd);
-                        const approvedAt = formatIsoDate(t?.approvedAt ?? t?.approved_at ?? null);
-                        const managerNote = String(t?.managerNote ?? t?.manager_note ?? "").trim();
-                        const internNote = String(t?.internNote ?? t?.intern_note ?? "").trim();
-                        const entries = Array.isArray(t?.entries) ? t.entries : [];
-                        const summary = timesheetAttendanceSummary(t);
+                <Select value={timesheetProjectFilter} onValueChange={(v) => setTimesheetProjectFilter(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All projects</SelectItem>
+                    {timesheetProjectOptions.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-                        const normalized = entries
-                          .map((e: any) => {
-                            const date = String(e?.date ?? "").slice(0, 10);
-                            const status = String(e?.status ?? "").trim();
-                            return { date, status };
-                          })
-                          .filter((r: any) => r.date)
-                          .sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
+                <Select value={timesheetCompanyFilter} onValueChange={(v) => setTimesheetCompanyFilter(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All companies</SelectItem>
+                    {timesheetCompanyOptions.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                        return (
-                          <>
-                            <Card className="p-4">
-                              <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div className="space-y-1">
-                                  <div className="text-sm font-semibold">
-                                    {periodStart} → {periodEnd}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    <span className="font-medium text-slate-700">{pmeta.projectName}</span>
-                                    {pmeta.companyName && pmeta.companyName !== "-" ? ` • ${pmeta.companyName}` : ""}
-                                    {pmeta.roleTitle && pmeta.roleTitle !== "-" ? ` • ${pmeta.roleTitle}` : ""}
-                                    {pmeta.duration && pmeta.duration !== "-" ? ` • ${pmeta.duration}` : ""}
-                                    {approvedAt && approvedAt !== "-" ? ` • Approved: ${approvedAt}` : ""}
-                                  </div>
+              <div className="mt-4">
+                {loadingTimesheets ? (
+                  <Card className="p-6">
+                    <p className="text-sm text-muted-foreground">Loading timesheets...</p>
+                  </Card>
+                ) : approvedTimesheets.length === 0 ? (
+                  <Card className="p-6">
+                    <p className="text-sm text-muted-foreground">No approved timesheets found.</p>
+                  </Card>
+                ) : filteredApprovedTimesheets.length === 0 ? (
+                  <Card className="p-6">
+                    <p className="text-sm text-muted-foreground">No approved timesheets match your filters.</p>
+                  </Card>
+                ) : (
+                  <div className="grid gap-3">
+                    {filteredApprovedTimesheets.map((t: any) => {
+                      const tid = String(t?.id ?? "").trim();
+                      const pmeta = getTimesheetProposalMeta(t);
+                      const periodStart = formatIsoDate(t?.periodStart);
+                      const periodEnd = formatIsoDate(t?.periodEnd);
+                      const summary = timesheetAttendanceSummary(t);
+                      const managerNote = String(t?.managerNote ?? t?.manager_note ?? "").trim();
+                      const approvedAt = formatIsoDate(t?.approvedAt ?? t?.approved_at ?? null);
+                      return (
+                        <Card key={tid || Math.random()} className="p-5">
+                          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0 space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="text-sm font-semibold truncate">
+                                  {periodStart} → {periodEnd}
                                 </div>
                                 <Badge className="bg-emerald-600">Approved</Badge>
                               </div>
-                            </Card>
-
-                            <div className="grid gap-3 md:grid-cols-2">
-                              <Card className="p-4">
-                                <p className="text-xs font-medium text-muted-foreground">Attendance summary</p>
-                                <div className="mt-2 grid gap-2 grid-cols-2 text-sm">
-                                  <div className="rounded-md border bg-muted/20 p-2">
-                                    <div className="text-xs text-muted-foreground">Present</div>
-                                    <div className="font-medium text-slate-800">{summary.present}</div>
-                                  </div>
-                                  <div className="rounded-md border bg-muted/20 p-2">
-                                    <div className="text-xs text-muted-foreground">Absent</div>
-                                    <div className="font-medium text-slate-800">{summary.absent}</div>
-                                  </div>
-                                  <div className="rounded-md border bg-muted/20 p-2">
-                                    <div className="text-xs text-muted-foreground">Fixed off</div>
-                                    <div className="font-medium text-slate-800">{summary.fixedOff}</div>
-                                  </div>
-                                  <div className="rounded-md border bg-muted/20 p-2">
-                                    <div className="text-xs text-muted-foreground">Holiday</div>
-                                    <div className="font-medium text-slate-800">{summary.holiday}</div>
+                              <div className="text-xs text-muted-foreground">
+                                <span className="font-medium text-slate-700">{pmeta.projectName}</span>
+                                {pmeta.companyName && pmeta.companyName !== "-" ? ` • ${pmeta.companyName}` : ""}
+                                {pmeta.roleTitle && pmeta.roleTitle !== "-" ? ` • ${pmeta.roleTitle}` : ""}
+                                {pmeta.duration && pmeta.duration !== "-" ? ` • ${pmeta.duration}` : ""}
+                                {approvedAt && approvedAt !== "-" ? ` • Approved: ${approvedAt}` : ""}
+                              </div>
+                              <div className="grid gap-2 md:grid-cols-5 text-xs text-muted-foreground">
+                                <div className="rounded-md border bg-muted/20 p-2">
+                                  <div className="font-medium text-slate-700">Present</div>
+                                  <div className="mt-0.5">{summary.present}</div>
+                                </div>
+                                <div className="rounded-md border bg-muted/20 p-2">
+                                  <div className="font-medium text-slate-700">Absent</div>
+                                  <div className="mt-0.5">{summary.absent}</div>
+                                </div>
+                                <div className="rounded-md border bg-muted/20 p-2">
+                                  <div className="font-medium text-slate-700">Fixed off</div>
+                                  <div className="mt-0.5">{summary.fixedOff}</div>
+                                </div>
+                                <div className="rounded-md border bg-muted/20 p-2">
+                                  <div className="font-medium text-slate-700">Holiday</div>
+                                  <div className="mt-0.5">{summary.holiday}</div>
+                                </div>
+                                <div className="rounded-md border bg-muted/20 p-2">
+                                  <div className="font-medium text-slate-700">Days</div>
+                                  <div className="mt-0.5">
+                                    {summary.filled}/{summary.total}
                                   </div>
                                 </div>
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                  Filled days: {summary.filled}/{summary.total}
+                              </div>
+                              {managerNote ? (
+                                <div className="rounded-md border bg-muted/20 p-3 text-sm whitespace-pre-wrap">
+                                  <span className="text-xs font-medium text-muted-foreground">Manager note</span>
+                                  <div className="mt-1">{managerNote}</div>
                                 </div>
-                              </Card>
-
-                              <Card className="p-4">
-                                <p className="text-xs font-medium text-muted-foreground">Notes</p>
-                                <div className="mt-2 space-y-2 text-sm">
-                                  <div className="rounded-md border bg-muted/20 p-3 whitespace-pre-wrap">
-                                    <span className="text-xs font-medium text-muted-foreground">Intern note</span>
-                                    <div className="mt-1">{internNote || "-"}</div>
-                                  </div>
-                                  <div className="rounded-md border bg-muted/20 p-3 whitespace-pre-wrap">
-                                    <span className="text-xs font-medium text-muted-foreground">Manager note</span>
-                                    <div className="mt-1">{managerNote || "-"}</div>
-                                  </div>
-                                </div>
-                              </Card>
+                              ) : null}
                             </div>
 
-                            <Card className="p-4">
-                              <p className="text-xs font-medium text-muted-foreground">Entries</p>
-                              <div className="mt-3 overflow-x-auto rounded-lg border custom-scrollbar-horizontal pb-3">
-                                <Table className="border-collapse">
-                                  <TableHeader className="sticky top-0 z-30 bg-background">
-                                    <TableRow className="bg-background">
-                                      <TableHead>Date</TableHead>
-                                      <TableHead>Status</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {normalized.length === 0 ? (
-                                      <TableRow>
-                                        <TableCell colSpan={2} className="text-sm text-muted-foreground">
-                                          No entries.
-                                        </TableCell>
-                                      </TableRow>
-                                    ) : (
-                                      normalized.map((r: any) => (
-                                        <TableRow key={String(r.date)} className="bg-background transition-colors hover:bg-muted/40">
-                                          <TableCell>{String(r.date)}</TableCell>
-                                          <TableCell>{String(r.status || "-")}</TableCell>
-                                        </TableRow>
-                                      ))
-                                    )}
-                                  </TableBody>
-                                </Table>
+                            <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedTimesheet(t);
+                                  setOpenTimesheetDetails(true);
+                                }}
+                              >
+                                <Clock className="h-4 w-4 mr-2" />
+                                View
+                              </Button>
+                              {pmeta.projectId ? (
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setLocation(`/admin/projects?projectId=${encodeURIComponent(pmeta.projectId)}`);
+                                  }}
+                                >
+                                  View Project Details
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <Dialog
+                open={openTimesheetDetails}
+                onOpenChange={(open) => {
+                  setOpenTimesheetDetails(open);
+                  if (!open) setSelectedTimesheet(null);
+                }}
+              >
+                <DialogContent className="max-w-3xl">
+                  <DialogHeader>
+                    <DialogTitle>Timesheet details</DialogTitle>
+                  </DialogHeader>
+
+                  <ScrollArea className="max-h-[70vh] pr-3">
+                    {!selectedTimesheet ? (
+                      <p className="text-sm text-muted-foreground">No timesheet selected.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {(() => {
+                          const t = selectedTimesheet;
+                          const pmeta = getTimesheetProposalMeta(t);
+                          const periodStart = formatIsoDate(t?.periodStart);
+                          const periodEnd = formatIsoDate(t?.periodEnd);
+                          const approvedAt = formatIsoDate(t?.approvedAt ?? t?.approved_at ?? null);
+                          const managerNote = String(t?.managerNote ?? t?.manager_note ?? "").trim();
+                          const internNote = String(t?.internNote ?? t?.intern_note ?? "").trim();
+                          const entries = Array.isArray(t?.entries) ? t.entries : [];
+                          const summary = timesheetAttendanceSummary(t);
+
+                          const normalized = entries
+                            .map((e: any) => {
+                              const date = String(e?.date ?? "").slice(0, 10);
+                              const status = String(e?.status ?? "").trim();
+                              return { date, status };
+                            })
+                            .filter((r: any) => r.date)
+                            .sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
+
+                          return (
+                            <>
+                              <Card className="p-4">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                  <div className="space-y-1">
+                                    <div className="text-sm font-semibold">
+                                      {periodStart} → {periodEnd}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      <span className="font-medium text-slate-700">{pmeta.projectName}</span>
+                                      {pmeta.companyName && pmeta.companyName !== "-" ? ` • ${pmeta.companyName}` : ""}
+                                      {pmeta.roleTitle && pmeta.roleTitle !== "-" ? ` • ${pmeta.roleTitle}` : ""}
+                                      {pmeta.duration && pmeta.duration !== "-" ? ` • ${pmeta.duration}` : ""}
+                                      {approvedAt && approvedAt !== "-" ? ` • Approved: ${approvedAt}` : ""}
+                                    </div>
+                                  </div>
+                                  <Badge className="bg-emerald-600">Approved</Badge>
+                                </div>
+                              </Card>
+
+                              <div className="grid gap-3 md:grid-cols-2">
+                                <Card className="p-4">
+                                  <p className="text-xs font-medium text-muted-foreground">Attendance summary</p>
+                                  <div className="mt-2 grid gap-2 grid-cols-2 text-sm">
+                                    <div className="rounded-md border bg-muted/20 p-2">
+                                      <div className="text-xs text-muted-foreground">Present</div>
+                                      <div className="font-medium text-slate-800">{summary.present}</div>
+                                    </div>
+                                    <div className="rounded-md border bg-muted/20 p-2">
+                                      <div className="text-xs text-muted-foreground">Absent</div>
+                                      <div className="font-medium text-slate-800">{summary.absent}</div>
+                                    </div>
+                                    <div className="rounded-md border bg-muted/20 p-2">
+                                      <div className="text-xs text-muted-foreground">Fixed off</div>
+                                      <div className="font-medium text-slate-800">{summary.fixedOff}</div>
+                                    </div>
+                                    <div className="rounded-md border bg-muted/20 p-2">
+                                      <div className="text-xs text-muted-foreground">Holiday</div>
+                                      <div className="font-medium text-slate-800">{summary.holiday}</div>
+                                    </div>
+                                  </div>
+                                  <div className="mt-2 text-xs text-muted-foreground">
+                                    Filled days: {summary.filled}/{summary.total}
+                                  </div>
+                                </Card>
+
+                                <Card className="p-4">
+                                  <p className="text-xs font-medium text-muted-foreground">Notes</p>
+                                  <div className="mt-2 space-y-2 text-sm">
+                                    <div className="rounded-md border bg-muted/20 p-3 whitespace-pre-wrap">
+                                      <span className="text-xs font-medium text-muted-foreground">Intern note</span>
+                                      <div className="mt-1">{internNote || "-"}</div>
+                                    </div>
+                                    <div className="rounded-md border bg-muted/20 p-3 whitespace-pre-wrap">
+                                      <span className="text-xs font-medium text-muted-foreground">Manager note</span>
+                                      <div className="mt-1">{managerNote || "-"}</div>
+                                    </div>
+                                  </div>
+                                </Card>
                               </div>
-                            </Card>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </ScrollArea>
-              </DialogContent>
-            </Dialog>
-          </ScrollArea>
-        </TabsContent>
+
+                              <Card className="p-4">
+                                <p className="text-xs font-medium text-muted-foreground">Entries</p>
+                                <div className="mt-3 overflow-x-auto rounded-lg border custom-scrollbar-horizontal pb-3">
+                                  <Table className="border-collapse">
+                                    <TableHeader className="sticky top-0 z-30 bg-background">
+                                      <TableRow className="bg-background">
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Status</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {normalized.length === 0 ? (
+                                        <TableRow>
+                                          <TableCell colSpan={2} className="text-sm text-muted-foreground">
+                                            No entries.
+                                          </TableCell>
+                                        </TableRow>
+                                      ) : (
+                                        normalized.map((r: any) => (
+                                          <TableRow key={String(r.date)} className="bg-background transition-colors hover:bg-muted/40">
+                                            <TableCell>{String(r.date)}</TableCell>
+                                            <TableCell>{String(r.status || "-")}</TableCell>
+                                          </TableRow>
+                                        ))
+                                      )}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </Card>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </DialogContent>
+              </Dialog>
+            </ScrollArea>
+          </TabsContent>
 
           <TabsContent value="profile" className="px-6 pb-6 pt-4">
             <ScrollArea className="h-[600px] pr-4">
               <div className="grid gap-4 md:grid-cols-2">
-              <Card className="p-4 md:col-span-2">
-                <p className="text-sm font-medium text-muted-foreground">About Me</p>
-                <div className="mt-2 space-y-3 text-sm">
-                
+                <Card className="p-4 md:col-span-2">
+                  <p className="text-sm font-medium text-muted-foreground">About Me</p>
+                  <div className="mt-2 space-y-3 text-sm">
 
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <div className="rounded-md border bg-white p-3">
-                      <p className="text-xs text-muted-foreground">City</p>
-                      <p className="mt-1">{summary.city ? String(summary.city) : "-"}</p>
-                    </div>
-                    <div className="rounded-md border bg-white p-3">
-                      <p className="text-xs text-muted-foreground">State</p>
-                      <p className="mt-1">{summary.state ? String(summary.state) : "-"}</p>
-                    </div>
-                   
-                    <div className="rounded-md border bg-white p-3">
-                      <p className="text-xs text-muted-foreground">Aadhaar</p>
-                      <p className="mt-1 font-mono">{summary.aadhaarNumber ? String(summary.aadhaarNumber) : "-"}</p>
-                    </div>
-                    <div className="rounded-md border bg-white p-3">
-                      <p className="text-xs text-muted-foreground">PAN</p>
-                      <p className="mt-1 font-mono">{summary.panNumber ? String(summary.panNumber) : "-"}</p>
-                    </div>
-                    {summary.emergencyPhone && (
-                      <div className="rounded-md border bg-white p-3 md:col-span-2">
-                        <p className="text-xs text-muted-foreground">Emergency Contact</p>
-                        <p className="mt-1 font-medium text-rose-600">
-                          {summary.emergencyName ? `${summary.emergencyName}: ` : ""}
-                          {summary.emergencyPhone}
-                        </p>
+
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <div className="rounded-md border bg-white p-3">
+                        <p className="text-xs text-muted-foreground">City</p>
+                        <p className="mt-1">{summary.city ? String(summary.city) : "-"}</p>
                       </div>
+                      <div className="rounded-md border bg-white p-3">
+                        <p className="text-xs text-muted-foreground">State</p>
+                        <p className="mt-1">{summary.state ? String(summary.state) : "-"}</p>
+                      </div>
+
+                      <div className="rounded-md border bg-white p-3">
+                        <p className="text-xs text-muted-foreground">Aadhaar</p>
+                        <p className="mt-1 font-mono">{summary.aadhaarNumber ? String(summary.aadhaarNumber) : "-"}</p>
+                      </div>
+                      <div className="rounded-md border bg-white p-3">
+                        <p className="text-xs text-muted-foreground">PAN</p>
+                        <p className="mt-1 font-mono">{summary.panNumber ? String(summary.panNumber) : "-"}</p>
+                      </div>
+                      {summary.emergencyPhone && (
+                        <div className="rounded-md border bg-white p-3 md:col-span-2">
+                          <p className="text-xs text-muted-foreground">Emergency Contact</p>
+                          <p className="mt-1 font-medium text-rose-600">
+                            {summary.emergencyName ? `${summary.emergencyName}: ` : ""}
+                            {summary.emergencyPhone}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid gap-2 md:grid-cols-2">
+
+                      <div>
+                        <p className="text-xs text-muted-foreground">LinkedIn</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <div className="min-w-0 rounded-md border bg-white px-3 py-2 text-sm truncate">
+                            {summary.linkedinUrl ? String(summary.linkedinUrl) : "-"}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!summary.linkedinUrl}
+                            onClick={() => openExternal(summary.linkedinUrl)}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!summary.linkedinUrl}
+                            onClick={() => void copyToClipboard(summary.linkedinUrl)}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="p-6 border-slate-200 shadow-sm md:col-span-2">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                        <Briefcase className="h-4 w-4 text-emerald-600" />
+                      </div>
+                      Professional Experience
+                    </h3>
+                    <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200">
+                      {(Array.isArray(summary.experience) ? summary.experience : []).length} Records
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-6">
+                    {(Array.isArray(summary.experience) ? summary.experience : []).length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50/30">
+                        <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                          <Briefcase className="h-6 w-6 text-slate-400" />
+                        </div>
+                        <p className="text-sm font-medium text-slate-500">No professional experience added yet.</p>
+                      </div>
+                    ) : (
+                      (summary.experience as any[]).map((e: any, idx: number) => {
+                        const company = String(e?.company ?? e?.companyName ?? e?.organization ?? "-").trim() || "-";
+                        const role = String(e?.role ?? e?.title ?? e?.position ?? "-").trim() || "-";
+                        const type = String(e?.type ?? "").trim();
+                        const start = String(e?.from ?? e?.startDate ?? e?.start ?? "").trim();
+                        const end = String(e?.to ?? e?.endDate ?? e?.end ?? "").trim();
+                        const period = [start, end].filter(Boolean).join(" - ") || "-";
+                        const description = String(e?.description ?? e?.details ?? "-").trim() || "-";
+
+                        return (
+                          <div
+                            key={String(e?.id ?? `${company}-${role}-${idx}`)}
+                            className="relative pl-6 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[2px] before:bg-slate-100 group hover:before:bg-emerald-200 transition-all"
+                          >
+                            <div className="absolute left-[-5px] top-0 h-[12px] w-[12px] rounded-full border-2 border-white bg-slate-200 group-hover:bg-emerald-500 transition-colors" />
+
+                            <div className="flex flex-col gap-3">
+                              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  {type && (
+                                    <div className="text-[10px] uppercase tracking-wider font-bold text-emerald-600 mb-1">
+                                      {type}
+                                    </div>
+                                  )}
+                                  <h4 className="text-base font-bold text-slate-900 leading-tight group-hover:text-emerald-700 transition-colors truncate">
+                                    {role}
+                                  </h4>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                                      <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                                      {company}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100 whitespace-nowrap self-start">
+                                  <CalendarDays className="h-3 w-3" />
+                                  {period}
+                                </div>
+                              </div>
+
+                              {description !== "-" && (
+                                <div className="rounded-xl border border-slate-50 bg-slate-50/40 p-4 mt-1">
+                                  <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">
+                                    {description}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="p-4 md:col-span-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Skills</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {skillsForDisplay.length === 0 && (
+                          <p className="text-sm text-muted-foreground">No skills added.</p>
+                        )}
+                        {skillsForDisplay.map((s) => {
+                          const level = s.rating === 3 ? "Advanced" : s.rating === 2 ? "Intermediate" : "Beginner";
+                          const colorClass = s.rating === 3 ? "bg-emerald-100 text-emerald-800 border-emerald-200" : s.rating === 2 ? "bg-blue-100 text-blue-800 border-blue-200" : "bg-slate-100 text-slate-800 border-slate-200";
+                          return (
+                            <div key={s.id} className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium", colorClass)}>
+                              {s.name}
+                              <span className="w-1 h-1 rounded-full bg-current opacity-40" />
+                              <span className="opacity-80 font-normal">{level}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSkillDraft(skillsForDisplay.map(s => ({ ...s })));
+                        setSkillError(null);
+                        setOpenEditSkills(true);
+                      }}
+                    >
+                      Edit Skills
+                    </Button>
+                  </div>
+                </Card>
+
+                <Card className="p-6 border-slate-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                        <FileText className="h-4 w-4 text-indigo-600" />
+                      </div>
+                      Academics
+                    </h3>
+                    {summary.academics?.status && (
+                      <Badge variant="outline" className={cn(
+                        "px-2 py-0.5 text-[10px] font-medium rounded-full uppercase tracking-wider",
+                        summary.academics.status === "Completed"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : "bg-amber-50 text-amber-700 border-amber-200"
+                      )}>
+                        {summary.academics.status}
+                      </Badge>
                     )}
                   </div>
 
-                  <div className="grid gap-2 md:grid-cols-2">
-                    
-                    <div>
-                      <p className="text-xs text-muted-foreground">LinkedIn</p>
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <div className="min-w-0 rounded-md border bg-white px-3 py-2 text-sm truncate">
-                          {summary.linkedinUrl ? String(summary.linkedinUrl) : "-"}
+                  <div className="space-y-6">
+                    {/* Primary Education */}
+                    <div className="relative pl-4 border-l-2 border-slate-100 pb-2">
+                      <div className="absolute -left-[9px] top-0 h-4 w-4 rounded-full border-2 border-white bg-indigo-500 shadow-sm" />
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-indigo-600 uppercase tracking-tight bg-indigo-50 px-1.5 py-0.5 rounded">
+                            {summary.academics?.level || "-"}
+                          </span>
+                          <span className="text-sm font-semibold text-slate-800">
+                            {summary.academics?.degree || "-"}
+                          </span>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={!summary.linkedinUrl}
-                          onClick={() => openExternal(summary.linkedinUrl)}
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={!summary.linkedinUrl}
-                          onClick={() => void copyToClipboard(summary.linkedinUrl)}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-6 border-slate-200 shadow-sm md:col-span-2">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-                      <Briefcase className="h-4 w-4 text-emerald-600" />
-                    </div>
-                    Professional Experience
-                  </h3>
-                  <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200">
-                    {(Array.isArray(summary.experience) ? summary.experience : []).length} Records
-                  </Badge>
-                </div>
-
-                <div className="space-y-6">
-                  {(Array.isArray(summary.experience) ? summary.experience : []).length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50/30">
-                      <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
-                        <Briefcase className="h-6 w-6 text-slate-400" />
-                      </div>
-                      <p className="text-sm font-medium text-slate-500">No professional experience added yet.</p>
-                    </div>
-                  ) : (
-                    (summary.experience as any[]).map((e: any, idx: number) => {
-                      const company = String(e?.company ?? e?.companyName ?? e?.organization ?? "-").trim() || "-";
-                      const role = String(e?.role ?? e?.title ?? e?.position ?? "-").trim() || "-";
-                      const type = String(e?.type ?? "").trim();
-                      const start = String(e?.from ?? e?.startDate ?? e?.start ?? "").trim();
-                      const end = String(e?.to ?? e?.endDate ?? e?.end ?? "").trim();
-                      const period = [start, end].filter(Boolean).join(" - ") || "-";
-                      const description = String(e?.description ?? e?.details ?? "-").trim() || "-";
-                      
-                      return (
-                        <div 
-                          key={String(e?.id ?? `${company}-${role}-${idx}`)}
-                          className="relative pl-6 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[2px] before:bg-slate-100 group hover:before:bg-emerald-200 transition-all"
-                        >
-                          <div className="absolute left-[-5px] top-0 h-[12px] w-[12px] rounded-full border-2 border-white bg-slate-200 group-hover:bg-emerald-500 transition-colors" />
-                          
-                          <div className="flex flex-col gap-3">
-                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                {type && (
-                                  <div className="text-[10px] uppercase tracking-wider font-bold text-emerald-600 mb-1">
-                                    {type}
-                                  </div>
-                                )}
-                                <h4 className="text-base font-bold text-slate-900 leading-tight group-hover:text-emerald-700 transition-colors truncate">
-                                  {role}
-                                </h4>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-                                    <Building2 className="h-3.5 w-3.5 text-slate-400" />
-                                    {company}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100 whitespace-nowrap self-start">
-                                <CalendarDays className="h-3 w-3" />
-                                {period}
-                              </div>
-                            </div>
-
-                            {description !== "-" && (
-                              <div className="rounded-xl border border-slate-50 bg-slate-50/40 p-4 mt-1">
-                                <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">
-                                  {description}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </Card>
-
-              <Card className="p-4 md:col-span-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Skills</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {skillsForDisplay.length === 0 && (
-                        <p className="text-sm text-muted-foreground">No skills added.</p>
-                      )}
-                      {skillsForDisplay.map((s) => {
-                        const level = s.rating === 3 ? "Advanced" : s.rating === 2 ? "Intermediate" : "Beginner";
-                        const colorClass = s.rating === 3 ? "bg-emerald-100 text-emerald-800 border-emerald-200" : s.rating === 2 ? "bg-blue-100 text-blue-800 border-blue-200" : "bg-slate-100 text-slate-800 border-slate-200";
-                        return (
-                          <div key={s.id} className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium", colorClass)}>
-                            {s.name}
-                            <span className="w-1 h-1 rounded-full bg-current opacity-40" />
-                            <span className="opacity-80 font-normal">{level}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setSkillDraft(skillsForDisplay.map(s => ({ ...s })));
-                      setSkillError(null);
-                      setOpenEditSkills(true);
-                    }}
-                  >
-                    Edit Skills
-                  </Button>
-                </div>
-              </Card>
-
-              <Card className="p-6 border-slate-200 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center">
-                      <FileText className="h-4 w-4 text-indigo-600" />
-                    </div>
-                    Academics
-                  </h3>
-                  {summary.academics?.status && (
-                    <Badge variant="outline" className={cn(
-                      "px-2 py-0.5 text-[10px] font-medium rounded-full uppercase tracking-wider",
-                      summary.academics.status === "Completed" 
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
-                        : "bg-amber-50 text-amber-700 border-amber-200"
-                    )}>
-                      {summary.academics.status}
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="space-y-6">
-                  {/* Primary Education */}
-                  <div className="relative pl-4 border-l-2 border-slate-100 pb-2">
-                    <div className="absolute -left-[9px] top-0 h-4 w-4 rounded-full border-2 border-white bg-indigo-500 shadow-sm" />
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-indigo-600 uppercase tracking-tight bg-indigo-50 px-1.5 py-0.5 rounded">
-                          {summary.academics?.level || "-"}
-                        </span>
-                        <span className="text-sm font-semibold text-slate-800">
-                          {summary.academics?.degree || "-"}
-                        </span>
-                      </div>
-                      <p className="text-sm font-medium text-slate-700 leading-tight">
-                        {summary.academics?.institution || "-"}
-                      </p>
-                      {summary.academics?.specialization && (
-                        <p className="text-xs text-slate-500 italic">
-                          Specialization: {summary.academics.specialization}
+                        <p className="text-sm font-medium text-slate-700 leading-tight">
+                          {summary.academics?.institution || "-"}
                         </p>
-                      )}
-                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                          <CalendarDays className="h-3.5 w-3.5" />
-                          <span>{summary.academics?.startYear || "-"} — {summary.academics?.endYear || (summary.academics?.status === "Pursuing" ? "Present" : "-")}</span>
-                        </div>
-                        {summary.academics?.score && (
-                          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md">
-                            <span className="text-slate-500 font-normal">Score:</span>
-                            {summary.academics.score} {summary.academics.scoreType === "cgpa" ? "CGPA" : "%"}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Professional Courses */}
-                  {Array.isArray(summary.academics?.professionalCourses) && summary.academics.professionalCourses.length > 0 && (
-                    <div className="pt-4 border-t border-slate-100">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Professional Courses</p>
-                      <div className="grid gap-3">
-                        {summary.academics.professionalCourses.map((course: any, idx: number) => (
-                          <div key={course.id || idx} className="rounded-xl border border-slate-100 bg-slate-50/50 p-3">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="space-y-1">
-                                <p className="text-sm font-bold text-slate-800">
-                                  {course.courseNamePreset === "Other" ? course.courseNameOther : course.courseNamePreset}
-                                  {course.level && <span className="ml-2 text-xs font-normal text-slate-500">({course.level})</span>}
-                                </p>
-                                <p className="text-xs font-medium text-slate-600">{course.institution || "-"}</p>
-                              </div>
-                              <Badge variant="outline" className={cn(
-                                "text-[9px] font-semibold h-5 px-1.5",
-                                course.status === "Completed" ? "bg-white text-emerald-600 border-emerald-100" : "bg-white text-amber-600 border-amber-100"
-                              )}>
-                                {course.status}
-                              </Badge>
-                            </div>
-                            {(course.completionDate || course.score) && (
-                              <div className="mt-2 flex items-center gap-4 text-[11px]">
-                                {course.completionDate && (
-                                  <span className="text-slate-500 flex items-center gap-1">
-                                    <CalendarDays className="h-3 w-3" /> {course.completionDate}
-                                  </span>
-                                )}
-                                {course.score && (
-                                  <span className="font-semibold text-slate-700">
-                                    Score: {course.score}{course.scoreType === "cgpa" ? " CGPA" : "%"}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Certifications */}
-                  {Array.isArray(summary.academics?.certifications) && summary.academics.certifications.length > 0 && (
-                    <div className="pt-4 border-t border-slate-100">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Certifications</p>
-                      <div className="grid gap-3">
-                        {summary.academics.certifications.map((cert: any, idx: number) => (
-                          <div key={cert.id || idx} className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
-                            <p className="text-sm font-bold text-slate-800">{cert.certificateName || "-"}</p>
-                            <p className="text-xs font-medium text-slate-600 mt-0.5">{cert.institution || "-"}</p>
-                            {(cert.startDate || cert.endDate) && (
-                              <p className="mt-2 text-[11px] text-slate-500 flex items-center gap-1">
-                                <CalendarDays className="h-3 w-3" />
-                                {cert.startDate || "-"} — {cert.endDate || "-"}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Card>
-
-              <Card className="p-4">
-                <p className="text-sm font-medium text-muted-foreground">Languages</p>
-                <div className="mt-2 space-y-1 text-sm">
-                  {summary.languages.length === 0 && (
-                    <p className="text-muted-foreground">No languages added.</p>
-                  )}
-                  {summary.languages.map((l: any) => {
-                    const options = [
-                      l?.read === "yes" ? "Read" : null,
-                      l?.write === "yes" ? "Write" : null,
-                      l?.speak === "yes" ? "Speak" : null,
-                    ].filter(Boolean);
-
-                    return (
-                      <div key={String(l?.id ?? l?.language ?? JSON.stringify(l))} className="rounded-md border border-slate-100 bg-slate-50/50 p-2 last:mb-0">
-                        <div className="flex items-center justify-between">
-                          <p className="font-semibold text-slate-900">
-                            {String(l?.language ?? "-")}
+                        {summary.academics?.specialization && (
+                          <p className="text-xs text-slate-500 italic">
+                            Specialization: {summary.academics.specialization}
                           </p>
-                          {l?.level && (
-                            <Badge variant="outline" className="text-[10px] h-4 px-1.5 bg-white">
-                              {String(l.level)}
-                            </Badge>
+                        )}
+                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                            <CalendarDays className="h-3.5 w-3.5" />
+                            <span>{summary.academics?.startYear || "-"} — {summary.academics?.endYear || (summary.academics?.status === "Pursuing" ? "Present" : "-")}</span>
+                          </div>
+                          {summary.academics?.score && (
+                            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md">
+                              <span className="text-slate-500 font-normal">Score:</span>
+                              {summary.academics.score} {summary.academics.scoreType === "cgpa" ? "CGPA" : "%"}
+                            </div>
                           )}
                         </div>
-                        {options.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1.5">
-                            {options.map((opt) => (
-                              <span key={opt} className="inline-flex items-center rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10">
-                                {opt}
-                              </span>
-                            ))}
+                      </div>
+                    </div>
+
+                    {/* Professional Courses */}
+                    {Array.isArray(summary.academics?.professionalCourses) && summary.academics.professionalCourses.length > 0 && (
+                      <div className="pt-4 border-t border-slate-100">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Professional Courses</p>
+                        <div className="grid gap-3">
+                          {summary.academics.professionalCourses.map((course: any, idx: number) => (
+                            <div key={course.id || idx} className="rounded-xl border border-slate-100 bg-slate-50/50 p-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="space-y-1">
+                                  <p className="text-sm font-bold text-slate-800">
+                                    {course.courseNamePreset === "Other" ? course.courseNameOther : course.courseNamePreset}
+                                    {course.level && <span className="ml-2 text-xs font-normal text-slate-500">({course.level})</span>}
+                                  </p>
+                                  <p className="text-xs font-medium text-slate-600">{course.institution || "-"}</p>
+                                </div>
+                                <Badge variant="outline" className={cn(
+                                  "text-[9px] font-semibold h-5 px-1.5",
+                                  course.status === "Completed" ? "bg-white text-emerald-600 border-emerald-100" : "bg-white text-amber-600 border-amber-100"
+                                )}>
+                                  {course.status}
+                                </Badge>
+                              </div>
+                              {(course.completionDate || course.score) && (
+                                <div className="mt-2 flex items-center gap-4 text-[11px]">
+                                  {course.completionDate && (
+                                    <span className="text-slate-500 flex items-center gap-1">
+                                      <CalendarDays className="h-3 w-3" /> {course.completionDate}
+                                    </span>
+                                  )}
+                                  {course.score && (
+                                    <span className="font-semibold text-slate-700">
+                                      Score: {course.score}{course.scoreType === "cgpa" ? " CGPA" : "%"}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Certifications */}
+                    {Array.isArray(summary.academics?.certifications) && summary.academics.certifications.length > 0 && (
+                      <div className="pt-4 border-t border-slate-100">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Certifications</p>
+                        <div className="grid gap-3">
+                          {summary.academics.certifications.map((cert: any, idx: number) => (
+                            <div key={cert.id || idx} className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
+                              <p className="text-sm font-bold text-slate-800">{cert.certificateName || "-"}</p>
+                              <p className="text-xs font-medium text-slate-600 mt-0.5">{cert.institution || "-"}</p>
+                              {(cert.startDate || cert.endDate) && (
+                                <p className="mt-2 text-[11px] text-slate-500 flex items-center gap-1">
+                                  <CalendarDays className="h-3 w-3" />
+                                  {cert.startDate || "-"} — {cert.endDate || "-"}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="p-4">
+                  <p className="text-sm font-medium text-muted-foreground">Languages</p>
+                  <div className="mt-2 space-y-1 text-sm">
+                    {summary.languages.length === 0 && (
+                      <p className="text-muted-foreground">No languages added.</p>
+                    )}
+                    {summary.languages.map((l: any) => {
+                      const options = [
+                        l?.read === "yes" ? "Read" : null,
+                        l?.write === "yes" ? "Write" : null,
+                        l?.speak === "yes" ? "Speak" : null,
+                      ].filter(Boolean);
+
+                      return (
+                        <div key={String(l?.id ?? l?.language ?? JSON.stringify(l))} className="rounded-md border border-slate-100 bg-slate-50/50 p-2 last:mb-0">
+                          <div className="flex items-center justify-between">
+                            <p className="font-semibold text-slate-900">
+                              {String(l?.language ?? "-")}
+                            </p>
+                            {l?.level && (
+                              <Badge variant="outline" className="text-[10px] h-4 px-1.5 bg-white">
+                                {String(l.level)}
+                              </Badge>
+                            )}
                           </div>
+                          {options.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1.5">
+                              {options.map((opt) => (
+                                <span key={opt} className="inline-flex items-center rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10">
+                                  {opt}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+
+                <Card className="p-4 md:col-span-2">
+                  <p className="text-sm font-medium text-muted-foreground">Extracurricular</p>
+                  <div className="mt-2 space-y-1 text-sm">
+                    {summary.extracurricular.length === 0 && (
+                      <p className="text-muted-foreground">No extracurricular activities added.</p>
+                    )}
+                    {summary.extracurricular.map((a: any) => (
+                      <p key={String(a?.id ?? a?.activity ?? JSON.stringify(a))}>
+                        {String(a?.activity ?? "-")}
+                        {a?.level ? ` (${String(a.level)})` : ""}
+                      </p>
+                    ))}
+                  </div>
+                </Card>
+
+                <Card className="p-4 md:col-span-2">
+                  <p className="text-sm font-medium text-muted-foreground">Location Preferences</p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2 text-sm">
+                    <div className="rounded-md border bg-muted/20 p-3">
+                      <p className="text-xs text-muted-foreground">Location types</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {(Array.isArray(summary.locationTypes) ? summary.locationTypes : []).length === 0 ? (
+                          <span className="text-muted-foreground">-</span>
+                        ) : (
+                          (summary.locationTypes as any[]).map((t: any, idx: number) => (
+                            <Badge key={`${String(t)}-${idx}`} variant="outline" className="bg-white">
+                              {String(t)}
+                            </Badge>
+                          ))
                         )}
                       </div>
-                    );
-                  })}
-                </div>
-              </Card>
+                    </div>
 
-              <Card className="p-4 md:col-span-2">
-                <p className="text-sm font-medium text-muted-foreground">Extracurricular</p>
-                <div className="mt-2 space-y-1 text-sm">
-                  {summary.extracurricular.length === 0 && (
-                    <p className="text-muted-foreground">No extracurricular activities added.</p>
-                  )}
-                  {summary.extracurricular.map((a: any) => (
-                    <p key={String(a?.id ?? a?.activity ?? JSON.stringify(a))}>
-                      {String(a?.activity ?? "-")}
-                      {a?.level ? ` (${String(a.level)})` : ""}
-                    </p>
-                  ))}
-                </div>
-              </Card>
+                    <div className="rounded-md border bg-muted/20 p-3">
+                      <p className="text-xs text-muted-foreground">Preferred locations</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {(Array.isArray(summary.preferredLocations) ? summary.preferredLocations : []).length === 0 ? (
+                          <span className="text-muted-foreground">-</span>
+                        ) : (
+                          (summary.preferredLocations as any[]).map((loc: any, idx: number) => (
+                            <Badge key={`${String(loc)}-${idx}`} variant="outline" className="bg-white">
+                              {String(loc)}
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+                    </div>
 
-              <Card className="p-4 md:col-span-2">
-                <p className="text-sm font-medium text-muted-foreground">Location Preferences</p>
-                <div className="mt-3 grid gap-3 md:grid-cols-2 text-sm">
-                  <div className="rounded-md border bg-muted/20 p-3">
-                    <p className="text-xs text-muted-foreground">Location types</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {(Array.isArray(summary.locationTypes) ? summary.locationTypes : []).length === 0 ? (
-                        <span className="text-muted-foreground">-</span>
-                      ) : (
-                        (summary.locationTypes as any[]).map((t: any, idx: number) => (
-                          <Badge key={`${String(t)}-${idx}`} variant="outline" className="bg-white">
-                            {String(t)}
-                          </Badge>
-                        ))
-                      )}
+                    <div className="rounded-md border bg-white p-3">
+                      <p className="text-xs text-muted-foreground">Current location</p>
+                      <p className="mt-1">{summary.location || "-"}</p>
+
+                    </div>
+
+                    <div className="rounded-md border bg-white p-3">
+                      <p className="text-xs text-muted-foreground">Laptop</p>
+                      <p className="mt-1">
+                        {summary.hasLaptop === null ? "-" : summary.hasLaptop ? "Yes" : "No"}
+                      </p>
                     </div>
                   </div>
-
-                  <div className="rounded-md border bg-muted/20 p-3">
-                    <p className="text-xs text-muted-foreground">Preferred locations</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {(Array.isArray(summary.preferredLocations) ? summary.preferredLocations : []).length === 0 ? (
-                        <span className="text-muted-foreground">-</span>
-                      ) : (
-                        (summary.preferredLocations as any[]).map((loc: any, idx: number) => (
-                          <Badge key={`${String(loc)}-${idx}`} variant="outline" className="bg-white">
-                            {String(loc)}
-                          </Badge>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-md border bg-white p-3">
-                    <p className="text-xs text-muted-foreground">Current location</p>
-                    <p className="mt-1">{summary.location || "-"}</p>
-
-                  </div>
-
-                  <div className="rounded-md border bg-white p-3">
-                    <p className="text-xs text-muted-foreground">Laptop</p>
-                    <p className="mt-1">
-                      {summary.hasLaptop === null ? "-" : summary.hasLaptop ? "Yes" : "No"}
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </ScrollArea>
-        </TabsContent>
+                </Card>
+              </div>
+            </ScrollArea>
+          </TabsContent>
 
           <TabsContent value="interviews" className="px-6 pb-6 pt-4">
             <ScrollArea className="h-[600px] pr-4">
               <Dialog
-              open={openInterviewDetails}
-              onOpenChange={(next) => {
-                setOpenInterviewDetails(next);
-                if (!next) setSelectedInterview(null);
-              }}
-            >
-              <DialogContent className="sm:max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Interview details</DialogTitle>
-                </DialogHeader>
+                open={openInterviewDetails}
+                onOpenChange={(next) => {
+                  setOpenInterviewDetails(next);
+                  if (!next) setSelectedInterview(null);
+                }}
+              >
+                <DialogContent className="sm:max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Interview details</DialogTitle>
+                  </DialogHeader>
 
-                <ScrollArea className="max-h-[70vh] pr-3">
-                  {!selectedInterview ? (
-                    <div className="text-sm text-muted-foreground">No interview selected.</div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="space-y-1">
-                          <div className="text-sm font-semibold">
-                            {String(
-                              selectedInterview?.employerCompanyName ??
+                  <ScrollArea className="max-h-[70vh] pr-3">
+                    {!selectedInterview ? (
+                      <div className="text-sm text-muted-foreground">No interview selected.</div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="text-sm font-semibold">
+                              {String(
+                                selectedInterview?.employerCompanyName ??
                                 selectedInterview?.employerName ??
                                 selectedInterview?.employerId ??
                                 "Employer",
-                            )}
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Interview ID: {String(selectedInterview?.id ?? "-")}
+                            </div>
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            Interview ID: {String(selectedInterview?.id ?? "-")}
-                          </div>
+                          <Badge
+                            variant="outline"
+                            className={statusBadgeClass(resolveInterviewStatus(selectedInterview))}
+                          >
+                            {resolveInterviewStatus(selectedInterview)}
+                          </Badge>
                         </div>
-                        <Badge
-                          variant="outline"
-                          className={statusBadgeClass(resolveInterviewStatus(selectedInterview))}
-                        >
-                          {resolveInterviewStatus(selectedInterview)}
-                        </Badge>
-                      </div>
 
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <Card className="p-4">
-                          <p className="text-xs font-medium text-muted-foreground">Project</p>
-                          <p className="mt-1 text-sm">
-                            {getProjectMeta(selectedInterview).name}
-                          </p>
-                          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                            {getProjectMeta(selectedInterview).locationType && (
-                              <p>
-                                <span className="text-muted-foreground">Work:</span> {getProjectMeta(selectedInterview).locationType}
-                                {getProjectMeta(selectedInterview).location ? ` • ${getProjectMeta(selectedInterview).location}` : ""}
-                              </p>
-                            )}
-                            {getProjectMeta(selectedInterview).scopeOfWork && (
-                              <p className="line-clamp-2">{getProjectMeta(selectedInterview).scopeOfWork}</p>
-                            )}
-                          </div>
-                          <p className="mt-2 text-xs font-medium text-muted-foreground">Timezone</p>
-                          <p className="mt-1 text-sm">{String(selectedInterview?.timezone ?? "-")}</p>
-                        </Card>
-                        <Card className="p-4">
-                          <p className="text-xs font-medium text-muted-foreground">Updated</p>
-                          <p className="mt-1 text-sm">
-                            {formatIsoDate(
-                              selectedInterview?.updatedAt ??
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <Card className="p-4">
+                            <p className="text-xs font-medium text-muted-foreground">Project</p>
+                            <p className="mt-1 text-sm">
+                              {getProjectMeta(selectedInterview).name}
+                            </p>
+                            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                              {getProjectMeta(selectedInterview).locationType && (
+                                <p>
+                                  <span className="text-muted-foreground">Work:</span> {getProjectMeta(selectedInterview).locationType}
+                                  {getProjectMeta(selectedInterview).location ? ` • ${getProjectMeta(selectedInterview).location}` : ""}
+                                </p>
+                              )}
+                              {getProjectMeta(selectedInterview).scopeOfWork && (
+                                <p className="line-clamp-2">{getProjectMeta(selectedInterview).scopeOfWork}</p>
+                              )}
+                            </div>
+                            <p className="mt-2 text-xs font-medium text-muted-foreground">Timezone</p>
+                            <p className="mt-1 text-sm">{String(selectedInterview?.timezone ?? "-")}</p>
+                          </Card>
+                          <Card className="p-4">
+                            <p className="text-xs font-medium text-muted-foreground">Updated</p>
+                            <p className="mt-1 text-sm">
+                              {formatIsoDate(
+                                selectedInterview?.updatedAt ??
                                 selectedInterview?.updated_at ??
                                 selectedInterview?.createdAt ??
                                 selectedInterview?.created_at,
-                            )}
-                          </p>
-                          <p className="mt-2 text-xs font-medium text-muted-foreground">Selected slot</p>
-                          <p className="mt-1 text-sm">
-                            {getSelectedSlotMeta(selectedInterview).label}
-                          </p>
+                              )}
+                            </p>
+                            <p className="mt-2 text-xs font-medium text-muted-foreground">Selected slot</p>
+                            <p className="mt-1 text-sm">
+                              {getSelectedSlotMeta(selectedInterview).label}
+                            </p>
+                          </Card>
+                        </div>
+
+                        <Card className="p-4">
+                          <p className="text-xs font-medium text-muted-foreground">Slots</p>
+                          <div className="mt-3 grid gap-2">
+                            {([1, 2, 3] as const).map((n) => {
+                              const key = `slot${n}` as const;
+                              const raw = selectedInterview?.[key];
+                              const selected = Number(
+                                selectedInterview?.selectedSlot ?? selectedInterview?.selected_slot ?? 0,
+                              );
+                              const isSelected = selected === n;
+                              return (
+                                <div
+                                  key={n}
+                                  className={
+                                    isSelected
+                                      ? "flex items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2"
+                                      : "flex items-center justify-between gap-3 rounded-md border bg-white px-3 py-2"
+                                  }
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-[10px]">
+                                      Slot {n}
+                                    </Badge>
+                                    <span className="text-sm">{raw ? formatSlot(raw, selectedInterview?.timezone) : "-"}</span>
+                                  </div>
+                                  {isSelected && (
+                                    <span className="text-[11px] font-semibold text-emerald-700">Selected</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </Card>
+
+                        <Card className="p-4">
+                          <p className="text-xs font-medium text-muted-foreground">Links</p>
+                          <div className="mt-3 space-y-2">
+                            {(
+                              String(selectedInterview?.meet_link ?? selectedInterview?.meetingLink ?? "")
+                                .trim()
+                                .length > 0
+                            ) && (
+                                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2">
+                                  <div className="min-w-0">
+                                    <p className="text-xs text-muted-foreground">Meeting</p>
+                                    <p className="text-sm truncate max-w-[520px]">
+                                      {String(selectedInterview?.meet_link ?? selectedInterview?.meetingLink)}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => copyToClipboard(selectedInterview?.meet_link ?? selectedInterview?.meetingLink)}
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => openExternal(selectedInterview?.meet_link ?? selectedInterview?.meetingLink)}
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+
+                            {(
+                              String(selectedInterview?.feedback_link ?? selectedInterview?.feedbackLink ?? "")
+                                .trim()
+                                .length > 0
+                            ) && (
+                                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2">
+                                  <div className="min-w-0">
+                                    <p className="text-xs text-muted-foreground">Feedback</p>
+                                    <p className="text-sm truncate max-w-[520px]">
+                                      {String(selectedInterview?.feedback_link ?? selectedInterview?.feedbackLink)}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => openExternal(selectedInterview?.feedback_link ?? selectedInterview?.feedbackLink)}
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+
+                            {(
+                              String(selectedInterview?.recording_link ?? selectedInterview?.recordingLink ?? "")
+                                .trim()
+                                .length > 0
+                            ) && (
+                                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2">
+                                  <div className="min-w-0">
+                                    <p className="text-xs text-muted-foreground">Recording</p>
+                                    <p className="text-sm truncate max-w-[520px]">
+                                      {String(selectedInterview?.recording_link ?? selectedInterview?.recordingLink)}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => openExternal(selectedInterview?.recording_link ?? selectedInterview?.recordingLink)}
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                          </div>
+                        </Card>
+
+                        <Card className="p-4">
+                          <p className="text-xs font-medium text-muted-foreground">Notes</p>
+                          <div className="mt-2 rounded-md border bg-muted/20 p-3 text-sm whitespace-pre-wrap">
+                            {String(selectedInterview?.notes ?? "-")}
+                          </div>
                         </Card>
                       </div>
+                    )}
+                  </ScrollArea>
+                </DialogContent>
+              </Dialog>
 
-                      <Card className="p-4">
-                        <p className="text-xs font-medium text-muted-foreground">Slots</p>
-                        <div className="mt-3 grid gap-2">
-                          {([1, 2, 3] as const).map((n) => {
-                            const key = `slot${n}` as const;
-                            const raw = selectedInterview?.[key];
-                            const selected = Number(
-                              selectedInterview?.selectedSlot ?? selectedInterview?.selected_slot ?? 0,
-                            );
-                            const isSelected = selected === n;
-                            return (
-                              <div
-                                key={n}
-                                className={
-                                  isSelected
-                                    ? "flex items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2"
-                                    : "flex items-center justify-between gap-3 rounded-md border bg-white px-3 py-2"
-                                }
-                              >
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="text-[10px]">
-                                    Slot {n}
-                                  </Badge>
-                                  <span className="text-sm">{raw ? formatSlot(raw, selectedInterview?.timezone) : "-"}</span>
-                                </div>
-                                {isSelected && (
-                                  <span className="text-[11px] font-semibold text-emerald-700">Selected</span>
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                <div className="relative lg:col-span-2">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={interviewSearch}
+                    onChange={(e) => setInterviewSearch(e.target.value)}
+                    placeholder="Search employer / company / project / notes / link"
+                    className="pl-9"
+                  />
+                </div>
+
+                <Select value={interviewStatusFilter} onValueChange={(v) => setInterviewStatusFilter(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All status</SelectItem>
+                    <SelectItem value="scheduled">Scheduled</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="sent">Sent</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="expired">Expired</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={interviewSlotFilter} onValueChange={(v) => setInterviewSlotFilter(v as any)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Slot" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All slots</SelectItem>
+                    <SelectItem value="selected">Selected slot</SelectItem>
+                    <SelectItem value="unselected">Unselected</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <div className="relative">
+                  <CalendarDays className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="date"
+                    value={interviewFromDate}
+                    onChange={(e) => setInterviewFromDate(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <div className="relative">
+                  <CalendarDays className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="date"
+                    value={interviewToDate}
+                    onChange={(e) => setInterviewToDate(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <div className="lg:col-span-2 flex items-center justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setInterviewSearch("");
+                      setInterviewStatusFilter("all");
+                      setInterviewSlotFilter("all");
+                      setInterviewFromDate("");
+                      setInterviewToDate("");
+                    }}
+                  >
+                    Reset filters
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                {interviews.length === 0 ? (
+                  <Card className="p-6">
+                    <p className="text-sm text-muted-foreground">No interviews found.</p>
+                  </Card>
+                ) : filteredInterviews.length === 0 ? (
+                  <Card className="p-6">
+                    <p className="text-sm text-muted-foreground">No interviews match your filters.</p>
+                  </Card>
+                ) : (
+                  <div className="grid gap-3">
+                    {filteredInterviews.map((i: any) => {
+                      const status = resolveInterviewStatus(i);
+                      const selected = Number(i?.selectedSlot ?? i?.selected_slot ?? 0);
+                      const companyLabel = String(i?.employerCompanyName ?? i?.employerName ?? "-").trim() || "-";
+                      const employerLabel = String(i?.employerName ?? "").trim();
+                      const tz = String(i?.timezone ?? "-").trim() || "-";
+                      const meet = String(i?.meet_link ?? i?.meetingLink ?? "").trim();
+
+                      const updated = formatIsoDate(i?.updatedAt ?? i?.updated_at ?? i?.createdAt ?? i?.created_at);
+
+                      return (
+                        <Card key={String(i?.id ?? Math.random())} className="p-5">
+                          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="text-sm font-semibold truncate">{companyLabel}</div>
+                                {employerLabel && employerLabel !== companyLabel && (
+                                  <div className="text-xs text-muted-foreground truncate">({employerLabel})</div>
                                 )}
                               </div>
-                            );
-                          })}
-                        </div>
-                      </Card>
-
-                      <Card className="p-4">
-                        <p className="text-xs font-medium text-muted-foreground">Links</p>
-                        <div className="mt-3 space-y-2">
-                          {(
-                            String(selectedInterview?.meet_link ?? selectedInterview?.meetingLink ?? "")
-                              .trim()
-                              .length > 0
-                          ) && (
-                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2">
-                              <div className="min-w-0">
-                                <p className="text-xs text-muted-foreground">Meeting</p>
-                                <p className="text-sm truncate max-w-[520px]">
-                                  {String(selectedInterview?.meet_link ?? selectedInterview?.meetingLink)}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => copyToClipboard(selectedInterview?.meet_link ?? selectedInterview?.meetingLink)}
-                                >
-                                  <Copy className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openExternal(selectedInterview?.meet_link ?? selectedInterview?.meetingLink)}
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                </Button>
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                <span className="inline-flex items-center gap-1">
+                                  <Link2 className="h-3 w-3" /> {tz}
+                                </span>
+                                <span>Updated: {updated}</span>
+                                {String(getProjectMeta(i).name ?? "").trim() && (
+                                  <span className="truncate">Project: {String(getProjectMeta(i).name)}</span>
+                                )}
                               </div>
                             </div>
-                          )}
 
-                          {(
-                            String(selectedInterview?.feedback_link ?? selectedInterview?.feedbackLink ?? "")
-                              .trim()
-                              .length > 0
-                          ) && (
-                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2">
-                              <div className="min-w-0">
-                                <p className="text-xs text-muted-foreground">Feedback</p>
-                                <p className="text-sm truncate max-w-[520px]">
-                                  {String(selectedInterview?.feedback_link ?? selectedInterview?.feedbackLink)}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openExternal(selectedInterview?.feedback_link ?? selectedInterview?.feedbackLink)}
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                </Button>
-                              </div>
+                            <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                              <Badge variant="outline" className={statusBadgeClass(status)}>
+                                {status}
+                              </Badge>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  selected
+                                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                                    : "border-slate-300 bg-slate-50 text-slate-700"
+                                }
+                              >
+                                {selected
+                                  ? `Slot ${selected} • ${String(getSelectedSlotMeta(i).label)}`
+                                  : "No slot"}
+                              </Badge>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedInterview(i);
+                                  setOpenInterviewDetails(true);
+                                }}
+                              >
+                                View details
+                              </Button>
                             </div>
-                          )}
+                          </div>
 
-                          {(
-                            String(selectedInterview?.recording_link ?? selectedInterview?.recordingLink ?? "")
-                              .trim()
-                              .length > 0
-                          ) && (
-                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2">
-                              <div className="min-w-0">
-                                <p className="text-xs text-muted-foreground">Recording</p>
-                                <p className="text-sm truncate max-w-[520px]">
-                                  {String(selectedInterview?.recording_link ?? selectedInterview?.recordingLink)}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openExternal(selectedInterview?.recording_link ?? selectedInterview?.recordingLink)}
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </Card>
-
-                      <Card className="p-4">
-                        <p className="text-xs font-medium text-muted-foreground">Notes</p>
-                        <div className="mt-2 rounded-md border bg-muted/20 p-3 text-sm whitespace-pre-wrap">
-                          {String(selectedInterview?.notes ?? "-")}
-                        </div>
-                      </Card>
-                    </div>
-                  )}
-                </ScrollArea>
-              </DialogContent>
-            </Dialog>
-
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-              <div className="relative lg:col-span-2">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={interviewSearch}
-                  onChange={(e) => setInterviewSearch(e.target.value)}
-                  placeholder="Search employer / company / project / notes / link"
-                  className="pl-9"
-                />
-              </div>
-
-              <Select value={interviewStatusFilter} onValueChange={(v) => setInterviewStatusFilter(v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All status</SelectItem>
-                  <SelectItem value="scheduled">Scheduled</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="sent">Sent</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="expired">Expired</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={interviewSlotFilter} onValueChange={(v) => setInterviewSlotFilter(v as any)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Slot" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All slots</SelectItem>
-                  <SelectItem value="selected">Selected slot</SelectItem>
-                  <SelectItem value="unselected">Unselected</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <div className="relative">
-                <CalendarDays className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="date"
-                  value={interviewFromDate}
-                  onChange={(e) => setInterviewFromDate(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <div className="relative">
-                <CalendarDays className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="date"
-                  value={interviewToDate}
-                  onChange={(e) => setInterviewToDate(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <div className="lg:col-span-2 flex items-center justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setInterviewSearch("");
-                    setInterviewStatusFilter("all");
-                    setInterviewSlotFilter("all");
-                    setInterviewFromDate("");
-                    setInterviewToDate("");
-                  }}
-                >
-                  Reset filters
-                </Button>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              {interviews.length === 0 ? (
-                <Card className="p-6">
-                  <p className="text-sm text-muted-foreground">No interviews found.</p>
-                </Card>
-              ) : filteredInterviews.length === 0 ? (
-                <Card className="p-6">
-                  <p className="text-sm text-muted-foreground">No interviews match your filters.</p>
-                </Card>
-              ) : (
-                <div className="grid gap-3">
-                  {filteredInterviews.map((i: any) => {
-                    const status = resolveInterviewStatus(i);
-                    const selected = Number(i?.selectedSlot ?? i?.selected_slot ?? 0);
-                    const companyLabel = String(i?.employerCompanyName ?? i?.employerName ?? "-").trim() || "-";
-                    const employerLabel = String(i?.employerName ?? "").trim();
-                    const tz = String(i?.timezone ?? "-").trim() || "-";
-                    const meet = String(i?.meet_link ?? i?.meetingLink ?? "").trim();
-
-                    const updated = formatIsoDate(i?.updatedAt ?? i?.updated_at ?? i?.createdAt ?? i?.created_at);
-
-                    return (
-                      <Card key={String(i?.id ?? Math.random())} className="p-5">
-                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                          <div className="min-w-0 space-y-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <div className="text-sm font-semibold truncate">{companyLabel}</div>
-                              {employerLabel && employerLabel !== companyLabel && (
-                                <div className="text-xs text-muted-foreground truncate">({employerLabel})</div>
+                          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                            <div className="min-w-0 text-xs text-muted-foreground">
+                              {meet ? (
+                                <span className="truncate block max-w-[760px]">Meeting: {meet}</span>
+                              ) : (
+                                <span>Meeting: -</span>
                               )}
                             </div>
-                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                              <span className="inline-flex items-center gap-1">
-                                <Link2 className="h-3 w-3" /> {tz}
-                              </span>
-                              <span>Updated: {updated}</span>
-                              {String(getProjectMeta(i).name ?? "").trim() && (
-                                <span className="truncate">Project: {String(getProjectMeta(i).name)}</span>
-                              )}
+                            <div className="flex items-center gap-2">
+                              <Button size="sm" variant="outline" disabled={!meet} onClick={() => copyToClipboard(meet)}>
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="outline" disabled={!meet} onClick={() => openExternal(meet)}>
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
                             </div>
                           </div>
-
-                          <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                            <Badge variant="outline" className={statusBadgeClass(status)}>
-                              {status}
-                            </Badge>
-                            <Badge
-                              variant="outline"
-                              className={
-                                selected
-                                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                                  : "border-slate-300 bg-slate-50 text-slate-700"
-                              }
-                            >
-                              {selected
-                                ? `Slot ${selected} • ${String(getSelectedSlotMeta(i).label)}`
-                                : "No slot"}
-                            </Badge>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedInterview(i);
-                                setOpenInterviewDetails(true);
-                              }}
-                            >
-                              View details
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                          <div className="min-w-0 text-xs text-muted-foreground">
-                            {meet ? (
-                              <span className="truncate block max-w-[760px]">Meeting: {meet}</span>
-                            ) : (
-                              <span>Meeting: -</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button size="sm" variant="outline" disabled={!meet} onClick={() => copyToClipboard(meet)}>
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline" disabled={!meet} onClick={() => openExternal(meet)}>
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-        </TabsContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
 
           <TabsContent value="proposals" className="px-6 pb-6 pt-4">
             <ScrollArea className="h-[600px] pr-4">
               <Dialog
-              open={openProposalDetails}
-              onOpenChange={(next) => {
-                setOpenProposalDetails(next);
-                if (!next) setSelectedProposal(null);
-              }}
-            >
-              <DialogContent className="sm:max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>Proposal details</DialogTitle>
-                </DialogHeader>
+                open={openProposalDetails}
+                onOpenChange={(next) => {
+                  setOpenProposalDetails(next);
+                  if (!next) setSelectedProposal(null);
+                }}
+              >
+                <DialogContent className="sm:max-w-3xl">
+                  <DialogHeader>
+                    <DialogTitle>Proposal details</DialogTitle>
+                  </DialogHeader>
 
-                <ScrollArea className="max-h-[85vh] pr-3">
-                  {!selectedProposal ? (
-                    <div className="text-sm text-muted-foreground">No proposal selected.</div>
-                  ) : (
-                    <div className="space-y-4">
-                      {(() => {
-                        const offer = (selectedProposal?.offerDetails || selectedProposal?.offer_details || {}) as any;
-                        const updatedRaw =
-                          selectedProposal?.updatedAt ??
-                          selectedProposal?.updated_at ??
-                          selectedProposal?.createdAt ??
-                          selectedProposal?.created_at;
-                        const updated = formatIsoDate(updatedRaw);
-                        const status = String(selectedProposal?.status ?? "-");
-                        const meta = getProjectMeta(selectedProposal);
-                        const roleTitle = String(offer?.roleTitle ?? offer?.role_title ?? "-");
-                        const jdRaw = String(offer?.jd ?? "").trim();
-                        const jdHtml = (() => {
-                          if (!jdRaw) return "";
-                          const looksLikeHtml = /<[^>]+>/.test(jdRaw);
-                          if (looksLikeHtml) return jdRaw;
-                          return escapeHtml(jdRaw).replace(/\r\n|\r|\n/g, "<br />");
-                        })();
-                        const jdSafeHtml = jdHtml ? DOMPurify.sanitize(jdHtml, { USE_PROFILES: { html: true } }) : "";
-                        const score = Number(selectedProposal?.findternScore ?? 0);
-                        const currency = String(offer?.currency ?? "INR").toUpperCase();
-                        const monthlyHours = Number(offer?.monthlyHours ?? offer?.monthly_hours ?? 160) || 160;
+                  <ScrollArea className="max-h-[85vh] pr-3">
+                    {!selectedProposal ? (
+                      <div className="text-sm text-muted-foreground">No proposal selected.</div>
+                    ) : (
+                      <div className="space-y-4">
+                        {(() => {
+                          const offer = (selectedProposal?.offerDetails || selectedProposal?.offer_details || {}) as any;
+                          const updatedRaw =
+                            selectedProposal?.updatedAt ??
+                            selectedProposal?.updated_at ??
+                            selectedProposal?.createdAt ??
+                            selectedProposal?.created_at;
+                          const updated = formatIsoDate(updatedRaw);
+                          const status = String(selectedProposal?.status ?? "-");
+                          const meta = getProjectMeta(selectedProposal);
+                          const roleTitle = String(offer?.roleTitle ?? offer?.role_title ?? "-");
+                          const jdRaw = String(offer?.jd ?? "").trim();
+                          const jdHtml = (() => {
+                            if (!jdRaw) return "";
+                            const looksLikeHtml = /<[^>]+>/.test(jdRaw);
+                            if (looksLikeHtml) return jdRaw;
+                            return escapeHtml(jdRaw).replace(/\r\n|\r|\n/g, "<br />");
+                          })();
+                          const jdSafeHtml = jdHtml ? DOMPurify.sanitize(jdHtml, { USE_PROFILES: { html: true } }) : "";
+                          const score = Number(selectedProposal?.findternScore ?? 0);
+                          const currency = String(offer?.currency ?? "INR").toUpperCase();
+                          const monthlyHours = Number(offer?.monthlyHours ?? offer?.monthly_hours ?? 160) || 160;
 
-                        const rawMonthly = Number(offer?.monthlyAmount ?? offer?.monthly_amount ?? 0);
-                        const rawTotal = Number(offer?.totalPrice ?? offer?.total_price ?? 0);
+                          const rawMonthly = Number(offer?.monthlyAmount ?? offer?.monthly_amount ?? 0);
+                          const rawTotal = Number(offer?.totalPrice ?? offer?.total_price ?? 0);
 
-                        const monthlyAmount = (() => {
-                          if (rawMonthly > 0) return rawMonthly;
-                          if (score < 6) return currency === "USD" ? 50 : 5000;
-                          const rate = score < 8 ? 1 : 2;
-                          const rateInCur = currency === "USD" ? rate : rate * 100;
-                          return monthlyHours * rateInCur;
-                        })();
+                          const monthlyAmount = (() => {
+                            if (rawMonthly > 0) return rawMonthly;
+                            if (score < 6) return currency === "USD" ? 50 : 5000;
+                            const rate = score < 8 ? 1 : 2;
+                            const rateInCur = currency === "USD" ? rate : rate * 100;
+                            return monthlyHours * rateInCur;
+                          })();
 
-                        const totalPrice = (() => {
-                          if (rawTotal > 0) return rawTotal;
-                          const duration = monthsFromDuration(offer?.duration);
-                          return monthlyAmount * duration;
-                        })();
+                          const totalPrice = (() => {
+                            if (rawTotal > 0) return rawTotal;
+                            const duration = monthsFromDuration(offer?.duration);
+                            return monthlyAmount * duration;
+                          })();
 
-                        const employerCompanyName = String(
-                          selectedProposal?.employerCompanyName ??
+                          const employerCompanyName = String(
+                            selectedProposal?.employerCompanyName ??
                             selectedProposal?.employerName ??
                             selectedProposal?.employerId ??
                             "-",
-                        ).trim();
+                          ).trim();
 
-                        const startRaw = offer?.startDate ?? offer?.start_date ?? null;
-                        const endRaw = offer?.endDate ?? offer?.end_date ?? null;
-                        const durationRaw = String(offer?.duration ?? "").trim();
-                        const startUtc = parseDateOnlyUtc(startRaw);
-                        const endUtc = parseDateOnlyUtc(endRaw);
+                          const startRaw = offer?.startDate ?? offer?.start_date ?? null;
+                          const endRaw = offer?.endDate ?? offer?.end_date ?? null;
+                          const durationRaw = String(offer?.duration ?? "").trim();
+                          const startUtc = parseDateOnlyUtc(startRaw);
+                          const endUtc = parseDateOnlyUtc(endRaw);
 
-                        const derivedMonths = startUtc && endUtc ? monthsBetweenDateOnlyUtc(startUtc, endUtc) : null;
-                        const parsedMonths = monthsFromDuration(durationRaw);
-                        const durationMonths = derivedMonths !== null ? derivedMonths : parsedMonths;
+                          const derivedMonths = startUtc && endUtc ? monthsBetweenDateOnlyUtc(startUtc, endUtc) : null;
+                          const parsedMonths = monthsFromDuration(durationRaw);
+                          const durationMonths = derivedMonths !== null ? derivedMonths : parsedMonths;
 
-                        const endDate = (() => {
-                          if (endUtc) return endUtc.toISOString().slice(0, 10);
-                          if (!startUtc) return "-";
-                          return addMonthsUtc(startUtc, durationMonths).toISOString().slice(0, 10);
-                        })();
+                          const endDate = (() => {
+                            if (endUtc) return endUtc.toISOString().slice(0, 10);
+                            if (!startUtc) return "-";
+                            return addMonthsUtc(startUtc, durationMonths).toISOString().slice(0, 10);
+                          })();
 
-                        const isFullTimeOffer = Boolean(offer?.isFullTime ?? offer?.is_full_time ?? selectedProposal?.isFullTime ?? selectedProposal?.is_full_time ?? false);
+                          const isFullTimeOffer = Boolean(offer?.isFullTime ?? offer?.is_full_time ?? selectedProposal?.isFullTime ?? selectedProposal?.is_full_time ?? false);
 
-                        const durationLabel = isFullTimeOffer ? "Full-time" : (durationMonths === 1 ? "1 month" : `${durationMonths} months`);
+                          const durationLabel = isFullTimeOffer ? "Full-time" : (durationMonths === 1 ? "1 month" : `${durationMonths} months`);
 
-                        const fullTimeOfferLabel =
-                          typeof offer?.isFullTime === "boolean" || typeof offer?.is_full_time === "boolean"
-                            ? (offer.isFullTime || offer.is_full_time ? "Yes" : "No")
-                            : "-";
+                          const fullTimeOfferLabel =
+                            typeof offer?.isFullTime === "boolean" || typeof offer?.is_full_time === "boolean"
+                              ? (offer.isFullTime || offer.is_full_time ? "Yes" : "No")
+                              : "-";
 
-                        return (
-                          <>
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div className="space-y-1">
-                                <div className="text-sm font-semibold">{roleTitle}</div>
-                                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                  <span>Company: {employerCompanyName || "-"}</span>
+                          return (
+                            <>
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="space-y-1">
+                                  <div className="text-sm font-semibold">{roleTitle}</div>
+                                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                    <span>Company: {employerCompanyName || "-"}</span>
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    Proposal ID: {String(selectedProposal?.id ?? "-")} • Updated: {updated}
+                                  </div>
                                 </div>
-                                <div className="text-xs text-muted-foreground">
-                                  Proposal ID: {String(selectedProposal?.id ?? "-")} • Updated: {updated}
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      proposalBadgeClass(status),
+                                      status.toLowerCase() === "hired" ? "bg-emerald-600 text-white border-none font-bold px-3 py-1" : ""
+                                    )}
+                                  >
+                                    {status.toLowerCase() === "hired" && isFullTimeOffer
+                                      ? "full time hired"
+                                      : String(status).toLowerCase()}
+                                  </Badge>
+                                  {isFullTimeOffer && status.toLowerCase() !== "rejected" && status.toLowerCase() !== "hired" && (
+                                    <Badge variant="secondary" className="bg-slate-100 text-slate-700 border-slate-200 text-[10px] font-semibold py-1 px-3">
+                                      Full Time Proposal
+                                    </Badge>
+                                  )}
                                 </div>
                               </div>
+
+                              <div className="grid gap-3 lg:grid-cols-3">
+                                <Card className="p-4 lg:col-span-2">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-medium text-muted-foreground">Project</p>
+                                      <p className="mt-1 text-sm font-semibold truncate">{meta.name}</p>
+                                      <div className="mt-2 flex flex-wrap gap-2">
+                                        {meta.locationType && (
+                                          <Badge variant="outline" className="bg-white">
+                                            {meta.locationType}
+                                          </Badge>
+                                        )}
+                                        {meta.location && (
+                                          <Badge variant="outline" className="bg-white">
+                                            {meta.location}
+                                          </Badge>
+                                        )}
+                                        {Array.isArray(meta.skills) && meta.skills.map((skill: string) => (
+                                          <Badge key={skill} variant="outline" className="bg-white">
+                                            {skill}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        const pid = meta.projectId;
+                                        if (!pid) return;
+                                        setLocation(`/admin/projects?projectId=${encodeURIComponent(pid)}`);
+                                      }}
+                                    >
+                                      View Project Details
+                                    </Button>
+                                  </div>
+
+                                  {meta.scopeOfWork && (
+                                    <div className="mt-3 rounded-md border bg-muted/20 p-3 text-sm whitespace-pre-wrap">
+                                      {meta.scopeOfWork}
+                                    </div>
+                                  )}
+                                </Card>
+
+                                <Card className="p-4">
+                                  <p className="text-xs font-medium text-muted-foreground">Offer summary</p>
+                                  <div className="mt-2 space-y-1 text-sm">
+                                    <p>
+                                      <span className="text-muted-foreground">Mode:</span> {String(offer?.mode ?? "-")}
+                                    </p>
+                                    <p>
+                                      <span className="text-muted-foreground">Location:</span> {String(offer?.location ?? "-")}
+                                    </p>
+                                    <p>
+                                      <span className="text-muted-foreground">Start:</span> {String(offer?.startDate ?? offer?.start_date ?? "-")}
+                                    </p>
+                                    <p>
+                                      <span className="text-muted-foreground">Duration:</span> {durationLabel}
+                                    </p>
+                                    <p>
+                                      <span className="text-muted-foreground">End:</span> {endDate}
+                                    </p>
+                                    <p>
+                                      <span className="text-muted-foreground">Full-time conversion:</span> {fullTimeOfferLabel}
+                                    </p>
+                                    <p>
+                                      <span className="text-muted-foreground">Shift:</span> {String(offer?.shiftFrom ?? offer?.shift_from ?? "-")}
+                                      {String(offer?.shiftTo ?? offer?.shift_to ?? "").trim()
+                                        ? ` - ${String(offer?.shiftTo ?? offer?.shift_to)}`
+                                        : ""}
+                                    </p>
+                                    <p>
+                                      <span className="text-muted-foreground">Timezone:</span> {String(offer?.timezone ?? "-")}
+                                    </p>
+                                  </div>
+                                </Card>
+                              </div>
+
+                              <div className="grid gap-3 md:grid-cols-3">
+                                <Card className="p-4">
+                                  <p className="text-xs font-medium text-muted-foreground">Pricing</p>
+                                  <div className="mt-2 space-y-1 text-sm">
+                                    <p>
+                                      <span className="text-muted-foreground">Tier:</span> {resolveProposalPricingLabel(selectedProposal)}
+                                    </p>
+                                    <p>
+                                      <span className="text-muted-foreground">Monthly hours:</span> {String(offer?.monthlyHours ?? offer?.monthly_hours ?? "-")}
+                                    </p>
+                                    <p>
+                                      <span className="text-muted-foreground">Monthly amount:</span> {isFullTimeOffer ? "-" : (monthlyAmount ? `${String(offer?.currency ?? "INR")} ${monthlyAmount.toLocaleString()}` : "-")}
+                                    </p>
+                                    <p>
+                                      <span className="text-muted-foreground">Total price:</span> {isFullTimeOffer ? "-" : (totalPrice ? `${String(offer?.currency ?? "INR")} ${totalPrice.toLocaleString()}` : "-")}
+                                    </p>
+                                  </div>
+                                </Card>
+
+                                <Card className="p-4">
+                                  <p className="text-xs font-medium text-muted-foreground">Policy</p>
+                                  <div className="mt-2 space-y-1 text-sm">
+                                    <p>
+                                      <span className="text-muted-foreground">Laptop:</span> {String(offer?.laptop ?? "-")}
+                                    </p>
+                                    <p>
+                                      <span className="text-muted-foreground">Paid leaves / month:</span> {String(offer?.paidLeavesPerMonth ?? offer?.paid_leaves_per_month ?? "-")}
+                                    </p>
+                                    <p>
+                                      <span className="text-muted-foreground">Schedule:</span> {String(offer?.weeklySchedule ?? offer?.weekly_schedule ?? "-")}
+                                    </p>
+                                  </div>
+                                </Card>
+
+                                <Card className="p-4">
+                                  <p className="text-xs font-medium text-muted-foreground">Work setup</p>
+                                  <div className="mt-2 space-y-1 text-sm">
+                                    <p>
+                                      <span className="text-muted-foreground">WFH days:</span> {String(offer?.workFromHomeDays ?? offer?.work_from_home_days ?? "-")}
+                                    </p>
+                                    <p>
+                                      <span className="text-muted-foreground">Office days:</span> {String(offer?.workFromOfficeDays ?? offer?.work_from_office_days ?? "-")}
+                                    </p>
+                                  </div>
+                                </Card>
+                              </div>
+
+                              <Card className="p-4">
+                                <p className="text-xs font-medium text-muted-foreground">Job description</p>
+                                {jdSafeHtml ? (
+                                  <div
+                                    className="mt-2 rounded-md border bg-muted/20 p-3 text-sm prose prose-slate prose-sm max-w-none break-words [overflow-wrap:anywhere]"
+                                    dangerouslySetInnerHTML={{ __html: jdSafeHtml }}
+                                  />
+                                ) : (
+                                  <div className="mt-2 rounded-md border bg-muted/20 p-3 text-sm whitespace-pre-wrap">
+                                    {stripHtml(jdRaw) || "-"}
+                                  </div>
+                                )}
+                              </Card>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </DialogContent>
+              </Dialog>
+
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                <div className="relative lg:col-span-2">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={proposalSearch}
+                    onChange={(e) => setProposalSearch(e.target.value)}
+                    placeholder="Search project / role / mode / location"
+                    className="pl-9"
+                  />
+                </div>
+
+                <Select value={proposalStatusFilter} onValueChange={(v) => setProposalStatusFilter(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All status</SelectItem>
+                    <SelectItem value="sent">Sent</SelectItem>
+                    <SelectItem value="accepted">Accepted</SelectItem>
+                    <SelectItem value="hired">Hired</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <div className="flex items-center justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setProposalSearch("");
+                      setProposalStatusFilter("all");
+                    }}
+                  >
+                    Reset
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                {proposals.length === 0 ? (
+                  <Card className="p-6">
+                    <p className="text-sm text-muted-foreground">No proposals found.</p>
+                  </Card>
+                ) : filteredProposals.length === 0 ? (
+                  <Card className="p-6">
+                    <p className="text-sm text-muted-foreground">No proposals match your filters.</p>
+                  </Card>
+                ) : (
+                  <div className="grid gap-3">
+                    {filteredProposals.map((p: any) => {
+                      const meta = getProjectMeta(p);
+                      const offer = (p?.offerDetails || p?.offer_details || {}) as any;
+                      const isFullTimeOffer = Boolean(offer?.isFullTime ?? offer?.is_full_time ?? p?.isFullTime ?? p?.is_full_time ?? false);
+                      const status = String(p?.status ?? "-");
+                      const role = String(offer?.roleTitle ?? offer?.role_title ?? "-");
+                      const mode = String(offer?.mode ?? meta.locationType ?? "-");
+                      const location = String(offer?.location ?? meta.location ?? "-");
+                      const start = String(offer?.startDate ?? offer?.start_date ?? "-");
+                      const duration = isFullTimeOffer ? "Full-time" : String(offer?.duration ?? "").trim();
+                      const startUtc = parseDateOnlyUtc(offer?.startDate ?? offer?.start_date ?? null);
+                      const endDate = isFullTimeOffer ? "-" : (startUtc
+                        ? addMonthsUtc(startUtc, monthsFromDuration(duration)).toISOString().slice(0, 10)
+                        : "-");
+                      const pricingLabel = resolveProposalPricingLabel(p);
+                      const updated = formatIsoDate(p?.updatedAt ?? p?.updated_at ?? p?.createdAt ?? p?.created_at);
+
+                      return (
+                        <Card
+                          key={String(p?.id ?? Math.random())}
+                          className={cn(
+                            "p-5 transition-all hover:shadow-md",
+                            isFullTimeOffer ? "border-l-4 border-l-indigo-500 bg-indigo-50/30" : ""
+                          )}
+                        >
+                          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0 space-y-2">
                               <div className="flex flex-wrap items-center gap-2">
-                                <Badge 
-                                  variant="outline" 
+                                <div className="text-sm font-semibold truncate">{role}</div>
+                                <Badge
+                                  variant="outline"
                                   className={cn(
                                     proposalBadgeClass(status),
-                                    status.toLowerCase() === "hired" ? "bg-emerald-600 text-white border-none font-bold px-3 py-1" : ""
+                                    status.toLowerCase() === "hired" ? "bg-emerald-600 text-white border-none font-bold" : ""
                                   )}
                                 >
-                                  {status.toLowerCase() === "hired" && isFullTimeOffer 
-                                    ? "full time hired" 
+                                  {status.toLowerCase() === "hired" && isFullTimeOffer
+                                    ? "full time hired"
                                     : String(status).toLowerCase()}
                                 </Badge>
                                 {isFullTimeOffer && status.toLowerCase() !== "rejected" && status.toLowerCase() !== "hired" && (
-                                  <Badge variant="secondary" className="bg-slate-100 text-slate-700 border-slate-200 text-[10px] font-semibold py-1 px-3">
+                                  <Badge variant="secondary" className="bg-slate-100 text-slate-700 border-slate-200 text-[10px] font-semibold py-0.5 px-2">
                                     Full Time Proposal
                                   </Badge>
                                 )}
                               </div>
+                              <div className="text-xs text-muted-foreground">
+                                <span className="font-medium text-slate-700">{meta.name}</span>
+                                {meta.locationType ? ` • ${meta.locationType}` : ""}
+                                {meta.location ? ` • ${meta.location}` : ""}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                <span>Mode: {mode}</span>
+                                <span>Location: {location}</span>
+                                <span>Start: {start}</span>
+                                <span>End: {endDate}</span>
+                                <span>Updated: {updated}</span>
+                              </div>
                             </div>
 
-                            <div className="grid gap-3 lg:grid-cols-3">
-                              <Card className="p-4 lg:col-span-2">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <p className="text-xs font-medium text-muted-foreground">Project</p>
-                                    <p className="mt-1 text-sm font-semibold truncate">{meta.name}</p>
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                      {meta.locationType && (
-                                        <Badge variant="outline" className="bg-white">
-                                          {meta.locationType}
-                                        </Badge>
-                                      )}
-                                      {meta.location && (
-                                        <Badge variant="outline" className="bg-white">
-                                          {meta.location}
-                                        </Badge>
-                                      )}
-                                      {Array.isArray(meta.skills) && meta.skills.map((skill: string) => (
-                                        <Badge key={skill} variant="outline" className="bg-white">
-                                          {skill}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      const pid = meta.projectId;
-                                      if (!pid) return;
-                                      setLocation(`/admin/projects?projectId=${encodeURIComponent(pid)}`);
-                                    }}
-                                  >
-                                    View Project Details
-                                  </Button>
-                                </div>
-
-                                {meta.scopeOfWork && (
-                                  <div className="mt-3 rounded-md border bg-muted/20 p-3 text-sm whitespace-pre-wrap">
-                                    {meta.scopeOfWork}
-                                  </div>
-                                )}
-                              </Card>
-
-                              <Card className="p-4">
-                                <p className="text-xs font-medium text-muted-foreground">Offer summary</p>
-                                <div className="mt-2 space-y-1 text-sm">
-                                  <p>
-                                    <span className="text-muted-foreground">Mode:</span> {String(offer?.mode ?? "-")}
-                                  </p>
-                                  <p>
-                                    <span className="text-muted-foreground">Location:</span> {String(offer?.location ?? "-")}
-                                  </p>
-                                  <p>
-                                    <span className="text-muted-foreground">Start:</span> {String(offer?.startDate ?? offer?.start_date ?? "-")}
-                                  </p>
-                                  <p>
-                                    <span className="text-muted-foreground">Duration:</span> {durationLabel}
-                                  </p>
-                                  <p>
-                                    <span className="text-muted-foreground">End:</span> {endDate}
-                                  </p>
-                                  <p>
-                                    <span className="text-muted-foreground">Full-time conversion:</span> {fullTimeOfferLabel}
-                                  </p>
-                                  <p>
-                                    <span className="text-muted-foreground">Shift:</span> {String(offer?.shiftFrom ?? offer?.shift_from ?? "-")}
-                                    {String(offer?.shiftTo ?? offer?.shift_to ?? "").trim()
-                                      ? ` - ${String(offer?.shiftTo ?? offer?.shift_to)}`
-                                      : ""}
-                                  </p>
-                                  <p>
-                                    <span className="text-muted-foreground">Timezone:</span> {String(offer?.timezone ?? "-")}
-                                  </p>
-                                </div>
-                              </Card>
-                            </div>
-
-                            <div className="grid gap-3 md:grid-cols-3">
-                              <Card className="p-4">
-                                <p className="text-xs font-medium text-muted-foreground">Pricing</p>
-                                <div className="mt-2 space-y-1 text-sm">
-                                  <p>
-                                    <span className="text-muted-foreground">Tier:</span> {resolveProposalPricingLabel(selectedProposal)}
-                                  </p>
-                                  <p>
-                                    <span className="text-muted-foreground">Monthly hours:</span> {String(offer?.monthlyHours ?? offer?.monthly_hours ?? "-")}
-                                  </p>
-                                  <p>
-                                    <span className="text-muted-foreground">Monthly amount:</span> {isFullTimeOffer ? "-" : (monthlyAmount ? `${String(offer?.currency ?? "INR")} ${monthlyAmount.toLocaleString()}` : "-")}
-                                  </p>
-                                  <p>
-                                    <span className="text-muted-foreground">Total price:</span> {isFullTimeOffer ? "-" : (totalPrice ? `${String(offer?.currency ?? "INR")} ${totalPrice.toLocaleString()}` : "-")}
-                                  </p>
-                                </div>
-                              </Card>
-
-                              <Card className="p-4">
-                                <p className="text-xs font-medium text-muted-foreground">Policy</p>
-                                <div className="mt-2 space-y-1 text-sm">
-                                  <p>
-                                    <span className="text-muted-foreground">Laptop:</span> {String(offer?.laptop ?? "-")}
-                                  </p>
-                                  <p>
-                                    <span className="text-muted-foreground">Paid leaves / month:</span> {String(offer?.paidLeavesPerMonth ?? offer?.paid_leaves_per_month ?? "-")}
-                                  </p>
-                                  <p>
-                                    <span className="text-muted-foreground">Schedule:</span> {String(offer?.weeklySchedule ?? offer?.weekly_schedule ?? "-")}
-                                  </p>
-                                </div>
-                              </Card>
-
-                              <Card className="p-4">
-                                <p className="text-xs font-medium text-muted-foreground">Work setup</p>
-                                <div className="mt-2 space-y-1 text-sm">
-                                  <p>
-                                    <span className="text-muted-foreground">WFH days:</span> {String(offer?.workFromHomeDays ?? offer?.work_from_home_days ?? "-")}
-                                  </p>
-                                  <p>
-                                    <span className="text-muted-foreground">Office days:</span> {String(offer?.workFromOfficeDays ?? offer?.work_from_office_days ?? "-")}
-                                  </p>
-                                </div>
-                              </Card>
-                            </div>
-
-                            <Card className="p-4">
-                              <p className="text-xs font-medium text-muted-foreground">Job description</p>
-                              {jdSafeHtml ? (
-                                <div
-                                  className="mt-2 rounded-md border bg-muted/20 p-3 text-sm prose prose-slate prose-sm max-w-none break-words [overflow-wrap:anywhere]"
-                                  dangerouslySetInnerHTML={{ __html: jdSafeHtml }}
-                                />
-                              ) : (
-                                <div className="mt-2 rounded-md border bg-muted/20 p-3 text-sm whitespace-pre-wrap">
-                                  {stripHtml(jdRaw) || "-"}
-                                </div>
-                              )}
-                            </Card>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </ScrollArea>
-              </DialogContent>
-            </Dialog>
-
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-              <div className="relative lg:col-span-2">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={proposalSearch}
-                  onChange={(e) => setProposalSearch(e.target.value)}
-                  placeholder="Search project / role / mode / location"
-                  className="pl-9"
-                />
-              </div>
-
-              <Select value={proposalStatusFilter} onValueChange={(v) => setProposalStatusFilter(v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All status</SelectItem>
-                  <SelectItem value="sent">Sent</SelectItem>
-                  <SelectItem value="accepted">Accepted</SelectItem>
-                  <SelectItem value="hired">Hired</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <div className="flex items-center justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setProposalSearch("");
-                    setProposalStatusFilter("all");
-                  }}
-                >
-                  Reset
-                </Button>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              {proposals.length === 0 ? (
-                <Card className="p-6">
-                  <p className="text-sm text-muted-foreground">No proposals found.</p>
-                </Card>
-              ) : filteredProposals.length === 0 ? (
-                <Card className="p-6">
-                  <p className="text-sm text-muted-foreground">No proposals match your filters.</p>
-                </Card>
-              ) : (
-                <div className="grid gap-3">
-                  {filteredProposals.map((p: any) => {
-                    const meta = getProjectMeta(p);
-                    const offer = (p?.offerDetails || p?.offer_details || {}) as any;
-                    const isFullTimeOffer = Boolean(offer?.isFullTime ?? offer?.is_full_time ?? p?.isFullTime ?? p?.is_full_time ?? false);
-                    const status = String(p?.status ?? "-");
-                    const role = String(offer?.roleTitle ?? offer?.role_title ?? "-");
-                    const mode = String(offer?.mode ?? meta.locationType ?? "-");
-                    const location = String(offer?.location ?? meta.location ?? "-");
-                    const start = String(offer?.startDate ?? offer?.start_date ?? "-");
-                    const duration = isFullTimeOffer ? "Full-time" : String(offer?.duration ?? "").trim();
-                    const startUtc = parseDateOnlyUtc(offer?.startDate ?? offer?.start_date ?? null);
-                    const endDate = isFullTimeOffer ? "-" : (startUtc
-                      ? addMonthsUtc(startUtc, monthsFromDuration(duration)).toISOString().slice(0, 10)
-                      : "-");
-                    const pricingLabel = resolveProposalPricingLabel(p);
-                    const updated = formatIsoDate(p?.updatedAt ?? p?.updated_at ?? p?.createdAt ?? p?.created_at);
-
-                    return (
-                      <Card 
-                        key={String(p?.id ?? Math.random())} 
-                        className={cn(
-                          "p-5 transition-all hover:shadow-md",
-                          isFullTimeOffer ? "border-l-4 border-l-indigo-500 bg-indigo-50/30" : ""
-                        )}
-                      >
-                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                          <div className="min-w-0 space-y-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <div className="text-sm font-semibold truncate">{role}</div>
-                              <Badge 
-                                variant="outline" 
+                            <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                              <Badge
+                                variant="outline"
                                 className={cn(
-                                  proposalBadgeClass(status),
-                                  status.toLowerCase() === "hired" ? "bg-emerald-600 text-white border-none font-bold" : ""
+                                  "bg-white font-semibold",
+                                  isFullTimeOffer ? "text-indigo-700 border-indigo-200" : ""
                                 )}
                               >
-                                {status.toLowerCase() === "hired" && isFullTimeOffer 
-                                  ? "full time hired" 
-                                  : String(status).toLowerCase()}
+                                {pricingLabel}
                               </Badge>
-                              {isFullTimeOffer && status.toLowerCase() !== "rejected" && status.toLowerCase() !== "hired" && (
-                                <Badge variant="secondary" className="bg-slate-100 text-slate-700 border-slate-200 text-[10px] font-semibold py-0.5 px-2">
-                                  Full Time Proposal
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              <span className="font-medium text-slate-700">{meta.name}</span>
-                              {meta.locationType ? ` • ${meta.locationType}` : ""}
-                              {meta.location ? ` • ${meta.location}` : ""}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                              <span>Mode: {mode}</span>
-                              <span>Location: {location}</span>
-                              <span>Start: {start}</span>
-                              <span>End: {endDate}</span>
-                              <span>Updated: {updated}</span>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedProposal(p);
+                                  setOpenProposalDetails(true);
+                                }}
+                              >
+                                View details
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  const pid = String(meta.projectId ?? "").trim();
+                                  if (!pid) return;
+                                  setLocation(`/admin/projects?projectId=${encodeURIComponent(pid)}`);
+                                }}
+                              >
+                                View Project Details
+                              </Button>
                             </div>
                           </div>
-
-                          <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                            <Badge 
-                              variant="outline" 
-                              className={cn(
-                                "bg-white font-semibold",
-                                isFullTimeOffer ? "text-indigo-700 border-indigo-200" : ""
-                              )}
-                            >
-                              {pricingLabel}
-                            </Badge>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedProposal(p);
-                                setOpenProposalDetails(true);
-                              }}
-                            >
-                              View details
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                const pid = String(meta.projectId ?? "").trim();
-                                if (!pid) return;
-                                setLocation(`/admin/projects?projectId=${encodeURIComponent(pid)}`);
-                              }}
-                            >
-                              View Project Details
-                            </Button>
-                          </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-        </TabsContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
 
           <TabsContent value="bank" className="px-6 pb-6 pt-4">
             <ScrollArea className="h-[600px] pr-4">
               <Card className="p-4">
-              <div className="grid gap-3 md:grid-cols-2 text-sm">
-                <div>
-                  <p className="text-xs text-muted-foreground">Bank Name</p>
-                  <p>{String((summary as any)?.bankDetails?.bankName ?? "-")}</p>
+                <div className="grid gap-3 md:grid-cols-2 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Bank Name</p>
+                    <p>{String((summary as any)?.bankDetails?.bankName ?? "-")}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Account Holder</p>
+                    <p>{String((summary as any)?.bankDetails?.accountHolderName ?? "-")}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Account Number</p>
+                    <p>{String((summary as any)?.bankDetails?.accountNumber ?? "-")}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">IFSC</p>
+                    <p>{String((summary as any)?.bankDetails?.ifscCode ?? "-")}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">UPI ID</p>
+                    <p>{String((summary as any)?.bankDetails?.upiId ?? "-")}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Account Holder</p>
-                  <p>{String((summary as any)?.bankDetails?.accountHolderName ?? "-")}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Account Number</p>
-                  <p>{String((summary as any)?.bankDetails?.accountNumber ?? "-")}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">IFSC</p>
-                  <p>{String((summary as any)?.bankDetails?.ifscCode ?? "-")}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">UPI ID</p>
-                  <p>{String((summary as any)?.bankDetails?.upiId ?? "-")}</p>
-                </div>
-              </div>
-            </Card>
-          </ScrollArea>
-        </TabsContent>
+              </Card>
+            </ScrollArea>
+          </TabsContent>
         </Tabs>
       </Card>
 
@@ -4074,8 +3987,8 @@ export default function AdminInternDetailPage() {
               <Button variant="outline" onClick={() => setOpenEditSkills(false)} disabled={savingSkills}>
                 Cancel
               </Button>
-              <Button 
-                onClick={handleSaveSkills} 
+              <Button
+                onClick={handleSaveSkills}
                 disabled={savingSkills}
                 className="bg-[#0E6049] hover:bg-[#0E6049]/90"
               >

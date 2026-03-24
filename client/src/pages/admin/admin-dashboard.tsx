@@ -955,7 +955,7 @@ export default function AdminDashboardPage() {
             <div className="flex items-center justify-between gap-2">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
-                  Proposals vs AI Interviews
+                  Total Proposals vs AI Interviews
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Last 6 months
