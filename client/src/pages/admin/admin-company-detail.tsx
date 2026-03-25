@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Building2, FileText, ExternalLink, TrendingUp, Users, Search, Calendar, MapPin, Globe, Mail, Phone, Briefcase,
   CheckCircle2, Clock, AlertCircle, X, ChevronRight, DollarSign, ArrowUpRight, ArrowDownRight, Loader2,
-  CreditCard, User, FileCheck, MoreHorizontal, Eye, ArrowLeft, ArrowRight
+  CreditCard, User, FileCheck, MoreHorizontal, Eye, ArrowLeft, ArrowRight, AlertTriangle
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useRoute } from "wouter";
@@ -153,6 +153,7 @@ export default function AdminCompanyDetailPage() {
   const [proposals, setProposals] = useState<any[]>([]);
   const [interviews, setInterviews] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [paymentSummary, setPaymentSummary] = useState<any>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -161,12 +162,13 @@ export default function AdminCompanyDetailPage() {
         setLoading(true);
         setError(null);
         setLogoError(false);
-        const [employerRes, projectsRes, proposalsRes, interviewsRes, ordersRes] = await Promise.all([
+        const [employerRes, projectsRes, proposalsRes, interviewsRes, ordersRes, paymentSummaryRes] = await Promise.all([
           apiRequest("GET", `/api/admin/employers/${companyId}`),
           apiRequest("GET", `/api/employer/${companyId}/projects`).catch(() => null),
           apiRequest("GET", `/api/employer/${companyId}/proposals`).catch(() => null),
           apiRequest("GET", `/api/employer/${companyId}/interviews`).catch(() => null),
           apiRequest("GET", `/api/admin/employers/${companyId}/orders?limit=200`).catch(() => null),
+          apiRequest("GET", `/api/admin/employers/${companyId}/payment-summary`).catch(() => null),
         ]);
         const employerJson = await employerRes.json();
         setEmployer((employerJson?.employer ?? null) as any);
@@ -178,6 +180,7 @@ export default function AdminCompanyDetailPage() {
         else setInterviews([]);
         if (ordersRes) { const j = await ordersRes.json().catch(() => null); setOrders(Array.isArray(j?.orders) ? j.orders : []); }
         else setOrders([]);
+        if (paymentSummaryRes) { const j = await paymentSummaryRes.json().catch(() => null); setPaymentSummary(j); }
       } catch (e) {
         console.error("Failed to load company details", e);
         setError("Failed to load company details");
@@ -202,8 +205,37 @@ export default function AdminCompanyDetailPage() {
     const earningsMinor = (orders ?? []).reduce((acc, o: any) => { const s = String(o?.status ?? "").trim().toLowerCase(); if (s !== "paid") return acc; const minor = Number(o?.amountMinor ?? o?.amount_minor ?? o?.amount ?? 0); return acc + (Number.isFinite(minor) ? minor : 0); }, 0);
     const totalProposals = Array.isArray(proposals) ? proposals.length : 0;
     const conversionRate = totalProposals > 0 ? hiredResourcesCount / totalProposals : 0;
-    return { companyName: String(e.companyName ?? e.name ?? "Company"), contactName: String(e.primaryContactName ?? e.name ?? "-"), contactRole: String(e.primaryContactRole ?? ""), email: String(e.companyEmail ?? "-"), phone, createdAt, location, websiteUrl: String(e.websiteUrl ?? ""), companySize: String(e.companySize ?? ""), country: String(e.country ?? ""), setupCompleted: !!e.setupCompleted, onboardingCompleted: !!e.onboardingCompleted, isActive: (e as any)?.isActive !== false, logoUrl: String(e.logoUrl ?? ""), gstNumber: String(e.gstNumber ?? ""), activeInternships, hiredResourcesCount, lastPaymentAt, earningsMinor, totalProposals, conversionRate };
-  }, [employer, orders, projects, proposals]);
+    
+    const paymentSum = paymentSummary?.summary ?? {};
+    return { 
+      companyName: String(e.companyName ?? e.name ?? "Company"), 
+      contactName: String(e.primaryContactName ?? e.name ?? "-"), 
+      contactRole: String(e.primaryContactRole ?? ""), 
+      email: String(e.companyEmail ?? "-"), 
+      phone, 
+      createdAt, 
+      location, 
+      websiteUrl: String(e.websiteUrl ?? ""), 
+      companySize: String(e.companySize ?? ""), 
+      country: String(e.country ?? ""), 
+      setupCompleted: !!e.setupCompleted, 
+      onboardingCompleted: !!e.onboardingCompleted, 
+      isActive: (e as any)?.isActive !== false, 
+      logoUrl: String(e.logoUrl ?? ""), 
+      gstNumber: String(e.gstNumber ?? ""), 
+      activeInternships, 
+      hiredResourcesCount, 
+      lastPaymentAt, 
+      earningsMinor, 
+      totalProposals, 
+      conversionRate,
+      totalBilledMinor: paymentSum.totalBilledMinor ?? earningsMinor,
+      totalPaidMinor: paymentSum.totalPaidMinor ?? earningsMinor,
+      remainingMinor: paymentSum.remainingMinor ?? 0,
+      upcomingPaymentMinor: paymentSum.upcomingPaymentMinor ?? 0,
+      nextUpcomingDate: paymentSum.nextUpcomingDate ?? null,
+    };
+  }, [employer, orders, projects, proposals, paymentSummary]);
 
   const tabData = useMemo(() => {
     const norm = (v: unknown) => String(v ?? "").trim().toLowerCase();
@@ -214,10 +246,11 @@ export default function AdminCompanyDetailPage() {
     const proposalList = (proposals ?? []).filter((p: any) => { const s = norm(p?.status ?? "-"); const sf = norm(tabStatus.proposals); if (sf) { if (sf === "expired") { if (s !== "expired" && s !== "withdrawn") return false; } else if (s !== sf) return false; } const hay = `${p?.internName ?? p?.candidateName ?? ""} ${p?.projectName ?? ""} ${p?.currency ?? ""}`; return matches(hay, tabSearch.proposals); });
     const interviewList = (interviews ?? []).filter((i: any) => { const s = norm(i?.status ?? "-"); const sf = norm(tabStatus.interviews); if (sf && s !== sf) return false; const hay = `${i?.internName ?? ""} ${i?.projectName ?? ""} ${i?.timezone ?? ""} ${i?.meetingLink ?? ""}`; return matches(hay, tabSearch.interviews); });
     const paymentList = (orders ?? []).filter((o: any) => { const s = norm(o?.status ?? "-"); const sf = norm(tabStatus.payments); if (sf && s !== sf) return false; const hay = `${o?.orderId ?? o?.order_id ?? ""} ${o?.currency ?? ""} ${o?.status ?? ""}`; return matches(hay, tabSearch.payments); });
-    const upcomingPaymentsList = (orders ?? []).filter((o: any) => { const s = norm(o?.status ?? "-"); if (s === "paid") return false; if (!s || s === "-") return false; const sf = norm(tabStatus.upcomingPayments); if (sf && s !== sf) return false; const hay = `${o?.internName ?? ""} ${o?.projectName ?? ""} ${o?.currency ?? ""} ${o?.orderId ?? o?.order_id ?? ""}`; return matches(hay, tabSearch.upcomingPayments); });
+    const upcomingPaymentsList = (paymentSummary?.upcomingPayments ?? []).filter((o: any) => { const s = norm(o?.status ?? ""); if (s === "paid") return false; const sf = norm(tabStatus.upcomingPayments); if (sf && s !== sf) return false; const hay = `${o?.candidateName ?? o?.internName ?? ""} ${o?.projectName ?? ""} ${o?.currency ?? ""} ${o?.id ?? ""}`; return matches(hay, tabSearch.upcomingPayments); });
     const hiredList = (proposals ?? []).filter((p: any) => norm(p?.status ?? "") === "hired").filter((p: any) => { const hay = `${p?.internName ?? p?.candidateName ?? ""} ${p?.projectName ?? ""}`; return matches(hay, tabSearch.hired); });
-    return { projectList, proposalList, interviewList, paymentList, upcomingPaymentsList, hiredList };
-  }, [orders, projects, proposals, interviews, tabSearch, tabStatus]);
+    const employerDuesList = paymentSummary?.internEmployerDues ?? [];
+    return { projectList, proposalList, interviewList, paymentList, upcomingPaymentsList, hiredList, employerDuesList };
+  }, [orders, projects, proposals, interviews, tabSearch, tabStatus, paymentSummary]);
 
   const pagination = useMemo(() => {
     const getList = (tab: TabKey) => { if (tab === "projects") return tabData.projectList; if (tab === "proposals") return tabData.proposalList; if (tab === "interviews") return tabData.interviewList; if (tab === "payments") return tabData.paymentList; if (tab === "upcomingPayments") return tabData.upcomingPaymentsList; return tabData.hiredList; };
@@ -369,7 +402,7 @@ export default function AdminCompanyDetailPage() {
                         "ml-2 px-2 py-0.5 text-xs font-medium rounded-full",
                         activeTab === tab ? "bg-[#0E6049] text-white" : "bg-muted text-muted-foreground"
                       )}>
-                        {tab === "projects" ? tabData.projectList.length : tab === "proposals" ? tabData.proposalList.length : tab === "interviews" ? tabData.interviewList.length : tab === "payments" ? tabData.paymentList.length : tab === "upcomingPayments" ? tabData.upcomingPaymentsList.length : tabData.hiredList.length}
+                        {tab === "projects" ? tabData.projectList.length : tab === "proposals" ? tabData.proposalList.length : tab === "interviews" ? tabData.interviewList.length : tab === "payments" ? tabData.paymentList.length :  tabData.hiredList.length}
                       </span>
                     )}
                   </TabsTrigger>
@@ -597,38 +630,279 @@ export default function AdminCompanyDetailPage() {
                   )}
 
                   {tab === "upcomingPayments" && (
-                    <div className="rounded-lg border overflow-hidden">
-                      <Table>
-                        <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40"><TableHead>Candidate</TableHead><TableHead>Project</TableHead><TableHead>Amount</TableHead><TableHead>Currency</TableHead><TableHead>Due Date</TableHead><TableHead>Total</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                          {tabData.upcomingPaymentsList.length === 0 ? <TableRow><TableCell colSpan={7}><EmptyState icon={DollarSign} title="No upcoming payments" description="All payments are up to date." /></TableCell></TableRow> :
-                            tabData.upcomingPaymentsList.map((o: any, idx: number) => {
-                              const orderId = String(o?.orderId ?? o?.order_id ?? "").trim();
-                              const candidateName = String(o?.internName ?? "—").trim() || "—";
-                              const projectName = String(o?.projectName ?? "—").trim() || "—";
-                              const cur = String(o?.currency ?? "INR").toUpperCase();
-                              const amountMinor = Number(o?.amountMinor ?? o?.amount_minor ?? 0);
-                              const amountMinorInr = cur === "USD" ? convertMinorToInrIfUsd(amountMinor, cur) : amountMinor;
-                              const amountReceivable = amountMinorInr ? formatAmount(amountMinorInr, cur === "USD" ? "INR" : cur) : "—";
-                              const createdAtRaw = o?.createdAt ?? o?.created_at ?? null;
-                              const receivableDate = formatDate(createdAtRaw ? String(createdAtRaw) : null);
-                              const receivedAt = (o as any)?.raw?.receivedAt ?? null;
-                              const isReceived = Boolean(receivedAt);
+                    <Card className="border-0 shadow-md overflow-hidden">
+                      <div className="p-4 sm:p-5 border-b bg-gradient-to-r from-[#0E6049]/5 to-transparent">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-[#0E6049]/10 flex items-center justify-center">
+                              <DollarSign className="h-5 w-5 text-[#0E6049]" />
+                            </div>
+                            <div>
+                              <h2 className="text-base sm:text-lg font-semibold">Payment Tracker</h2>
+                              <p className="text-xs text-muted-foreground">
+                                Track payments for all hired candidates
+                              </p>
+                            </div>
+                          </div>
+                          
+                          {/* Stats Summary */}
+                          <div className="flex flex-wrap gap-3">
+                            {(() => {
+                              const active = tabData.employerDuesList.filter((d: any) => {
+                                const isCompleted = (d?.remainingMonths ?? 1) <= 0;
+                                return !isCompleted;
+                              }).length;
+                              const completed = tabData.employerDuesList.length - active;
+                              const totalDue = tabData.employerDuesList.reduce((sum: number, d: any) => sum + Number(d?.dueAmountMinor ?? 0), 0);
                               return (
-                                <TableRow key={String(o?.id ?? orderId ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
-                                  <TableCell className="font-medium">{candidateName}</TableCell>
-                                  <TableCell>{projectName}</TableCell>
-                                  <TableCell className="font-medium text-amber-600">{amountReceivable}</TableCell>
-                                  <TableCell>{cur}</TableCell>
-                                  <TableCell className="text-muted-foreground">{receivableDate}</TableCell>
-                                  <TableCell>—</TableCell>
-                                  <TableCell className="text-right"><Button size="sm" variant="outline" disabled={isReceived || !companyId || !orderId || markingReceivedId === orderId || String(o?.status ?? "").trim().toLowerCase() === "paid"} onClick={async () => { if (!companyId || !orderId) return; try { setMarkingReceivedId(orderId); await apiRequest("POST", `/api/admin/employers/${encodeURIComponent(companyId)}/orders/${encodeURIComponent(orderId)}/mark-received`); setOrders((prev) => prev.map((x: any) => { const oid = String(x?.orderId ?? x?.order_id ?? "").trim(); if (oid !== orderId) return x; return { ...x, raw: { ...x.raw, receivedAt: new Date().toISOString() } }; })); } catch { return; } finally { setMarkingReceivedId(""); } }}>{isReceived ? "Received" : "Mark Received"}</Button></TableCell>
-                                </TableRow>
+                                <>
+                                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+                                    <div className="h-2 w-2 rounded-full bg-amber-500" />
+                                    <span className="text-xs font-medium text-amber-700">{active} Active</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
+                                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                                    <span className="text-xs font-medium text-emerald-700">{completed} Completed</span>
+                                  </div>
+                                  
+                                </>
                               );
-                            })}
-                        </TableBody>
-                      </Table>
-                    </div>
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-4 sm:p-5">
+                        {/* Filter Tabs */}
+                        <div className="space-y-3 mb-5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-medium text-muted-foreground mr-2">Status:</span>
+                            {[
+                              { key: "all", label: "All", count: tabData.employerDuesList.length },
+                              { key: "active", label: "Active", count: tabData.employerDuesList.filter((d: any) => (d?.remainingMonths ?? 1) > 0).length, color: "amber" },
+                              { key: "completed", label: "Completed", count: tabData.employerDuesList.filter((d: any) => (d?.remainingMonths ?? 1) <= 0).length, color: "emerald" },
+                            ].map((filter) => (
+                              <button
+                                key={filter.key}
+                                onClick={() => setTabStatus((prev) => ({ ...prev, upcomingPayments: filter.key === "all" ? "" : filter.key }))}
+                                className={cn(
+                                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                                  (filter.key === "all" && !tabStatus.upcomingPayments) || tabStatus.upcomingPayments === filter.key
+                                    ? filter.color === "amber" ? "bg-amber-100 text-amber-700 border border-amber-300"
+                                    : filter.color === "emerald" ? "bg-emerald-100 text-emerald-700 border border-emerald-300"
+                                    : "bg-[#0E6049] text-white border border-[#0E6049]"
+                                    : "bg-muted text-muted-foreground hover:bg-muted/80 border border-transparent"
+                                )}
+                              >
+                                {filter.label}
+                                <span className={cn(
+                                  "px-1.5 py-0.5 rounded-full text-[10px]",
+                                  (filter.key === "all" && !tabStatus.upcomingPayments) || tabStatus.upcomingPayments === filter.key
+                                    ? filter.color === "amber" ? "bg-amber-200 text-amber-800"
+                                    : filter.color === "emerald" ? "bg-emerald-200 text-emerald-800"
+                                    : "bg-white/20"
+                                    : "bg-background"
+                                )}>
+                                  {filter.count}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                          
+                          {/* Currency Filter */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-medium text-muted-foreground mr-2">Currency:</span>
+                            {[
+                              { key: "all", label: "All", count: tabData.employerDuesList.length },
+                              { key: "INR", label: "₹ INR", count: tabData.employerDuesList.filter((d: any) => String(d?.currency ?? "INR").toUpperCase() === "INR").length, color: "blue" },
+                              { key: "USD", label: "$ USD", count: tabData.employerDuesList.filter((d: any) => String(d?.currency ?? "INR").toUpperCase() === "USD").length, color: "blue" },
+                            ].map((filter) => (
+                              <button
+                                key={`currency-${filter.key}`}
+                                onClick={() => setTabSearch((prev) => ({ ...prev, upcomingPayments: filter.key === "all" ? "" : filter.key }))}
+                                className={cn(
+                                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                                  tabSearch.upcomingPayments === filter.key
+                                    ? filter.key === "INR" ? "bg-blue-100 text-blue-700 border border-blue-300"
+                                    : filter.key === "USD" ? "bg-purple-100 text-purple-700 border border-purple-300"
+                                    : "bg-[#0E6049] text-white border border-[#0E6049]"
+                                    : "bg-muted text-muted-foreground hover:bg-muted/80 border border-transparent"
+                                )}
+                              >
+                                {filter.label}
+                                <span className={cn(
+                                  "px-1.5 py-0.5 rounded-full text-[10px]",
+                                  tabSearch.upcomingPayments === filter.key
+                                    ? filter.key === "INR" ? "bg-blue-200 text-blue-800"
+                                    : filter.key === "USD" ? "bg-purple-200 text-purple-800"
+                                    : "bg-white/20"
+                                    : "bg-background"
+                                )}>
+                                  {filter.count}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {tabData.employerDuesList.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-16 text-center">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 mb-4">
+                              <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-foreground">No payment records</h3>
+                            <p className="text-sm text-muted-foreground mt-1">No hired candidates to track payments for.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {tabData.employerDuesList
+                              .filter((d: any) => {
+                                // Status filter
+                                if (tabStatus.upcomingPayments && tabStatus.upcomingPayments !== "all") {
+                                  const isCompleted = (d?.remainingMonths ?? 1) <= 0;
+                                  if (tabStatus.upcomingPayments === "completed" && !isCompleted) return false;
+                                  if (tabStatus.upcomingPayments === "active" && isCompleted) return false;
+                                }
+                                // Currency filter
+                                if (tabSearch.upcomingPayments && tabSearch.upcomingPayments !== "all") {
+                                  const currency = String(d?.currency ?? "INR").toUpperCase();
+                                  if (currency !== tabSearch.upcomingPayments) return false;
+                                }
+                                return true;
+                              })
+                              .map((d: any, idx: number) => {
+                                const candidateName = d?.internName ?? "—";
+                                const projectName = d?.projectName ?? "—";
+                                const startDate = d?.startDate ? formatDate(d.startDate) : "—";
+                                const duration = d?.duration ?? "—";
+                                const hasFullTime = String(duration).toLowerCase().includes("full-time") || String(duration).toLowerCase().includes("pp");
+                                const upcomingPaymentDate = d?.upcomingPaymentDate ? formatDate(d.upcomingPaymentDate) : "—";
+                                const currency = String(d?.currency ?? "INR").toUpperCase();
+                                const upcomingPaymentMinor = Number(d?.monthlyAmountMinor ?? d?.monthlyAmount ?? 0);
+                                const totalAmountMinor = Number(d?.totalAmountMinor ?? 0);
+                                const dueAmountMinor = Number(d?.dueAmountMinor ?? 0);
+                                const paidMonths = Number(d?.paidMonths ?? 0);
+                                const totalMonths = Number(d?.totalMonths ?? 1);
+                                const isCompleted = (d?.remainingMonths ?? 1) <= 0;
+                                const progress = totalMonths > 0 ? Math.min(100, Math.round((paidMonths / totalMonths) * 100)) : 0;
+                                
+                                return (
+                                  <div 
+                                    key={String(d?.proposalId ?? idx)} 
+                                    className={cn(
+                                      "rounded-xl border overflow-hidden transition-all hover:shadow-md",
+                                      isCompleted ? "bg-emerald-50/50 border-emerald-200" : "bg-white border-slate-200"
+                                    )}
+                                  >
+                                    {/* Card Header */}
+                                    <div className={cn(
+                                      "flex items-center justify-between p-4",
+                                      isCompleted ? "bg-emerald-100/50" : "bg-slate-50/50"
+                                    )}>
+                                      <div className="flex items-center gap-3">
+                                        <div className={cn(
+                                          "h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold",
+                                          isCompleted ? "bg-emerald-200 text-emerald-700" : "bg-[#0E6049]/10 text-[#0E6049]"
+                                        )}>
+                                          {candidateName !== "—" ? candidateName.charAt(0).toUpperCase() : "?"}
+                                        </div>
+                                        <div>
+                                          <h4 className="text-sm font-semibold">{candidateName}</h4>
+                                          <p className="text-xs text-muted-foreground">{projectName}</p>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className={hasFullTime ? "bg-emerald-50 text-emerald-700 border-emerald-200" : ""}>
+                                          {hasFullTime ? "Full-time" : duration}
+                                        </Badge>
+                                        {isCompleted ? (
+                                          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
+                                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                                            Completed
+                                          </Badge>
+                                        ) : (
+                                          <Badge className="bg-amber-100 text-amber-700 border-amber-200">
+                                            <Clock className="h-3 w-3 mr-1" />
+                                            Active
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Progress Bar */}
+                                    <div className="px-4 py-3 border-t border-slate-100">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-medium text-muted-foreground">Payment Progress</span>
+                                        <span className="text-xs font-semibold">{paidMonths} / {totalMonths} months</span>
+                                      </div>
+                                      <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                                        <div 
+                                          className={cn(
+                                            "h-full rounded-full transition-all duration-500",
+                                            isCompleted ? "bg-emerald-500" : "bg-[#0E6049]"
+                                          )}
+                                          style={{ width: `${progress}%` }}
+                                        />
+                                      </div>
+                                    </div>
+
+                                    {/* Details Grid */}
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 border-t border-slate-100">
+                                      <div>
+                                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Start Date</p>
+                                        <p className="text-sm font-medium">{startDate}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Next Payment</p>
+                                        <p className={cn("text-sm font-medium", upcomingPaymentDate !== "—" ? "text-amber-600" : "")}>
+                                          {upcomingPaymentDate !== "—" ? upcomingPaymentDate : "—"}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Upcoming Amount</p>
+                                        <p className={cn("text-sm font-semibold", upcomingPaymentMinor > 0 ? "text-amber-600" : "")}>
+                                          {formatAmount(upcomingPaymentMinor, currency)}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Total Amount</p>
+                                        <p className="text-sm font-semibold">{formatAmount(totalAmountMinor, currency)}</p>
+                                      </div>
+                                    </div>
+
+                                    {/* Due Amount Footer */}
+                                    <div className={cn(
+                                      "flex items-center justify-between px-4 py-3 border-t",
+                                      isCompleted ? "bg-emerald-100/50 border-emerald-200" : "bg-slate-50 border-slate-100"
+                                    )}>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-medium text-muted-foreground">Due Amount:</span>
+                                        <span className={cn(
+                                          "text-sm font-bold",
+                                          isCompleted ? "text-emerald-600" : dueAmountMinor > 0 ? "text-red-600" : "text-emerald-600"
+                                        )}>
+                                          {formatAmount(dueAmountMinor, currency)}
+                                        </span>
+                                      </div>
+                                      {!isCompleted && dueAmountMinor > 0 && (
+                                        <span className="text-xs text-muted-foreground">
+                                          {totalMonths - paidMonths} payment{totalMonths - paidMonths !== 1 ? "s" : ""} remaining
+                                        </span>
+                                      )}
+                                      {isCompleted && (
+                                        <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                                          <CheckCircle2 className="h-3 w-3" />
+                                          All payments completed
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        )}
+                      </div>
+                    </Card>
                   )}
 
                   {tab === "hired" && (

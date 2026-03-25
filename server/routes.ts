@@ -15268,6 +15268,155 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
     }
   });
 
+  app.get("/api/admin/employers/:employerId/payment-summary", async (req, res) => {
+    try {
+      if (!(req as any)?.session?.admin) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const employerId = String(req.params.employerId ?? "").trim();
+      if (!employerId) return res.status(400).json({ message: "employerId is required" });
+
+      const employer = await storage.getEmployer(employerId);
+      if (!employer) return res.status(404).json({ message: "Employer not found" });
+
+      const payments = await storage.listEmployerPaymentsByEmployerId(employerId, { limit: 5000 }).catch(() => []);
+      const proposals = await storage.getProposalsByEmployerId(employerId).catch(() => []);
+      const projects = await Promise.all(proposals.map((p: any) => storage.getProject(p?.projectId ?? p?.project_id ?? "").catch(() => undefined)));
+      const users = await Promise.all(proposals.map((p: any) => storage.getUser(p?.internId ?? p?.intern_id ?? "").catch(() => undefined)));
+
+      const projectById = new Map<string, any>();
+      for (const p of projects) {
+        if (p) projectById.set(String((p as any)?.id ?? ""), p);
+      }
+
+      const userById = new Map<string, any>();
+      for (const u of users) {
+        if (u) userById.set(String((u as any)?.id ?? ""), u);
+      }
+
+      const hiredProposals = (proposals as any[]).filter((p: any) => {
+        const status = String(p?.status ?? "").trim().toLowerCase();
+        return status === "hired";
+      });
+
+      const monthsFromDuration = (duration: unknown) => {
+        switch (String(duration ?? "").trim().toLowerCase()) {
+          case "2m": return 2;
+          case "3m": return 3;
+          case "6m": return 6;
+          default: return 1;
+        }
+      };
+
+      const getInternName = (p: any) => {
+        const internId = String(p?.internId ?? p?.intern_id ?? "").trim();
+        const u = userById.get(internId);
+        return u ? `${String(u.firstName ?? "")} ${String(u.lastName ?? "")}`.trim() || null : null;
+      };
+
+      const getProjectName = (p: any) => {
+        const projectId = String(p?.projectId ?? p?.project_id ?? "").trim();
+        const proj = projectById.get(projectId);
+        return proj ? String(proj?.projectName ?? proj?.project_name ?? "") || null : null;
+      };
+
+      const getStartDate = (p: any) => {
+        const startDate = p?.startDate ?? p?.start_date ?? p?.createdAt ?? p?.created_at ?? null;
+        if (!startDate) return null;
+        const d = new Date(startDate);
+        if (Number.isNaN(d.getTime())) return null;
+        return d.toISOString().slice(0, 10);
+      };
+
+      const getDuration = (p: any) => {
+        const offer = p?.offerDetails ?? p?.offer_details ?? {};
+        const duration = String(offer?.duration ?? offer?.internshipDuration ?? "").trim();
+        const months = monthsFromDuration(duration);
+        return months;
+      };
+
+      const totalPaidMinor = payments
+        .filter((p: any) => String(p?.status ?? "").trim().toLowerCase() === "paid")
+        .reduce((acc: number, p: any) => acc + (Number(p?.amountMinor ?? 0) || 0), 0);
+
+      const totalBilledMinor = payments
+        .filter((p: any) => {
+          const s = String(p?.status ?? "").trim().toLowerCase();
+          return s === "paid" || s === "pending" || s === "created";
+        })
+        .reduce((acc: number, p: any) => acc + (Number(p?.amountMinor ?? 0) || 0), 0);
+
+      const upcomingPayments = payments
+        .filter((p: any) => {
+          const s = String(p?.status ?? "").trim().toLowerCase();
+          return s === "pending" || s === "created" || (!s && String(p?.orderId ?? "").trim());
+        })
+        .map((p: any) => {
+          const raw = p?.raw ?? {};
+          const notes = raw?.notes ?? raw?.order?.notes ?? {};
+          const proposalIds = notes?.proposalIds ?? notes?.proposal_ids ?? [];
+          const pid = Array.isArray(proposalIds) && proposalIds.length === 1 ? proposalIds[0] : null;
+          const proposal = pid ? (proposals as any[]).find((pr: any) => String(pr?.id ?? "") === pid) : null;
+          
+          return {
+            id: p?.orderId ?? p?.id ?? "",
+            amountMinor: Number(p?.amountMinor ?? 0) || 0,
+            currency: String(p?.currency ?? "INR").toUpperCase(),
+            dueDate: p?.createdAt ? new Date(p.createdAt).toISOString().slice(0, 10) : null,
+            candidateName: proposal ? getInternName(proposal) : "Multiple",
+            projectName: proposal ? getProjectName(proposal) : "Multiple",
+            startDate: proposal ? getStartDate(proposal) : null,
+            duration: proposal ? getDuration(proposal) : 0,
+            status: String(p?.status ?? "pending"),
+          };
+        })
+        .filter((p: any) => p.amountMinor > 0);
+
+      const nextUpcoming = upcomingPayments.length > 0 ? upcomingPayments[0] : null;
+      const totalUpcomingMinor = upcomingPayments.reduce((acc: number, p: any) => acc + p.amountMinor, 0);
+
+      const internIds = Array.from(new Set(hiredProposals.map((p: any) => String(p?.internId ?? p?.intern_id ?? "").trim()).filter(Boolean)));
+      const internEmployerDues = [];
+
+      for (const internId of internIds) {
+        try {
+          const duesRes = await fetch(`${req.protocol}://${req.get("host")}/api/admin/interns/${internId}/employer-dues`, {
+            headers: { Cookie: req.get("Cookie") || "" },
+          });
+          if (duesRes.ok) {
+            const duesData = await duesRes.json();
+            const dues = Array.isArray(duesData.employerDues) ? duesData.employerDues : [];
+            for (const d of dues) {
+              if (String(d?.employerId ?? "") === employerId) {
+                internEmployerDues.push({
+                  ...d,
+                  internId,
+                  internName: getInternName(hiredProposals.find((p: any) => String(p?.internId ?? p?.intern_id ?? "") === internId)),
+                });
+              }
+            }
+          }
+        } catch {}
+      }
+
+      return res.json({
+        summary: {
+          totalBilledMinor,
+          totalPaidMinor,
+          remainingMinor: totalBilledMinor - totalPaidMinor,
+          upcomingPaymentMinor: totalUpcomingMinor,
+          nextUpcomingDate: nextUpcoming?.dueDate ?? null,
+        },
+        upcomingPayments,
+        internEmployerDues,
+      });
+    } catch (error) {
+      console.error("Admin employer payment summary error:", error);
+      return res.status(500).json({ message: error instanceof Error ? error.message : "Failed to fetch payment summary" });
+    }
+  });
+
   app.get("/api/employer/:employerId/orders/:orderId/invoice", async (req, res) => {
     try {
       const employerId = String(req.params.employerId ?? "").trim();
@@ -15819,7 +15968,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         };
       });
 
-      return res.json({ items });
+      return res.json({ employerDues: items });
     } catch (error) {
       console.error("Admin intern employer dues error:", error);
       return res.status(500).json({ message: "Failed to compute employer dues" });
