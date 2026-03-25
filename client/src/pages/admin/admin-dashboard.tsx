@@ -56,7 +56,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Area, AreaChart, Tooltip } from "recharts";
+import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Area, AreaChart, Tooltip, PieChart, Pie, Cell } from "recharts";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { AnimatedEmptyStateCard } from "../not-found";
@@ -287,13 +287,15 @@ export default function AdminDashboardPage() {
   const projectTo = Math.min(projectsTotal, (projectsPage - 1) * projectsLimit + internships.length);
 
   const applicationsTrendData = dashboard?.trendData ?? [];
+  const totalAIInterviews = applicationsTrendData.reduce((sum: number, d: any) => sum + (d?.interviews ?? 0), 0);
+  const totalProposals = applicationsTrendData.reduce((sum: number, d: any) => sum + (d?.applications ?? 0), 0);
   const funnelData = dashboard?.funnelData ?? [];
   const funnelDataDisplay = useMemo(
     () =>
       (funnelData ?? []).map((row) => {
         const stage = String((row as any)?.stage ?? "").trim();
         if (stage.toLowerCase() === "interviewed") {
-          return { ...row, stage: "AI Interviews Completed" };
+          return { ...row, stage: "All Interviews Completed" };
         }
         if (stage.toLowerCase() === "selected") {
           return { ...row, stage: "Internship Selected" };
@@ -308,7 +310,7 @@ export default function AdminDashboardPage() {
       color: "hsl(152, 61%, 40%)",
     },
     interviews: {
-      label: "AI Interviews",
+      label: "All Interviews",
       color: "hsl(215, 16%, 47%)",
     },
   };
@@ -621,9 +623,9 @@ export default function AdminDashboardPage() {
           />
 
           <StatCard
-            title="Active Companies"
+            title="Total Companies"
             value={dashboardLoading ? "..." : activeCompanies}
-            subValue="Actively hiring"
+            subValue={!dashboardLoading && incompleteProfiles > 0 ? `${incompleteProfiles} pending setup` : "All setup completed"}
             icon={Building2}
             color="emerald"
             onClick={() => setLocation("/admin/companies")}
@@ -639,9 +641,8 @@ export default function AdminDashboardPage() {
           />
 
           <StatCard
-            title="AI Interviews"
-            value={dashboardLoading ? "..." : stats.completedInterviews}
-            subValue="Successfully completed"
+            title="All Interviews"
+            value={dashboardLoading ? "..." : totalAIInterviews}
             icon={CheckCircle2}
             color="purple"
             onClick={() => setLocation("/admin/interns")}
@@ -674,7 +675,7 @@ export default function AdminDashboardPage() {
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Activity Trends</h3>
-                <p className="text-2xl font-bold tracking-tight mt-1">Proposals vs AI Interviews</p>
+                <p className="text-2xl font-bold tracking-tight mt-1">Proposals vs All Interviews</p>
               </div>
               <Badge variant="outline" className="px-2 py-1 text-[10px] font-bold">LAST 6 MONTHS</Badge>
             </div>
@@ -717,7 +718,7 @@ export default function AdminDashboardPage() {
                   <Area 
                     type="monotone" 
                     dataKey="interviews" 
-                    name="AI Interviews"
+                    name="All Interviews"
                     stroke="#8b5cf6" 
                     strokeWidth={3}
                     fillOpacity={1} 
@@ -733,7 +734,7 @@ export default function AdminDashboardPage() {
               </div>
               <div className="flex items-center gap-2">
                 <div className="h-3 w-3 rounded-full bg-purple-500" />
-                <span className="text-xs font-bold text-slate-600 dark:text-slate-400">AI Interviews</span>
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-400">All Interviews</span>
               </div>
             </div>
           </Card>
@@ -741,39 +742,73 @@ export default function AdminDashboardPage() {
           <Card className="p-6 shadow-sm border-slate-200 dark:border-slate-800">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">User Flow</h3>
-                <p className="text-2xl font-bold tracking-tight mt-1">Conversion Funnel</p>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Placement Stats</h3>
+                <p className="text-2xl font-bold tracking-tight mt-1">Hiring Distribution</p>
               </div>
               <div className="p-2 bg-slate-50 dark:bg-slate-900 rounded-lg">
                 <TrendingUp className="h-4 w-4 text-slate-400" />
               </div>
             </div>
-            <div className="space-y-6">
-              {funnelDataDisplay.map((item, idx) => {
-                const maxValue = Math.max(...funnelDataDisplay.map(d => d.value));
-                const percentage = (item.value / maxValue) * 100;
-                const colors = ["bg-blue-500", "bg-indigo-500", "bg-purple-500", "bg-pink-500", "bg-rose-500"];
-                
-                return (
-                  <div key={idx} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-tight">{item.stage}</span>
-                      <span className="text-sm font-bold">{item.value}</span>
-                    </div>
-                    <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div 
-                        className={cn("h-full rounded-full transition-all duration-1000", colors[idx % colors.length])}
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
+            <div className="flex items-center justify-center gap-8">
+              <div className="relative">
+                <ResponsiveContainer width={160} height={160}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: "Full-time", value: hiredFullTime.length, color: "#3b82f6" },
+                        { name: "Internship", value: hiredInternship.length, color: "#8b5cf6" },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={70}
+                      paddingAngle={4}
+                      dataKey="value"
+                    >
+                      {[
+                        { name: "Full-time", value: hiredFullTime.length, color: "#3b82f6" },
+                        { name: "Internship", value: hiredInternship.length, color: "#8b5cf6" },
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <span className="text-2xl font-bold">{hiredFullTime.length + hiredInternship.length}</span>
+                    <p className="text-[10px] text-muted-foreground">Total</p>
                   </div>
-                );
-              })}
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-3 w-3 rounded-full bg-blue-500" />
+                  <div>
+                    <span className="text-sm font-bold">{hiredFullTime.length}</span>
+                    <p className="text-[10px] text-muted-foreground">Full-time Hires</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="h-3 w-3 rounded-full bg-purple-500" />
+                  <div>
+                    <span className="text-sm font-bold">{hiredInternship.length}</span>
+                    <p className="text-[10px] text-muted-foreground">Internship Hires</p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Tracking unique interns progressing through each stage from initial signup to final selection.
-              </p>
+            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{totalProposals}</p>
+                  <p className="text-[10px] text-muted-foreground">Total Proposals</p>
+                </div>
+                <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <p className="text-lg font-bold text-purple-600 dark:text-purple-400">{totalAIInterviews}</p>
+                  <p className="text-[10px] text-muted-foreground">All Interviews</p>
+                </div>
+              </div>
             </div>
           </Card>
         </div>

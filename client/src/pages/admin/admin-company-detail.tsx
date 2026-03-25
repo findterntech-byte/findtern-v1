@@ -402,7 +402,7 @@ export default function AdminCompanyDetailPage() {
                         "ml-2 px-2 py-0.5 text-xs font-medium rounded-full",
                         activeTab === tab ? "bg-[#0E6049] text-white" : "bg-muted text-muted-foreground"
                       )}>
-                        {tab === "projects" ? tabData.projectList.length : tab === "proposals" ? tabData.proposalList.length : tab === "interviews" ? tabData.interviewList.length : tab === "payments" ? tabData.paymentList.length :  tabData.hiredList.length}
+                        {tab === "projects" ? tabData.projectList.length : tab === "proposals" ? tabData.proposalList.length : tab === "interviews" ? tabData.interviewList.length : tab === "payments" ? tabData.paymentList.length : tab === "upcomingPayments" ? tabData.employerDuesList.filter((d: any) => (d?.remainingMonths ?? 1) > 0).length : tabData.hiredList.length}
                       </span>
                     )}
                   </TabsTrigger>

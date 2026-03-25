@@ -232,7 +232,7 @@ export default function AdminInternsPage() {
     | "interviewExpired"
     | "interviewPending"
     | "totalInterview"
-    | "pendingProposals"
+    // | "pendingProposals"
     | "toPay"
     | "totalToPay"
     | "paidTillNow"
@@ -265,7 +265,7 @@ export default function AdminInternsPage() {
         { key: "interviewPending" as const, label: "Pending" },
         { key: "totalInterview" as const, label: "Total" },
         { key: "findternScore" as const, label: "Findtern Score" },
-        { key: "profileStatus" as const, label: "Profile Status" },
+        { key: "profileStatus" as const, label: "Findtern Score" },
         { key: "onboardingStatus" as const, label: "Onboarding status", filterKey: "onboardingStatus" as const },
         // { key: "pendingProposals" as const, label: "Pending Interviews", sortKey: "pendingInterviewCount" as const },
         { key: "toPay" as const, label: "Intern payout (50%)", sortKey: "toPay" as const },
@@ -1288,9 +1288,9 @@ export default function AdminInternsPage() {
     >
       <div className="flex flex-col gap-6">
         {/* KPI Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Card className="flex flex-row items-center justify-between p-6 transition-all hover:shadow-md">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Interns</p>
               <h2 className="text-3xl font-bold tracking-tight">{overview.total}</h2>
             </div>
@@ -1300,7 +1300,7 @@ export default function AdminInternsPage() {
           </Card>
 
           <Card className="flex flex-row items-center justify-between p-6 transition-all hover:shadow-md">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Active Now</p>
               <h2 className="text-3xl font-bold tracking-tight text-emerald-600">{overview.active}</h2>
             </div>
@@ -1311,7 +1311,7 @@ export default function AdminInternsPage() {
 
          
           <Card className="flex flex-row items-center justify-between p-6 transition-all hover:shadow-md">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Onboarded</p>
               <h2 className="text-3xl font-bold tracking-tight text-blue-600">{overview.onboarded}</h2>
             </div>
@@ -1358,7 +1358,7 @@ export default function AdminInternsPage() {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold">Activity Trends</h3>
-                <p className="text-sm text-muted-foreground">Proposals vs Interviews (Last 6 months)</p>
+                <p className="text-sm text-muted-foreground">All Proposals vs All Interviews (Last 6 months)</p>
               </div>
               <Activity className="h-5 w-5 text-muted-foreground" />
             </div>
@@ -2090,11 +2090,11 @@ export default function AdminInternsPage() {
                       </TableCell>
                     )}
 
-                    {columnVisibility.pendingProposals && (
+                    {/* {columnVisibility.pendingProposals && (
                       <TableCell className="py-4 whitespace-nowrap text-sm font-medium">
                         {Number(intern.pendingInterviewCount ?? 0) || <span className="text-muted-foreground/40 font-normal">0</span>}
                       </TableCell>
-                    )}
+                    )} */}
 
                     {columnVisibility.toPay && (
                       <TableCell className="py-4 whitespace-nowrap">
