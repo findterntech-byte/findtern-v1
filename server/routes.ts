@@ -8377,6 +8377,18 @@ export async function registerRoutes(
       const safeUsers = users.map(({ password, ...rest }) => rest);
       const safeEmployers = employers.map(({ password, ...rest }) => rest);
 
+      const excludedEmployerIds = new Set<string>();
+      for (const e of safeEmployers as any[]) {
+        const id = String((e as any)?.id ?? "").trim();
+        if (!id) continue;
+        if (id.toLowerCase() === "admin") {
+          excludedEmployerIds.add(id.toLowerCase());
+          continue;
+        }
+        const email = String((e as any)?.companyEmail ?? "").trim().toLowerCase();
+        if (email === "ai-interview@findtern.ai") excludedEmployerIds.add(id.toLowerCase());
+      }
+
       const proposalCountByInternId = new Map<string, number>();
       const proposalCountByProjectId = new Map<string, number>();
       let selectedCount = 0;
@@ -8433,31 +8445,20 @@ export async function registerRoutes(
         return rawStatus || "sent";
       };
 
-      const completedInternIds = new Set<string>();
+      let completedInterviewsCount = 0;
       const scheduledInterviewCount = (interviews as any[]).reduce((acc, i) => {
         const effective = getInterviewEffectiveStatus(i);
         const employerId = String(i?.employerId ?? i?.employer_id ?? "").trim().toLowerCase();
+        const isExcludedEmployer = employerId ? excludedEmployerIds.has(employerId) : false;
 
         if (effective === "completed") {
-          // Count all completed interviews for the "Interviews Completed" stats
-          const internId = String(i?.internId ?? i?.intern_id ?? "").trim();
-          if (internId) completedInternIds.add(internId);
+          // Count all completed interviews (records) excluding admin/test employers
+          if (!isExcludedEmployer) completedInterviewsCount += 1;
         }
-        // Only count interviews that are actually scheduled by employers (not AI)
-        const isEmployerScheduled = employerId !== "admin" && effective === "scheduled";
+        // Only count interviews that are actually scheduled by employers (exclude admin/test)
+        const isEmployerScheduled = !isExcludedEmployer && effective === "scheduled";
         return acc + (isEmployerScheduled ? 1 : 0);
       }, 0);
-
-      // Also add interns who have a findternScore in onboarding but might not have a completed interview record
-      for (const o of onboarding as any[]) {
-        const score = (o as any)?.extraData?.findternScore;
-        const userId = String(o?.userId ?? o?.user_id ?? "").trim();
-        if (userId && score !== undefined && score !== null) {
-          completedInternIds.add(userId);
-        }
-      }
-
-      const completedInterviewsCount = completedInternIds.size;
 
       const activeInternships = (projects as any[]).reduce((acc, p) => {
         const status = String(p?.status ?? "active").trim().toLowerCase();
@@ -8689,8 +8690,8 @@ export async function registerRoutes(
 
       const interviewCountByMonth = new Map<string, number>();
       for (const i of interviews as any[]) {
-        const effective = getInterviewEffectiveStatus(i);
-        if (effective !== "completed") continue; // Only count completed interviews
+        const employerId = String(i?.employerId ?? i?.employer_id ?? "").trim().toLowerCase();
+        if (employerId && excludedEmployerIds.has(employerId)) continue;
 
         const raw = i?.createdAt ?? i?.created_at ?? null;
         if (!raw) continue;
@@ -9506,7 +9507,7 @@ export async function registerRoutes(
         if (status === "rejected") {
           proposalRejectedByEmployerId.set(employerId, (proposalRejectedByEmployerId.get(employerId) ?? 0) + 1);
         }
-        if (status === "expired") {
+        if (status === "expired" || status === "withdrawn") {
           proposalExpiredByEmployerId.set(employerId, (proposalExpiredByEmployerId.get(employerId) ?? 0) + 1);
         }
         if (status !== "hired") continue;

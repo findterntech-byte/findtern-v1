@@ -14,11 +14,6 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { FileText, ExternalLink, TrendingUp, Users, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useRoute } from "wouter";
@@ -364,7 +359,13 @@ export default function AdminCompanyDetailPage() {
     const proposalList = (proposals ?? []).filter((p: any) => {
       const status = norm(p?.status ?? "-");
       const statusFilter = norm(tabStatus.proposals);
-      if (statusFilter && status !== statusFilter) return false;
+      if (statusFilter) {
+        if (statusFilter === "expired") {
+          if (status !== "expired" && status !== "withdrawn") return false;
+        } else if (status !== statusFilter) {
+          return false;
+        }
+      }
       const hay = `${p?.internName ?? p?.candidateName ?? ""} ${p?.projectName ?? ""} ${p?.currency ?? ""}`;
       return matches(hay, tabSearch.proposals);
     });
@@ -388,6 +389,7 @@ export default function AdminCompanyDetailPage() {
     const upcomingPaymentsList = (orders ?? []).filter((o: any) => {
       const status = norm(o?.status ?? "-");
       if (status === "paid") return false;
+      if (!status || status === "-") return false;
 
       const statusFilter = norm(tabStatus.upcomingPayments);
       if (statusFilter && status !== statusFilter) return false;
@@ -820,6 +822,7 @@ export default function AdminCompanyDetailPage() {
                               <SelectItem value="accepted">Accepted</SelectItem>
                               <SelectItem value="rejected">Rejected</SelectItem>
                               <SelectItem value="hired">Hired</SelectItem>
+                              <SelectItem value="expired">Withdrawn</SelectItem>
                             </>
                           )}
                           {activeTab === "interviews" && (
@@ -1053,7 +1056,9 @@ export default function AdminCompanyDetailPage() {
                   const fullTime = p?.fullTimeOffer ?? p?.full_time_offer;
                   const skills = Array.isArray(p?.skills) ? p.skills : [];
                   const pincode = String(p?.pincode ?? "-") || "-";
-                  const city = String(p?.city ?? "-") || "-";
+                  const projectCity = String(p?.city ?? "-") || "-";
+                  const employerCity = summary.location && summary.location !== "-" ? summary.location.split(",")[0].trim() : "";
+                  const city = projectCity && projectCity !== "-" ? projectCity : (employerCity || "-");
                   const timezone = String(p?.timezone ?? "-") || "-";
                   const scope = String(p?.scopeOfWork ?? p?.scope_of_work ?? "-") || "-";
                   const status = String(p?.status ?? "-") || "-";
@@ -1365,25 +1370,27 @@ export default function AdminCompanyDetailPage() {
                 if (!open) setSelectedProposal(null);
               }}
             >
-              <DialogContent className="max-w-[900px]">
-                <DialogHeader>
-                  <DialogTitle>Proposal details</DialogTitle>
+              <DialogContent className="max-w-3xl max-h-[90vh]">
+                <DialogHeader className="pb-2">
+                  <DialogTitle className="text-xl font-bold">
+                    Proposal Details
+                  </DialogTitle>
                 </DialogHeader>
 
-                <ScrollArea className="max-h-[85vh] pr-4">
+                <ScrollArea className="max-h-[calc(90vh-80px)]">
                   {(() => {
                     const pr = selectedProposal ?? {};
-                    const offer = (pr as any)?.offerDetails ?? (pr as any)?.offer_details ?? {};
+                    const offer = (pr as any)?.offerDetails ?? (pr as any)?.offer ?? (pr as any) ?? {};
                     const fullTimeOffer = (offer as any)?.fullTimeOffer ?? null;
                     const hasFullTimeOffer = !!fullTimeOffer && typeof fullTimeOffer === "object";
 
                     const internId = String((pr as any)?.internId ?? (pr as any)?.intern_id ?? "").trim();
 
                     const currency = String((pr as any)?.currency ?? (offer as any)?.currency ?? "INR").toUpperCase();
-                    const monthly = Number((offer as any)?.monthlyAmount ?? 0);
-                    const duration = String((offer as any)?.duration ?? "").trim();
+                    const monthly = Number((pr as any)?.monthlyAmount ?? (offer as any)?.monthlyAmount ?? (offer as any)?.monthly_amount ?? 0);
+                    const duration = String((pr as any)?.duration ?? (offer as any)?.duration ?? "").trim();
                     const months = monthsFromDuration(duration);
-                    const totalRaw = Number((offer as any)?.totalPrice ?? 0);
+                    const totalRaw = Number((pr as any)?.totalPrice ?? (offer as any)?.totalPrice ?? (offer as any)?.total_price ?? 0);
                     const derivedTotal = Number.isFinite(monthly) ? monthly * months : 0;
                     const total = Number.isFinite(totalRaw) && totalRaw > 0 ? totalRaw : derivedTotal;
 
@@ -1400,171 +1407,232 @@ export default function AdminCompanyDetailPage() {
                     const offerLetterUrl = hasFullTimeOffer ? String((fullTimeOffer as any)?.offerLetterUrl ?? "") : "";
                     const offerHref = offerLetterUrl ? toDisplayUrl(offerLetterUrl) : "";
 
-                    const candidateName = String((pr as any)?.internName ?? (pr as any)?.candidateName ?? "").trim() || "-";
-                    const projectName = String((pr as any)?.projectName ?? "").trim() || "-";
-                    const projectLocation = String((offer as any)?.location ?? (offer as any)?.jobLocation ?? "").trim();
-                    const workMode = String((offer as any)?.workMode ?? (offer as any)?.work_mode ?? "").trim();
+                    const candidateName = String((pr as any)?.internName ?? (pr as any)?.candidateName ?? (pr as any)?.candidateName ?? "").trim() || "-";
+                    const projectName = String((pr as any)?.projectName ?? (pr as any)?.project_name ?? "").trim() || "-";
+                    const projectLocation = String((offer as any)?.location ?? (offer as any)?.jobLocation ?? (pr as any)?.location ?? "").trim();
+                    const workMode = String((offer as any)?.workMode ?? (offer as any)?.work_mode ?? (offer as any)?.mode ?? (pr as any)?.workMode ?? "").trim();
+                    const roleTitle = String((offer as any)?.roleTitle ?? (fullTimeOffer as any)?.jobTitle ?? "").trim();
+                    const jd = String((offer as any)?.jd ?? (offer as any)?.jobDescription ?? "").trim();
 
-                    const startDateRaw = String((offer as any)?.startDate ?? (offer as any)?.start_date ?? "").trim();
+                    const startDateRaw = String((offer as any)?.startDate ?? (offer as any)?.start_date ?? (pr as any)?.startDate ?? "").trim();
                     const startDate = startDateRaw ? formatDate(startDateRaw) : "-";
-                    const shiftTimings = String((offer as any)?.shiftTimings ?? (offer as any)?.shift_timings ?? "").trim();
+                    const shiftFrom = String((offer as any)?.shiftFrom ?? (offer as any)?.shift_from ?? "").trim();
+                    const shiftTo = String((offer as any)?.shiftTo ?? (offer as any)?.shift_to ?? "").trim();
+                    const shiftTimings = shiftFrom && shiftTo ? `${shiftFrom} - ${shiftTo}` : (shiftFrom || shiftTo || "");
                     const weeklySchedule = String((offer as any)?.weeklySchedule ?? (offer as any)?.weekly_schedule ?? "").trim();
-                    const leavePerMonth = String((offer as any)?.leavePerMonth ?? (offer as any)?.leave_per_month ?? "").trim();
+                    const paidLeavesPerMonth = String((offer as any)?.paidLeavesPerMonth ?? (offer as any)?.paid_leaves_per_month ?? (offer as any)?.leavePerMonth ?? "").trim();
                     const monthlyHours = String((offer as any)?.monthlyHours ?? (offer as any)?.monthly_hours ?? "").trim();
-                    const laptop = String((offer as any)?.laptopProvided ?? (offer as any)?.laptop_provided ?? "").trim();
+                    const laptop = String((offer as any)?.laptop ?? (offer as any)?.laptop_provided ?? (offer as any)?.laptopProvided ?? (offer as any)?.hasLaptop ?? "").trim();
+                    const timezone = String((offer as any)?.timezone ?? (pr as any)?.timezone ?? "Asia/Kolkata").trim();
+
+                    const createdAtRaw = pr?.createdAt ?? pr?.created_at ?? null;
+                    const createdAt = createdAtRaw ? formatDate(String(createdAtRaw)) : "-";
+
+                    const statusBadgeClass = (() => {
+                      const s = String((pr as any)?.status ?? "").toLowerCase();
+                      if (s === "hired" || s === "accepted") return "bg-emerald-500";
+                      if (s === "rejected") return "bg-red-500";
+                      if (s === "expired" || s === "withdrawn") return "bg-amber-500";
+                      return "bg-blue-500";
+                    })();
+
+                    const getWorkModeIcon = () => {
+                      const mode = workMode.toLowerCase();
+                      if (mode === "remote") return "🌐 Remote";
+                      if (mode === "hybrid") return "🏢 Hybrid";
+                      if (mode === "onsite" || mode === "on-site") return "🏢 On-site";
+                      return workMode ? `🏢 ${workMode}` : "Not specified";
+                    };
+
+                    const laptopBadge = (() => {
+                      const lap = laptop.toLowerCase();
+                      if (lap === "yes" || lap === "true" || lap === "provided") return "bg-green-100 text-green-700";
+                      if (lap === "no" || lap === "false" || lap === "not provided") return "bg-red-100 text-red-700";
+                      return "bg-gray-100 text-gray-700";
+                    })();
+
+                    const formatValue = (val: string) => val && val.trim() ? val.trim() : null;
 
                     return (
-                      <div className="grid gap-4 py-2">
-                        <div className="rounded-lg border bg-background p-4">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div className="min-w-0">
-                              <p className="text-xs text-muted-foreground">Project</p>
-                              <p className="mt-1 text-base font-semibold break-words">{projectName}</p>
-                              <p className="mt-1 text-xs text-muted-foreground break-words">
-                                {[workMode, projectLocation].filter(Boolean).join(" • ") || "-"}
+                      <div className="space-y-4 px-1">
+                        <div className="rounded-xl border bg-gradient-to-r from-slate-50 to-blue-50 p-5 shadow-sm">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-3">
+                                <Badge className={hasFullTimeOffer ? "bg-purple-500 hover:bg-purple-600" : "bg-blue-500 hover:bg-blue-600"}>
+                                  {hasFullTimeOffer ? "Full-Time" : "Internship"}
+                                </Badge>
+                                <Badge className={statusBadgeClass}>
+                                  {displayProposalStatus((pr as any)?.status)}
+                                </Badge>
+                              </div>
+                              <h3 className="text-xl font-bold text-slate-900">
+                                {formatValue(roleTitle) || formatValue(projectName) || "Untitled Proposal"}
+                              </h3>
+                              <p className="text-sm text-slate-600 mt-2">
+                                {getWorkModeIcon()}
+                                {formatValue(projectLocation) && ` • ${formatValue(projectLocation)}`}
                               </p>
                             </div>
-
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-700">
-                                {hasFullTimeOffer ? "Full-time offer" : duration || "-"}
-                              </Badge>
-                              <Badge className={String((pr as any)?.status ?? "").toLowerCase() === "hired" ? "bg-[#0E6049]" : "bg-slate-500"}>
-                                {displayProposalStatus((pr as any)?.status)}
-                              </Badge>
-                            </div>
-                          </div>
-
-                          <Separator className="my-4" />
-
-                          <div className="grid gap-3 sm:grid-cols-3">
-                            <div className="min-w-0">
-                              <p className="text-xs text-muted-foreground">Candidate</p>
-                              <p className="mt-1 text-sm font-medium break-words">{candidateName}</p>
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs text-muted-foreground">Start date</p>
-                              <p className="mt-1 text-sm break-words">{startDate}</p>
-                            </div>
-                            <div className="flex items-start justify-start sm:justify-end">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={!internId}
-                                onClick={() => {
-                                  if (!internId) return;
-                                  setLocation(`/admin/interns/${encodeURIComponent(internId)}`);
-                                }}
-                              >
-                                View Profile
-                              </Button>
-                            </div>
+                            {!hasFullTimeOffer && monthlyDisplay > 0 && (
+                              <div className="text-right bg-white rounded-lg px-4 py-2 shadow-sm">
+                                <p className="text-2xl font-bold text-emerald-600">
+                                  {formatMajorMoney(monthlyDisplay, displayCurrency)}
+                                </p>
+                                <p className="text-xs text-slate-500">per month</p>
+                              </div>
+                            )}
+                            {hasFullTimeOffer && annualCtcInr > 0 && (
+                              <div className="text-right bg-white rounded-lg px-4 py-2 shadow-sm">
+                                <p className="text-2xl font-bold text-purple-600">
+                                  {formatMajorMoney(annualCtcInr, "INR")}
+                                </p>
+                                <p className="text-xs text-slate-500">Annual CTC</p>
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div className="rounded-lg border bg-background p-4">
-                            <p className="text-sm font-semibold">Internship details</p>
-                            <div className="mt-4 grid gap-3 text-sm">
-                              <div className="flex items-start justify-between gap-4">
-                                <p className="text-xs text-muted-foreground">Monthly hours</p>
-                                <p className="text-right break-words">{monthlyHours || "-"}</p>
-                              </div>
-                              <div className="flex items-start justify-between gap-4">
-                                <p className="text-xs text-muted-foreground">Shift timings</p>
-                                <p className="text-right break-words">{shiftTimings || "-"}</p>
-                              </div>
-                              <div className="flex items-start justify-between gap-4">
-                                <p className="text-xs text-muted-foreground">Weekly schedule</p>
-                                <p className="text-right break-words">{weeklySchedule || "-"}</p>
-                              </div>
-                              <div className="flex items-start justify-between gap-4">
-                                <p className="text-xs text-muted-foreground">Leave / month</p>
-                                <p className="text-right break-words">{leavePerMonth || "-"}</p>
-                              </div>
-                              <div className="flex items-start justify-between gap-4">
-                                <p className="text-xs text-muted-foreground">Work mode</p>
-                                <p className="text-right break-words">{workMode || "-"}</p>
-                              </div>
-                              <div className="flex items-start justify-between gap-4">
-                                <p className="text-xs text-muted-foreground">Location</p>
-                                <p className="text-right break-words">{projectLocation || "-"}</p>
-                              </div>
-                              <div className="flex items-start justify-between gap-4">
-                                <p className="text-xs text-muted-foreground">Laptop</p>
-                                <p className="text-right break-words">{laptop || "-"}</p>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="rounded-lg border bg-background p-4">
-                            <p className="text-sm font-semibold">Compensation</p>
-                            <div className="mt-4 grid gap-3 text-sm">
-                              {!hasFullTimeOffer && (
-                                <>
-                                  <div className="flex items-start justify-between gap-4">
-                                    <p className="text-xs text-muted-foreground">Monthly pay</p>
-                                    <p className="text-right break-words">
-                                      {monthlyDisplay ? formatMajorMoney(monthlyDisplay, displayCurrency) : "-"}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-start justify-between gap-4">
-                                    <p className="text-xs text-muted-foreground">Total amount</p>
-                                    <p className="text-right break-words">
-                                      {totalDisplay ? formatMajorMoney(totalDisplay, displayCurrency) : "-"}
-                                    </p>
-                                  </div>
-                                </>
-                              )}
-
-                              {hasFullTimeOffer && (
-                                <>
-                                  <div className="flex items-start justify-between gap-4">
-                                    <p className="text-xs text-muted-foreground">Job title</p>
-                                    <p className="text-right break-words">{String((fullTimeOffer as any)?.jobTitle ?? "-")}</p>
-                                  </div>
-                                  <div className="flex items-start justify-between gap-4">
-                                    <p className="text-xs text-muted-foreground">Annual CTC (INR)</p>
-                                    <p className="text-right break-words">{annualCtcInr ? formatMajorMoney(annualCtcInr, "INR") : "-"}</p>
-                                  </div>
-                                  <div className="flex items-start justify-between gap-4">
-                                    <p className="text-xs text-muted-foreground">Offer letter</p>
-                                    <p className="text-right break-words">
-                                      {offerHref ? (
-                                        <a
-                                          href={offerHref}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-primary underline underline-offset-2"
-                                        >
-                                          Open
-                                        </a>
-                                      ) : (
-                                        "-"
-                                      )}
-                                    </p>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <Card className="p-4 bg-gradient-to-br from-white to-slate-50">
+                            <p className="text-xs text-slate-500 mb-1">Candidate</p>
+                            <p className="font-semibold text-sm truncate" title={candidateName}>{candidateName}</p>
+                          </Card>
+                          <Card className="p-4 bg-gradient-to-br from-white to-slate-50">
+                            <p className="text-xs text-slate-500 mb-1">Project</p>
+                            <p className="font-semibold text-sm truncate" title={projectName}>{projectName}</p>
+                          </Card>
+                          <Card className="p-4 bg-gradient-to-br from-white to-slate-50">
+                            <p className="text-xs text-slate-500 mb-1">Start Date</p>
+                            <p className="font-semibold text-sm">{startDate}</p>
+                          </Card>
+                          <Card className="p-4 bg-gradient-to-br from-white to-slate-50">
+                            <p className="text-xs text-slate-500 mb-1">Duration</p>
+                            <p className="font-semibold text-sm">{hasFullTimeOffer ? "Full-time" : (formatValue(duration) || "-")}</p>
+                          </Card>
                         </div>
 
-                        <Collapsible>
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium">Raw JSON</p>
-                            <CollapsibleTrigger asChild>
-                              <Button size="sm" variant="outline">Toggle</Button>
-                            </CollapsibleTrigger>
+                        {!hasFullTimeOffer && (
+                          <>
+                            <Card className="p-5">
+                              <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <span className="w-2 h-6 bg-blue-500 rounded-full"></span>
+                                Work Details
+                              </h4>
+                              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                                {[
+                                  { label: "Monthly Hours", value: formatValue(monthlyHours) },
+                                  { label: "Shift Timings", value: formatValue(shiftTimings) },
+                                  { label: "Weekly Schedule", value: formatValue(weeklySchedule) },
+                                  { label: "Paid Leaves / Month", value: formatValue(paidLeavesPerMonth) },
+                                  { label: "Work Mode", value: formatValue(workMode) },
+                                  { label: "Location", value: formatValue(projectLocation) },
+                                  { label: "Timezone", value: formatValue(timezone) },
+                                ].map((item) => (
+                                  <div key={item.label} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
+                                    <span className="text-sm text-slate-500">{item.label}</span>
+                                    <span className="font-medium text-sm text-slate-900">{item.value || "-"}</span>
+                                  </div>
+                                ))}
+                                <div className="flex justify-between items-center py-2">
+                                  <span className="text-sm text-slate-500">Laptop Provided</span>
+                                  <Badge className={laptopBadge}>
+                                    {formatValue(laptop) || "-"}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </Card>
+
+                            <Card className="p-5">
+                              <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <span className="w-2 h-6 bg-emerald-500 rounded-full"></span>
+                                Compensation
+                              </h4>
+                              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                                <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                  <span className="text-sm text-slate-500">Monthly Pay</span>
+                                  <span className="font-bold text-emerald-600">
+                                    {monthlyDisplay > 0 ? formatMajorMoney(monthlyDisplay, displayCurrency) : "-"}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                  <span className="text-sm text-slate-500">Total Amount</span>
+                                  <span className="font-bold">
+                                    {totalDisplay > 0 ? formatMajorMoney(totalDisplay, displayCurrency) : "-"}
+                                  </span>
+                                </div>
+                                {duration && (
+                                  <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                    <span className="text-sm text-slate-500">Duration</span>
+                                    <span className="font-medium">{duration}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </Card>
+                          </>
+                        )}
+
+                        {hasFullTimeOffer && (
+                          <Card className="p-5">
+                            <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                              <span className="w-2 h-6 bg-purple-500 rounded-full"></span>
+                              Employment Details
+                            </h4>
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                              <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                <span className="text-sm text-slate-500">Job Title</span>
+                                <span className="font-medium">{formatValue((fullTimeOffer as any)?.jobTitle) || "-"}</span>
+                              </div>
+                              <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                <span className="text-sm text-slate-500">Annual CTC</span>
+                                <span className="font-bold text-purple-600">
+                                  {annualCtcInr > 0 ? formatMajorMoney(annualCtcInr, "INR") : "-"}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                <span className="text-sm text-slate-500">Work Mode</span>
+                                <span className="font-medium">{formatValue(workMode) || "-"}</span>
+                              </div>
+                              <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                <span className="text-sm text-slate-500">Offer Letter</span>
+                                <span className="font-medium">
+                                  {offerHref ? (
+                                    <a href={offerHref} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">
+                                      View
+                                    </a>
+                                  ) : "-"}
+                                </span>
+                              </div>
+                            </div>
+                          </Card>
+                        )}
+
+                        {formatValue(jd) && (
+                          <Card className="p-5">
+                            <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                              <span className="w-2 h-6 bg-slate-500 rounded-full"></span>
+                              Job Description
+                            </h4>
+                            <p className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{jd}</p>
+                          </Card>
+                        )}
+
+                        <div className="flex items-center justify-between pt-4 border-t bg-slate-50 -mx-1 px-4 py-3 rounded-b-xl">
+                          <div className="text-sm text-slate-500">
+                            <span className="font-medium">Created:</span> {createdAt}
                           </div>
-                          <CollapsibleContent>
-                            <ScrollArea className="mt-3 h-[35vh] w-full rounded-md border bg-muted/10 p-3">
-                              <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
-                                {selectedProposal ? JSON.stringify(selectedProposal, null, 2) : "-"}
-                              </pre>
-                            </ScrollArea>
-                          </CollapsibleContent>
-                        </Collapsible>
+                          <Button
+                            size="sm"
+                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={() => {
+                              if (!internId) return;
+                              setLocation(`/admin/interns/${encodeURIComponent(internId)}`);
+                            }}
+                            disabled={!internId}
+                          >
+                            View Candidate
+                          </Button>
+                        </div>
                       </div>
                     );
                   })()}
@@ -1877,53 +1945,22 @@ export default function AdminCompanyDetailPage() {
                         )}
 
                         <Separator />
-
-                        <Collapsible>
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium">Raw JSON</p>
-                            <CollapsibleTrigger asChild>
-                              <Button size="sm" variant="outline">Toggle</Button>
-                            </CollapsibleTrigger>
-                          </div>
-                          <CollapsibleContent>
-                            <ScrollArea className="mt-3 h-[35vh] w-full rounded-md border bg-muted/10 p-3">
-                              <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
-                                {selectedPayment ? JSON.stringify(selectedPayment, null, 2) : "-"}
-                              </pre>
-                            </ScrollArea>
-                          </CollapsibleContent>
-                        </Collapsible>
                       </>
                     );
                   })()}
                 </div>
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      if (!selectedPayment) return;
-                      try {
-                        await navigator.clipboard.writeText(JSON.stringify(selectedPayment, null, 2));
-                      } catch {
-                        // ignore
-                      }
-                    }}
-                    disabled={!selectedPayment}
-                  >
-                    Copy JSON
-                  </Button>
-                </DialogFooter>
               </DialogContent>
             </Dialog>
           </TabsContent>
 
           <TabsContent value="hired" className="px-6 pb-6 pt-4">
             <div className="relative w-full overflow-auto rounded-lg border">
-              <Table className="min-w-[900px]">
+              <Table className="min-w-[1000px]">
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow className="bg-background">
                   <TableHead>Candidate</TableHead>
                   <TableHead>Project</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Monthly</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead className="text-right">Action</TableHead>
@@ -1932,13 +1969,15 @@ export default function AdminCompanyDetailPage() {
                 <TableBody>
                 {pagination.total === 0 && activeTab === "hired" ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-sm text-muted-foreground">
+                    <TableCell colSpan={6} className="text-sm text-muted-foreground">
                       No hired resources found.
                     </TableCell>
                   </TableRow>
                 ) : (
                   (activeTab === "hired" ? (pagination.pageList as any[]) : tabData.hiredList).slice(0, activeTab === "hired" ? 999999 : 0).map((p: any, idx: number) => {
                     const offer = p?.offerDetails ?? {};
+                    const fullTimeOffer = (offer as any)?.fullTimeOffer ?? null;
+                    const hasFullTimeOffer = !!fullTimeOffer && typeof fullTimeOffer === "object";
                     const monthly = typeof offer?.monthlyAmount === "number" ? offer.monthlyAmount : 0;
                     const total = typeof offer?.totalPrice === "number" ? offer.totalPrice : 0;
                     const internId = String(p?.internId ?? p?.intern_id ?? p?.intern?.id ?? "").trim();
@@ -1949,6 +1988,13 @@ export default function AdminCompanyDetailPage() {
                       >
                         <TableCell className="font-medium">{String(p?.internName ?? "-")}</TableCell>
                         <TableCell>{String(p?.projectName ?? "-")}</TableCell>
+                        <TableCell>
+                          {hasFullTimeOffer ? (
+                            <Badge className="bg-[#0E6049]">Full-time</Badge>
+                          ) : (
+                            <Badge variant="outline">Internship</Badge>
+                          )}
+                        </TableCell>
                         <TableCell>{monthly ? `${monthly}` : "-"}</TableCell>
                         <TableCell>{total ? `${total}` : "-"}</TableCell>
                         <TableCell className="text-right">

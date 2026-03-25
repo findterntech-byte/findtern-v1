@@ -45,6 +45,7 @@ import {
   Building2,
   ExternalLink,
   ChevronRight,
+  ViewIcon,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -589,8 +590,8 @@ export default function AdminDashboardPage() {
           </div>
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" className="h-9 gap-2" onClick={() => setLocation("/admin/reports")}>
-              <Download className="h-4 w-4" />
-              Reports
+              <ViewIcon className="h-4 w-4" />
+             View Reports
             </Button>
             <Button size="sm" className="h-9 gap-2 bg-primary hover:bg-primary/90" onClick={() => setLocation("/admin/proposal-tracker")}>
               <Calendar className="h-4 w-4" />
@@ -649,7 +650,7 @@ export default function AdminDashboardPage() {
 
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <StatCard
-            title="Full-Time Opportunities"
+            title="Potential Full Time Opportunities"
             value={metricsLoading ? "..." : metrics?.projects?.fullTimeOfferCount ?? 0}
             subValue={`of ${metricsLoading ? "..." : metrics?.projects?.total ?? 0} total projects`}
             icon={Briefcase}

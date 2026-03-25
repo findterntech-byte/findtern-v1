@@ -12,6 +12,8 @@ import {
 
   SidebarGroupContent,
 
+  SidebarGroupLabel,
+
   SidebarHeader,
 
   SidebarInset,
@@ -29,6 +31,8 @@ import {
   SidebarMenuSubItem,
 
   SidebarTrigger,
+
+  SidebarSeparator,
 
 } from "@/components/ui/sidebar";
 
@@ -429,21 +433,24 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
 
       <Sidebar className="border-r bg-white text-slate-900" collapsible="offcanvas">
 
-        <SidebarHeader className="flex items-center gap-3 border-b px-4 py-4">
- <div className="flex justify-center" data-testid="logo-container">
-          <img
-            src={findternLogo}
-            alt="Findtern - Internship Simplified"
-            className=" w-auto"
-            data-testid="img-logo"
-          />
-        </div>
-
+        <SidebarHeader className="border-b px-4 py-4">
+          <div className="flex items-center justify-center" data-testid="logo-container">
+            <img
+              src={findternLogo}
+              alt="Findtern - Internship Simplified"
+              className="h-10 w-auto"
+              data-testid="img-logo"
+            />
+          </div>
         </SidebarHeader>
 
-        <SidebarContent className="px-2 pt-2">
+        <SidebarContent className="px-3 pt-3">
 
           <SidebarGroup>
+
+            <SidebarGroupLabel className="px-1 text-[11px] font-semibold tracking-wide text-slate-500">
+              MAIN
+            </SidebarGroupLabel>
 
             <SidebarGroupContent>
 
@@ -465,33 +472,26 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
 
                         onClick={() => setLocation(item.href)}
 
-                        className={`text-[13px] font-medium transition-all duration-150
-
-                          ${
-
-                            isActive
-
-                              ? "bg-emerald-50 text-emerald-900 shadow-sm"
-
-                              : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-900"
-
-                          }`}
+                        className={cn(
+                          "relative text-[13px] font-medium transition-all duration-150",
+                          "rounded-lg px-3 py-2",
+                          "hover:bg-emerald-50/70 hover:text-emerald-900",
+                          "focus-visible:ring-2 focus-visible:ring-emerald-300",
+                          isActive
+                            ? "bg-emerald-50 text-emerald-900 shadow-sm before:absolute before:left-0 before:top-1/2 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-r before:bg-emerald-500"
+                            : "text-slate-700"
+                        )}
 
                       >
 
                         <div
 
-                          className={`flex h-6 w-6 items-center justify-center rounded-md border text-[13px]
-
-                            ${
-
-                              isActive
-
-                                ? "border-emerald-500 bg-emerald-100 text-emerald-900"
-
-                                : "border-slate-200 bg-slate-50 text-slate-500"
-
-                            }`}
+                          className={cn(
+                            "flex h-7 w-7 items-center justify-center rounded-md border",
+                            isActive
+                              ? "border-emerald-500 bg-emerald-100 text-emerald-900"
+                              : "border-slate-200 bg-white text-slate-500"
+                          )}
 
                         >
 
@@ -522,33 +522,26 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
 
                         isActive={isInternRoute}
 
-                        className={`text-[13px] font-medium transition-all duration-150
-
-                          ${
-
-                            isInternRoute
-
-                              ? "bg-emerald-50 text-emerald-900 shadow-sm"
-
-                              : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-900"
-
-                          }`}
+                        className={cn(
+                          "relative text-[13px] font-medium transition-all duration-150",
+                          "rounded-lg px-3 py-2",
+                          "hover:bg-emerald-50/70 hover:text-emerald-900",
+                          "focus-visible:ring-2 focus-visible:ring-emerald-300",
+                          isInternRoute
+                            ? "bg-emerald-50 text-emerald-900 shadow-sm before:absolute before:left-0 before:top-1/2 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-r before:bg-emerald-500"
+                            : "text-slate-700"
+                        )}
 
                       >
 
                         <div
 
-                          className={`flex h-6 w-6 items-center justify-center rounded-md border text-[13px]
-
-                            ${
-
-                              isInternRoute
-
-                                ? "border-emerald-500 bg-emerald-100 text-emerald-900"
-
-                                : "border-slate-200 bg-slate-50 text-slate-500"
-
-                            }`}
+                          className={cn(
+                            "flex h-7 w-7 items-center justify-center rounded-md border",
+                            isInternRoute
+                              ? "border-emerald-500 bg-emerald-100 text-emerald-900"
+                              : "border-slate-200 bg-white text-slate-500"
+                          )}
 
                         >
 
@@ -593,15 +586,9 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
                                 }}
 
                                 className={cn(
-
-                                  "gap-2 text-[13px]",
-
-                                  isActive
-
-                                    ? "bg-emerald-50 text-emerald-900"
-
-                                    : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-900"
-
+                                  "gap-2 text-[13px] rounded-lg px-3 py-2",
+                                  "hover:bg-emerald-50/70 hover:text-emerald-900",
+                                  isActive ? "bg-emerald-50 text-emerald-900" : "text-slate-700"
                                 )}
 
                               >
@@ -610,7 +597,7 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
 
                                   className={cn(
 
-                                    "flex h-6 w-6 items-center justify-center rounded-md border",
+                                    "flex h-7 w-7 items-center justify-center rounded-md border",
 
                                     isActive
 
@@ -658,33 +645,26 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
 
                         isActive={isCompanyRoute}
 
-                        className={`text-[13px] font-medium transition-all duration-150
-
-                          ${
-
-                            isCompanyRoute
-
-                              ? "bg-emerald-50 text-emerald-900 shadow-sm"
-
-                              : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-900"
-
-                          }`}
+                        className={cn(
+                          "relative text-[13px] font-medium transition-all duration-150",
+                          "rounded-lg px-3 py-2",
+                          "hover:bg-emerald-50/70 hover:text-emerald-900",
+                          "focus-visible:ring-2 focus-visible:ring-emerald-300",
+                          isCompanyRoute
+                            ? "bg-emerald-50 text-emerald-900 shadow-sm before:absolute before:left-0 before:top-1/2 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-r before:bg-emerald-500"
+                            : "text-slate-700"
+                        )}
 
                       >
 
                         <div
 
-                          className={`flex h-6 w-6 items-center justify-center rounded-md border text-[13px]
-
-                            ${
-
-                              isCompanyRoute
-
-                                ? "border-emerald-500 bg-emerald-100 text-emerald-900"
-
-                                : "border-slate-200 bg-slate-50 text-slate-500"
-
-                            }`}
+                          className={cn(
+                            "flex h-7 w-7 items-center justify-center rounded-md border",
+                            isCompanyRoute
+                              ? "border-emerald-500 bg-emerald-100 text-emerald-900"
+                              : "border-slate-200 bg-white text-slate-500"
+                          )}
 
                         >
 
@@ -729,15 +709,9 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
                                 }}
 
                                 className={cn(
-
-                                  "gap-2 text-[13px]",
-
-                                  isActive
-
-                                    ? "bg-emerald-50 text-emerald-900"
-
-                                    : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-900"
-
+                                  "gap-2 text-[13px] rounded-lg px-3 py-2",
+                                  "hover:bg-emerald-50/70 hover:text-emerald-900",
+                                  isActive ? "bg-emerald-50 text-emerald-900" : "text-slate-700"
                                 )}
 
                               >
@@ -746,7 +720,7 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
 
                                   className={cn(
 
-                                    "flex h-6 w-6 items-center justify-center rounded-md border",
+                                    "flex h-7 w-7 items-center justify-center rounded-md border",
 
                                     isActive
 
@@ -795,33 +769,26 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
 
                         isActive={isReportsRoute}
 
-                        className={`text-[13px] font-medium transition-all duration-150
-
-                          ${
-
-                            isReportsRoute
-
-                              ? "bg-emerald-50 text-emerald-900 shadow-sm"
-
-                              : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-900"
-
-                          }`}
+                        className={cn(
+                          "relative text-[13px] font-medium transition-all duration-150",
+                          "rounded-lg px-3 py-2",
+                          "hover:bg-emerald-50/70 hover:text-emerald-900",
+                          "focus-visible:ring-2 focus-visible:ring-emerald-300",
+                          isReportsRoute
+                            ? "bg-emerald-50 text-emerald-900 shadow-sm before:absolute before:left-0 before:top-1/2 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-r before:bg-emerald-500"
+                            : "text-slate-700"
+                        )}
 
                       >
 
                         <div
 
-                          className={`flex h-6 w-6 items-center justify-center rounded-md border text-[13px]
-
-                            ${
-
-                              isReportsRoute
-
-                                ? "border-emerald-500 bg-emerald-100 text-emerald-900"
-
-                                : "border-slate-200 bg-slate-50 text-slate-500"
-
-                            }`}
+                          className={cn(
+                            "flex h-7 w-7 items-center justify-center rounded-md border",
+                            isReportsRoute
+                              ? "border-emerald-500 bg-emerald-100 text-emerald-900"
+                              : "border-slate-200 bg-white text-slate-500"
+                          )}
 
                         >
 
@@ -866,15 +833,9 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
                                 }}
 
                                 className={cn(
-
-                                  "gap-2 text-[13px]",
-
-                                  isActive
-
-                                    ? "bg-emerald-50 text-emerald-900"
-
-                                    : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-900"
-
+                                  "gap-2 text-[13px] rounded-lg px-3 py-2",
+                                  "hover:bg-emerald-50/70 hover:text-emerald-900",
+                                  isActive ? "bg-emerald-50 text-emerald-900" : "text-slate-700"
                                 )}
 
                               >
@@ -883,7 +844,7 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
 
                                   className={cn(
 
-                                    "flex h-6 w-6 items-center justify-center rounded-md border",
+                                    "flex h-7 w-7 items-center justify-center rounded-md border",
 
                                     isActive
 
@@ -935,33 +896,26 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
 
                         isActive={isCmsRoute}
 
-                        className={`text-[13px] font-medium transition-all duration-150
-
-                          ${
-
-                            isCmsRoute
-
-                              ? "bg-emerald-50 text-emerald-900 shadow-sm"
-
-                              : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-900"
-
-                          }`}
+                        className={cn(
+                          "relative text-[13px] font-medium transition-all duration-150",
+                          "rounded-lg px-3 py-2",
+                          "hover:bg-emerald-50/70 hover:text-emerald-900",
+                          "focus-visible:ring-2 focus-visible:ring-emerald-300",
+                          isCmsRoute
+                            ? "bg-emerald-50 text-emerald-900 shadow-sm before:absolute before:left-0 before:top-1/2 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-r before:bg-emerald-500"
+                            : "text-slate-700"
+                        )}
 
                       >
 
                         <div
 
-                          className={`flex h-6 w-6 items-center justify-center rounded-md border text-[13px]
-
-                            ${
-
-                              isCmsRoute
-
-                                ? "border-emerald-500 bg-emerald-100 text-emerald-900"
-
-                                : "border-slate-200 bg-slate-50 text-slate-500"
-
-                            }`}
+                          className={cn(
+                            "flex h-7 w-7 items-center justify-center rounded-md border",
+                            isCmsRoute
+                              ? "border-emerald-500 bg-emerald-100 text-emerald-900"
+                              : "border-slate-200 bg-white text-slate-500"
+                          )}
 
                         >
 
@@ -1008,15 +962,9 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
                                 }}
 
                                 className={cn(
-
-                                  "gap-2 text-[13px]",
-
-                                  isActive
-
-                                    ? "bg-emerald-50 text-emerald-900"
-
-                                    : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-900"
-
+                                  "gap-2 text-[13px] rounded-lg px-3 py-2",
+                                  "hover:bg-emerald-50/70 hover:text-emerald-900",
+                                  isActive ? "bg-emerald-50 text-emerald-900" : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-900"
                                 )}
 
                               >
@@ -1025,7 +973,7 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
 
                                   className={cn(
 
-                                    "flex h-6 w-6 items-center justify-center rounded-md border",
+                                    "flex h-7 w-7 items-center justify-center rounded-md border",
 
                                     isActive
 
@@ -1061,6 +1009,7 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
 
                 )}
 
+                <SidebarSeparator className="my-2" />
               </SidebarMenu>
 
             </SidebarGroupContent>

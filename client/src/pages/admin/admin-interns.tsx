@@ -229,6 +229,9 @@ export default function AdminInternsPage() {
     | "interviewSent"
     | "interviewScheduled"
     | "interviewCompleted"
+    | "interviewExpired"
+    | "interviewPending"
+    | "totalInterview"
     | "pendingProposals"
     | "toPay"
     | "totalToPay"
@@ -258,10 +261,13 @@ export default function AdminInternsPage() {
         { key: "interviewSent" as const, label: "Sent" },
         { key: "interviewScheduled" as const, label: "Scheduled" },
         { key: "interviewCompleted" as const, label: "Completed" },
+        { key: "interviewExpired" as const, label: "Expired" },
+        { key: "interviewPending" as const, label: "Pending" },
+        { key: "totalInterview" as const, label: "Total" },
         { key: "findternScore" as const, label: "Findtern Score" },
         { key: "profileStatus" as const, label: "Profile Status" },
         { key: "onboardingStatus" as const, label: "Onboarding status", filterKey: "onboardingStatus" as const },
-        { key: "pendingProposals" as const, label: "Pending Interviews", sortKey: "pendingInterviewCount" as const },
+        // { key: "pendingProposals" as const, label: "Pending Interviews", sortKey: "pendingInterviewCount" as const },
         { key: "toPay" as const, label: "Intern payout (50%)", sortKey: "toPay" as const },
         { key: "totalToPay" as const, label: "Total to pay" },
         { key: "paidTillNow" as const, label: "Paid till now" },
@@ -1303,16 +1309,7 @@ export default function AdminInternsPage() {
             </div>
           </Card>
 
-          <Card className="flex flex-row items-center justify-between p-6 transition-all hover:shadow-md">
-            <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Pending Approval</p>
-              <h2 className="text-3xl font-bold tracking-tight text-amber-600">{overview.pendingApproval}</h2>
-            </div>
-            <div className="rounded-full bg-amber-50 p-3 text-amber-600">
-              <Clock className="h-6 w-6" />
-            </div>
-          </Card>
-
+         
           <Card className="flex flex-row items-center justify-between p-6 transition-all hover:shadow-md">
             <div className="flex flex-col gap-1">
               <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Onboarded</p>
@@ -1796,11 +1793,11 @@ export default function AdminInternsPage() {
                       <ColumnHeader col={columns[11]} />
                     </TableHead>
                   )}
-                  {columnVisibility.pendingProposals && (
+                  {/* {columnVisibility.pendingProposals && (
                     <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
                       <ColumnHeader col={columns[12]} />
                     </TableHead>
-                  )}
+                  )} */}
                   {columnVisibility.toPay && (
                     <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
                       <ColumnHeader col={columns[13]} />
@@ -1972,11 +1969,7 @@ export default function AdminInternsPage() {
                           >
                             {intern.interview}
                           </Badge>
-                          {Number(intern.totalInterviewCount ?? 0) > 0 && (
-                            <span className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-tighter">
-                              Total: {intern.totalInterviewCount}
-                            </span>
-                          )}
+
                         </div>
                       </TableCell>
                     )}
@@ -2014,6 +2007,49 @@ export default function AdminInternsPage() {
                         ) : (
                           <span className="text-muted-foreground/40">-</span>
                         )}
+                      </TableCell>
+                    )}
+
+                    {columnVisibility.interviewExpired && (
+                      <TableCell className="py-4 text-center">
+                        {Number(intern.interviewExpiredCount ?? 0) > 0 ? (
+                          <Badge className="bg-red-50/50 text-red-700 border-red-200/50 font-bold" variant="outline">
+                            {intern.interviewExpiredCount}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground/40">-</span>
+                        )}
+                      </TableCell>
+                    )}
+
+                    {columnVisibility.interviewPending && (
+                      <TableCell className="py-4 text-center">
+                        {Number(intern.pendingInterviewCount ?? 0) > 0 ? (
+                          <Badge className="bg-amber-50/50 text-amber-700 border-amber-200/50 font-bold" variant="outline">
+                            {intern.pendingInterviewCount}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground/40">-</span>
+                        )}
+                      </TableCell>
+                    )}
+
+                    {columnVisibility.totalInterview && (
+                      <TableCell className="py-4 text-center">
+                        {(() => {
+                          const total = (intern.interviewSentCount ?? 0) + 
+                                       (intern.interviewScheduledCount ?? 0) + 
+                                       (intern.interviewCompletedCount ?? 0) + 
+                                       (intern.interviewExpiredCount ?? 0) +
+                                       (intern.pendingInterviewCount ?? 0);
+                          return total > 0 ? (
+                            <Badge className="bg-purple-50/50 text-purple-700 border-purple-200/50 font-bold" variant="outline">
+                              {total}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground/40">-</span>
+                          );
+                        })()}
                       </TableCell>
                     )}
 
