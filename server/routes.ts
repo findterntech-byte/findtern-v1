@@ -16,6 +16,7 @@ import path from "path";
 import * as XLSX from "xlsx";
 import { createRequire } from "module";
 import { buildIcsInvite, sendSmtpMail } from "./mailer";
+import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 dotenv.config();
 const changePasswordSchema = z.object({
@@ -4320,8 +4321,110 @@ export async function registerRoutes(
     });
   });
 
+  app.put("/api/admin/profile", async (req, res) => {
+    try {
+      const admin = req.session.admin;
+      if (!admin || !admin.id) {
+        return res.status(401).json({ message: "Admin login required" });
+      }
+
+      const { firstName, lastName, email } = req.body as {
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+      };
+
+      if (!firstName || typeof firstName !== "string" || !firstName.trim()) {
+        return res.status(400).json({ message: "First name is required" });
+      }
+      if (!lastName || typeof lastName !== "string" || !lastName.trim()) {
+        return res.status(400).json({ message: "Last name is required" });
+      }
+      if (!email || typeof email !== "string" || !email.trim()) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        return res.status(400).json({ message: "Please enter a valid email address" });
+      }
+
+      const updated = await storage.updateAdmin(admin.id, {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim().toLowerCase(),
+      });
+
+      if (updated) {
+        req.session.admin.firstName = updated.firstName;
+        req.session.admin.lastName = updated.lastName;
+        req.session.admin.email = updated.email;
+      }
+
+      return res.json({
+        message: "Profile updated successfully",
+        admin: {
+          id: req.session.admin.id,
+          firstName: req.session.admin.firstName,
+          lastName: req.session.admin.lastName,
+          email: req.session.admin.email,
+          role: req.session.admin.role,
+          permissions: req.session.admin.permissions,
+        },
+      });
+    } catch (error) {
+      console.error("Admin profile update error:", error);
+      return res.status(500).json({ message: "An error occurred while updating profile" });
+    }
+  });
+
+  app.post("/api/admin/change-password", async (req, res) => {
+    try {
+      const admin = req.session.admin;
+      if (!admin || !admin.id) {
+        return res.status(401).json({ message: "Admin login required" });
+      }
+
+      const { currentPassword, newPassword } = req.body as {
+        currentPassword?: string;
+        newPassword?: string;
+      };
+
+      if (!currentPassword || typeof currentPassword !== "string" || !currentPassword) {
+        return res.status(400).json({ message: "Current password is required" });
+      }
+      if (!newPassword || typeof newPassword !== "string" || !newPassword) {
+        return res.status(400).json({ message: "New password is required" });
+      }
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "New password must be at least 8 characters" });
+      }
+
+      const adminRecord = await storage.getAdmin(admin.id);
+      if (!adminRecord) {
+        return res.status(404).json({ message: "Admin not found" });
+      }
+
+      if (!adminRecord.password) {
+        return res.status(400).json({ message: "Password not set for this account. Please contact super admin." });
+      }
+
+      const passwordMatch = adminRecord.password === currentPassword;
+      if (!passwordMatch) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      await storage.updateAdminPassword(admin.id, newPassword);
+
+      return res.json({ message: "Password changed successfully" });
+    } catch (error) {
+      console.error("Admin change password error:", error);
+      return res.status(500).json({ message: "An error occurred while changing password" });
+    }
+  });
+
   app.use("/api/admin", (req, res, next) => {
-    if (req.path === "/login" || req.path === "/logout") return next();
+    if (req.path === "/login" || req.path === "/logout" || req.path === "/profile" || req.path === "/change-password") return next();
 
     const admin = req.session.admin;
     if (!admin) {
@@ -4812,6 +4915,7 @@ export async function registerRoutes(
           source: "employer",
           createdAt: created.toISOString(),
           raw: (p as any)?.raw ?? {},
+          employerId: employerId,
         });
       }
 
@@ -7355,11 +7459,8 @@ export async function registerRoutes(
             if (typeof explicit === "string" && explicit.trim()) return explicit.trim();
             const explicitBool = (extra as any)?.isOnboarded;
             if (typeof explicitBool === "boolean") return explicitBool ? "Onboarded" : "Not onboarded";
-
-            const bankDetails = (extra as any)?.bankDetails ?? {};
-            const hasBank = Boolean(String(bankDetails?.accountNumber ?? "").trim()) || Boolean(String(bankDetails?.upiId ?? "").trim());
-            const hasSkills = Array.isArray((onboarding as any)?.skills) ? ((onboarding as any)?.skills ?? []).length > 0 : false;
-            return hasBank && hasSkills ? "Onboarded" : "Not onboarded";
+            const isPaid = Boolean(extra?.payment?.isPaid);
+            return isPaid ? "Onboarded" : "Not onboarded";
           })();
 
           const payoutAgg = payoutAggByInternId.get(internId) ?? {
@@ -8548,14 +8649,8 @@ export async function registerRoutes(
         if (typeof explicit === "string" && explicit.trim()) return explicit.trim();
         const explicitBool = (extra as any)?.isOnboarded;
         if (typeof explicitBool === "boolean") return explicitBool ? "Onboarded" : "Not onboarded";
-
-        const bankDetails = (extra as any)?.bankDetails ?? (extra as any)?.bank_details ?? {};
-        const hasBank =
-          Boolean(String((bankDetails as any)?.accountNumber ?? "").trim()) ||
-          Boolean(String((bankDetails as any)?.upiId ?? "").trim());
-        const skills = Array.isArray((o as any)?.skills) ? ((o as any)?.skills ?? []) : [];
-        const hasSkills = skills.length > 0;
-        return hasBank && hasSkills ? "Onboarded" : "Not onboarded";
+        const isPaid = Boolean(extra?.payment?.isPaid);
+        return isPaid ? "Onboarded" : "Not onboarded";
       };
 
       const deriveLiveStatus = (o: any) => {

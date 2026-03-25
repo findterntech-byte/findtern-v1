@@ -40,23 +40,34 @@ import {
 import {
   ArrowDown,
   ArrowUp,
+  ArrowRight,
+  Building2,
+  CheckCircle2,
+  Clock,
   Columns,
   EyeOff,
   Filter,
+  Globe,
+  Loader2,
   MoreVertical,
+  Phone,
+  Plus,
   Search,
+  TrendingUp,
+  Users,
+  X,
+  DollarSign,
+  Calendar,
+  Mail,
+  MapPin,
+  Briefcase,
+  UserCheck,
+  AlertCircle,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import { Cell, Pie, PieChart } from "recharts";
+import { cn } from "@/lib/utils";
 
 type Company = {
   id: string;
@@ -87,19 +98,114 @@ type Company = {
   onboardingCompleted: boolean;
 };
 
+type ColumnKey =
+  | "sno"
+  | "companyName"
+  | "email"
+  | "country"
+  | "city"
+  | "spocName"
+  | "phone"
+  | "createdAt"
+  | "activeInternships"
+  | "lastPaymentAt"
+  | "totalBilledAmount"
+  | "totalPaidAmount"
+  | "totalRemainingAmount"
+  | "upcomingPaymentAmount"
+  | "upcomingPaymentAt"
+  | "proposalsTotal"
+  | "proposalsSent"
+  | "proposalsAccepted"
+  | "proposalsRejected"
+  | "proposalsExpired"
+  | "totalHires"
+  | "internationalFte"
+  | "actions"
+  | "status";
+
+interface StatCardProps {
+  title: string;
+  value: number | string;
+  subtitle?: string;
+  icon: React.ReactNode;
+  trend?: { value: number; positive: boolean };
+  className?: string;
+  variant?: "default" | "success" | "warning" | "muted";
+}
+
+function StatCard({ title, value, subtitle, icon, trend, className, variant = "default" }: StatCardProps) {
+  const variants = {
+    default: "bg-gradient-to-br from-slate-50 to-white border-slate-200",
+    success: "bg-gradient-to-br from-emerald-50 to-emerald-100/30 border-emerald-200",
+    warning: "bg-gradient-to-br from-amber-50 to-amber-100/30 border-amber-200",
+    muted: "bg-gradient-to-br from-slate-100/50 to-slate-50 border-slate-200/50",
+  };
+
+  const iconVariants = {
+    default: "bg-slate-100 text-slate-600",
+    success: "bg-emerald-100 text-emerald-600",
+    warning: "bg-amber-100 text-amber-600",
+    muted: "bg-slate-200 text-slate-500",
+  };
+
+  return (
+    <Card className={cn("p-5 relative overflow-hidden border", variants[variant], className)}>
+      <div className="flex items-start justify-between">
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground/80 uppercase tracking-wide">{title}</p>
+          <p className="text-3xl font-bold tracking-tight">{value}</p>
+          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+          {trend && (
+            <div className={cn("flex items-center gap-1 text-xs font-medium", trend.positive ? "text-emerald-600" : "text-rose-600")}>
+              <TrendingUp className={cn("h-3 w-3", !trend.positive && "rotate-180")} />
+              <span>{trend.value}%</span>
+            </div>
+          )}
+        </div>
+        <div className={cn("p-3 rounded-xl", iconVariants[variant])}>
+          {icon}
+        </div>
+      </div>
+      <div className="absolute -bottom-4 -right-4 w-24 h-24 rounded-full bg-gradient-to-br from-primary/5 to-transparent opacity-50" />
+    </Card>
+  );
+}
+
+function StatusBadge({ status }: { status: "active" | "pending" | "deactivated" | "none" }) {
+  const config = {
+    active: { label: "Active", className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+    pending: { label: "Pending", className: "bg-amber-100 text-amber-700 border-amber-200" },
+    deactivated: { label: "Deactivated", className: "bg-slate-100 text-slate-600 border-slate-200" },
+    none: { label: "None", className: "bg-slate-100 text-slate-500 border-slate-200" },
+  };
+
+  return (
+    <Badge className={cn("font-medium border", config[status].className)}>
+      {status === "active" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+      {status === "pending" && <Clock className="h-3 w-3 mr-1" />}
+      {status === "deactivated" && <AlertCircle className="h-3 w-3 mr-1" />}
+      {config[status].label}
+    </Badge>
+  );
+}
+
+function InternationalFteBadge({ status }: { status: string }) {
+  const s = String(status ?? "none").trim().toLowerCase();
+  if (s === "approved") {
+    return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">Approved</Badge>;
+  }
+  if (s === "applied") {
+    return <Badge className="bg-amber-100 text-amber-700 border-amber-200">Applied</Badge>;
+  }
+  return <Badge variant="outline" className="text-slate-500">—</Badge>;
+}
+
 export default function AdminCompaniesPage() {
   const [, setLocation] = useLocation();
 
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState<
-    | "createdAt"
-    | "companyName"
-    | "email"
-    | "phone"
-    | "activeInternships"
-    | "lastPaymentAt"
-    | "upcomingPaymentAt"
-  >("createdAt");
+  const [sortBy, setSortBy] = useState<"createdAt" | "companyName" | "email" | "phone" | "activeInternships" | "lastPaymentAt" | "upcomingPaymentAt">("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<5 | 10 | 25 | 50>(10);
@@ -112,133 +218,31 @@ export default function AdminCompaniesPage() {
   const [ifteOpen, setIfteOpen] = useState(false);
   const [ifteCompanyId, setIfteCompanyId] = useState<string>("");
 
-  type ColumnKey =
-    | "sno"
-    | "companyName"
-    | "email"
-    | "country"
-    | "city"
-    | "spocName"
-    | "phone"
-    | "createdAt"
-    | "activeInternships"
-    | "lastPaymentAt"
-    | "totalBilledAmount"
-    | "totalPaidAmount"
-    | "totalRemainingAmount"
-    | "upcomingPaymentAmount"
-    | "upcomingPaymentAt"
-    | "proposalsTotal"
-    | "proposalsSent"
-    | "proposalsAccepted"
-    | "proposalsRejected"
-    | "proposalsExpired"
-    | "totalHires"
-    | "internationalFte"
-    | "actions"
-    | "status";
-
   const columns = useMemo(
     () =>
       [
         { key: "sno" as const, label: "S.No" },
-        {
-          key: "companyName" as const,
-          label: "Company name",
-          sortKey: "companyName" as const,
-          filterKey: "companyName" as const,
-        },
-        {
-          key: "email" as const,
-          label: "Company email",
-          sortKey: "email" as const,
-          filterKey: "email" as const,
-        },
-        {
-          key: "country" as const,
-          label: "Country",
-          filterKey: "country" as const,
-        },
-        {
-          key: "city" as const,
-          label: "City",
-          filterKey: "city" as const,
-        },
-        {
-          key: "spocName" as const,
-          label: "FPOC  Name",
-          filterKey: "spocName" as const,
-        },
-        {
-          key: "phone" as const,
-          label: "Phone",
-          sortKey: "phone" as const,
-          filterKey: "phone" as const,
-        },
-        {
-          key: "createdAt" as const,
-          label: "Created on",
-          sortKey: "createdAt" as const,
-        },
-        {
-          key: "activeInternships" as const,
-          label: "Active Projects",
-          sortKey: "activeInternships" as const,
-        },
-        {
-          key: "lastPaymentAt" as const,
-          label: "Last payment date",
-          sortKey: "lastPaymentAt" as const,
-        },
-        {
-          key: "totalBilledAmount" as const,
-          label: "Total Amount",
-        },
-        {
-          key: "totalPaidAmount" as const,
-          label: "Paid till now",
-        },
-        {
-          key: "totalRemainingAmount" as const,
-          label: "Remaining",
-        },
-        {
-          key: "upcomingPaymentAmount" as const,
-          label: "Upcoming Payment",
-        },
-        {
-          key: "upcomingPaymentAt" as const,
-          label: "Upcoming Payment date",
-          sortKey: "upcomingPaymentAt" as const,
-        },
-        {
-          key: "proposalsTotal" as const,
-          label: "Total proposals",
-        },
-        {
-          key: "proposalsSent" as const,
-          label: "Proposals sent",
-        },
-        {
-          key: "proposalsAccepted" as const,
-          label: "Accepted",
-        },
-        {
-          key: "proposalsRejected" as const,
-          label: "Rejected",
-        },
-        {
-          key: "proposalsExpired" as const,
-          label: "Withdrawn",
-        },
-        {
-          key: "totalHires" as const,
-          label: "Hires",
-        },
-        {
-          key: "internationalFte" as const,
-          label: "International FTE",
-        },
+        { key: "companyName" as const, label: "Company name", sortKey: "companyName" as const, filterKey: "companyName" as const },
+        { key: "email" as const, label: "Company email", sortKey: "email" as const, filterKey: "email" as const },
+        { key: "country" as const, label: "Country", filterKey: "country" as const },
+        { key: "city" as const, label: "City", filterKey: "city" as const },
+        { key: "spocName" as const, label: "FPOC Name", filterKey: "spocName" as const },
+        { key: "phone" as const, label: "Phone", sortKey: "phone" as const, filterKey: "phone" as const },
+        { key: "createdAt" as const, label: "Created on", sortKey: "createdAt" as const },
+        { key: "activeInternships" as const, label: "Active Projects", sortKey: "activeInternships" as const },
+        { key: "lastPaymentAt" as const, label: "Last payment date", sortKey: "lastPaymentAt" as const },
+        { key: "totalBilledAmount" as const, label: "Total Amount" },
+        { key: "totalPaidAmount" as const, label: "Paid till now" },
+        { key: "totalRemainingAmount" as const, label: "Remaining" },
+        { key: "upcomingPaymentAmount" as const, label: "Upcoming Payment" },
+        { key: "upcomingPaymentAt" as const, label: "Upcoming Payment date", sortKey: "upcomingPaymentAt" as const },
+        { key: "proposalsTotal" as const, label: "Total proposals" },
+        { key: "proposalsSent" as const, label: "Proposals sent" },
+        { key: "proposalsAccepted" as const, label: "Accepted" },
+        { key: "proposalsRejected" as const, label: "Rejected" },
+        { key: "proposalsExpired" as const, label: "Withdrawn" },
+        { key: "totalHires" as const, label: "Hires" },
+        { key: "internationalFte" as const, label: "International FTE" },
         { key: "actions" as const, label: "Action" },
         { key: "status" as const, label: "Status" },
       ] as const,
@@ -286,9 +290,7 @@ export default function AdminCompaniesPage() {
               : null;
           const upcomingPaymentCurrency = e?.upcomingPaymentCurrency ? String(e.upcomingPaymentCurrency) : null;
 
-          const phone = [String(e?.countryCode ?? ""), String(e?.phoneNumber ?? "")]
-            .filter(Boolean)
-            .join(" ") || "-";
+          const phone = [String(e?.countryCode ?? ""), String(e?.phoneNumber ?? "")].filter(Boolean).join(" ") || "-";
 
           return {
             id: String(e?.id ?? ""),
@@ -334,21 +336,21 @@ export default function AdminCompaniesPage() {
   }, [profileStatus]);
 
   const formatDate = (raw: string | null) => {
-    if (!raw) return "-";
+    if (!raw) return "—";
     const d = new Date(raw);
     if (Number.isNaN(d.getTime())) return String(raw);
-    return d.toISOString().slice(0, 10);
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   };
 
   const formatAmount = (amountMinor: number | null, currencyCode: string | null) => {
-    if (amountMinor === null || amountMinor === undefined) return "-";
+    if (amountMinor === null || amountMinor === undefined) return "—";
     const cur = String(currencyCode || "INR").toUpperCase();
     const locale = cur === "INR" ? "en-IN" : "en-US";
     const major = Number.isFinite(amountMinor) ? amountMinor / 100 : 0;
     return new Intl.NumberFormat(locale, {
       style: "currency",
       currency: cur,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 0,
     }).format(major || 0);
   };
 
@@ -359,7 +361,7 @@ export default function AdminCompaniesPage() {
     return new Intl.NumberFormat(locale, {
       style: "currency",
       currency: cur,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 0,
     }).format(major || 0);
   };
 
@@ -368,9 +370,7 @@ export default function AdminCompaniesPage() {
     if (!id) return;
     try {
       setActionCompanyId(id);
-      await apiRequest("POST", `/api/admin/employers/${encodeURIComponent(id)}/toggle-active`, {
-        isActive: nextIsActive,
-      });
+      await apiRequest("POST", `/api/admin/employers/${encodeURIComponent(id)}/toggle-active`, { isActive: nextIsActive });
       setCompanies((prev) => prev.map((c) => (c.id === id ? { ...c, isActive: nextIsActive } : c)));
     } catch (e) {
       console.error("Failed to toggle company active", e);
@@ -385,11 +385,7 @@ export default function AdminCompaniesPage() {
     if (!id) return;
     try {
       setActionCompanyId(id);
-      const res = await apiRequest(
-        "POST",
-        `/api/admin/employers/${encodeURIComponent(id)}/international-fte/status`,
-        { status: nextStatus },
-      );
+      const res = await apiRequest("POST", `/api/admin/employers/${encodeURIComponent(id)}/international-fte/status`, { status: nextStatus });
       const json = await res.json().catch(() => null);
       const status = String(json?.employer?.internationalFteStatus ?? nextStatus);
       setCompanies((prev) => prev.map((c) => (c.id === id ? { ...c, internationalFteStatus: status } : c)));
@@ -401,23 +397,12 @@ export default function AdminCompaniesPage() {
     }
   };
 
-  const openInternationalFteDialog = (companyId: string) => {
-    const id = String(companyId ?? "").trim();
-    if (!id) return;
-    setIfteCompanyId(id);
-    setIfteOpen(true);
-  };
-
   const approveInternationalFte = async (companyId: string) => {
     const id = String(companyId ?? "").trim();
     if (!id) return;
     try {
       setActionCompanyId(id);
-      const res = await apiRequest(
-        "POST",
-        `/api/admin/employers/${encodeURIComponent(id)}/international-fte/approve`,
-        {},
-      );
+      const res = await apiRequest("POST", `/api/admin/employers/${encodeURIComponent(id)}/international-fte/approve`, {});
       const json = await res.json().catch(() => null);
       const status = String(json?.employer?.internationalFteStatus ?? "approved");
       setCompanies((prev) => prev.map((c) => (c.id === id ? { ...c, internationalFteStatus: status } : c)));
@@ -439,28 +424,10 @@ export default function AdminCompaniesPage() {
     const deactivated = Math.max(0, total - active);
     const onboardingCompleted = rows.filter((c) => c.isActive && c.onboardingCompleted).length;
     const onboardingPending = rows.filter((c) => c.isActive && !c.onboardingCompleted).length;
+    const totalRevenue = rows.reduce((sum, c) => sum + c.totalPaidAmountMinor, 0);
+    const totalPending = rows.reduce((sum, c) => sum + c.totalRemainingAmountMinor, 0);
 
-    const series = [
-      { key: "Active", value: onboardingCompleted, fill: "hsl(142 76% 36%)" },
-      { key: "Pending", value: onboardingPending, fill: "hsl(38 92% 50%)" },
-      { key: "Deactivated", value: deactivated, fill: "hsl(215 16% 47%)" },
-    ].filter((x) => x.value > 0);
-
-    const config = {
-      Active: { label: "Active", color: "hsl(142 76% 36%)" },
-      Pending: { label: "Pending", color: "hsl(38 92% 50%)" },
-      Deactivated: { label: "Deactivated", color: "hsl(215 16% 47%)" },
-    } as const;
-
-    return {
-      total,
-      active,
-      deactivated,
-      onboardingCompleted,
-      onboardingPending,
-      series,
-      config,
-    };
+    return { total, active, deactivated, onboardingCompleted, onboardingPending, totalRevenue, totalPending };
   }, [rows]);
 
   const filtered = useMemo(() => {
@@ -519,9 +486,7 @@ export default function AdminCompaniesPage() {
     });
   }, [filtered, sortBy, sortDir]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [search, pageSize, sortBy, sortDir, columnFilters]);
+  useEffect(() => { setPage(1); }, [search, pageSize, sortBy, sortDir, columnFilters]);
 
   const total = sorted.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -530,13 +495,7 @@ export default function AdminCompaniesPage() {
   const endIndex = Math.min(startIndex + pageSize, total);
   const paginated = sorted.slice(startIndex, endIndex);
 
-  const ColumnHeader = ({
-    col,
-    alignRight,
-  }: {
-    col: (typeof columns)[number];
-    alignRight?: boolean;
-  }) => {
+  const ColumnHeader = ({ col }: { col: (typeof columns)[number] }) => {
     const isSortable = Boolean((col as any).sortKey);
     const sortKey = (col as any).sortKey as typeof sortBy | undefined;
     const isFiltered = Boolean(String((columnFilters as any)[col.key] ?? "").trim());
@@ -554,617 +513,613 @@ export default function AdminCompaniesPage() {
     };
 
     return (
-      <div className={alignRight ? "flex items-center justify-end gap-2" : "flex items-center gap-2"}>
-        <span className="truncate">{col.label}</span>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 rounded-md text-muted-foreground hover:bg-muted"
-            >
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuLabel className="text-xs">{col.label}</DropdownMenuLabel>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className={cn("flex items-center gap-1.5 transition-colors", isFiltered && "text-primary")}>
+            <span className="truncate">{col.label}</span>
+            {isFiltered && <span className="h-2 w-2 rounded-full bg-primary" />}
+            <MoreVertical className="h-4 w-4 opacity-50" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-52">
+          <DropdownMenuLabel className="text-xs">{col.label}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuItem disabled={!isSortable} onClick={() => onSort("asc")}>
+              <ArrowUp className="h-4 w-4" /> Sort Ascending
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!isSortable} onClick={() => onSort("desc")}>
+              <ArrowDown className="h-4 w-4" /> Sort Descending
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem disabled={!isSortable} onClick={() => onSort("asc")}>
-                <ArrowUp className="h-4 w-4" />
-                Sort by ASC
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled={!isSortable} onClick={() => onSort("desc")}>
-                <ArrowDown className="h-4 w-4" />
-                Sort by DESC
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled={!(col as any).filterKey} onClick={openFilter}>
-                <Filter className="h-4 w-4" />
-                {isFiltered ? "Edit filter" : "Filter"}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() =>
-                  setColumnVisibility((prev) => ({
-                    ...prev,
-                    [col.key]: false,
-                  }))
-                }
-                disabled={col.key === "actions"}
-              >
-                <EyeOff className="h-4 w-4" />
-                Hide column
-              </DropdownMenuItem>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  <Columns className="h-4 w-4" />
-                  Manage columns
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-60">
-                  {columns
-                    .filter((c) => c.key !== "actions")
-                    .map((c) => (
-                      <DropdownMenuCheckboxItem
-                        key={c.key}
-                        checked={Boolean(columnVisibility[c.key])}
-                        onCheckedChange={(checked) =>
-                          setColumnVisibility((prev) => ({
-                            ...prev,
-                            [c.key]: Boolean(checked),
-                          }))
-                        }
-                      >
-                        {c.label}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+            <DropdownMenuItem disabled={!(col as any).filterKey} onClick={openFilter}>
+              <Filter className="h-4 w-4" /> {isFiltered ? "Edit Filter" : "Add Filter"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setColumnVisibility((prev) => ({ ...prev, [col.key]: false }))} disabled={col.key === "actions"}>
+              <EyeOff className="h-4 w-4" /> Hide Column
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger><Columns className="h-4 w-4" /> Manage Columns</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-56">
+                {columns.filter((c) => c.key !== "actions").map((c) => (
+                  <DropdownMenuCheckboxItem key={c.key} checked={Boolean(columnVisibility[c.key])} onCheckedChange={(checked) => setColumnVisibility((prev) => ({ ...prev, [c.key]: Boolean(checked) }))}>
+                    {c.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   };
 
   return (
-    <AdminLayout
-      title="Companies"
-      description="Manage companies, view their details, and see associated interns."
-    >
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className="p-5">
-          <p className="text-xs font-medium text-muted-foreground">Total companies</p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums">{overview.total}</p>
-          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">Active {overview.active}</span>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-700">Deactivated {overview.deactivated}</span>
-          </div>
-        </Card>
-
-        <Card className="p-5">
-          <p className="text-xs font-medium text-muted-foreground">Onboarding completed</p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums">{overview.onboardingCompleted}</p>
-          <p className="mt-2 text-xs text-muted-foreground">Companies with completed onboarding.</p>
-        </Card>
-
-        <Card className="p-5">
-          <p className="text-xs font-medium text-muted-foreground">Onboarding pending</p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums">{overview.onboardingPending}</p>
-          <p className="mt-2 text-xs text-muted-foreground">Active companies still pending onboarding.</p>
-        </Card>
-
-        <Card className="p-5 md:col-span-2 xl:col-span-1">
-          <p className="text-xs font-medium text-muted-foreground">Company status split</p>
-          <p className="mt-2 text-sm text-muted-foreground">Active vs Pending vs Deactivated</p>
-          <div className="mt-4">
-            <ChartContainer config={overview.config as any} className="h-[180px] w-full">
-              <PieChart>
-                <ChartTooltip content={<ChartTooltipContent nameKey="key" />} />
-                <Pie
-                  data={overview.series}
-                  dataKey="value"
-                  nameKey="key"
-                  innerRadius={45}
-                  outerRadius={70}
-                  paddingAngle={2}
-                >
-                  {overview.series.map((entry) => (
-                    <Cell key={entry.key} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <ChartLegend content={<ChartLegendContent nameKey="key" />} />
-              </PieChart>
-            </ChartContainer>
-          </div>
-        </Card>
-      </div>
-
-      <Card className="border-none shadow-sm">
-        <div className="flex flex-col gap-4 border-b px-6 py-4 md:flex-row md:items-center md:justify-between">
-          <p className="text-sm font-medium text-muted-foreground">Company List</p>
-          <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end md:w-auto">
-            <div className="relative w-full sm:w-[320px]">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                placeholder="Search company, email, phone..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-10 pl-10"
-              />
-            </div>
-
-            <Select value={profileStatus} onValueChange={(v) => setProfileStatus(v as any)}>
-              <SelectTrigger className="h-10 w-full sm:w-[220px]">
-                <SelectValue placeholder="Filter by profile status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Profiles</SelectItem>
-                <SelectItem value="complete">Complete Profiles</SelectItem>
-                <SelectItem value="incomplete">Incomplete Profiles</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={sortBy}
-              onValueChange={(v) => {
-                const next = v as any;
-                setSortBy(next);
-                if (next === "upcomingPaymentAt") {
-                  setSortDir("asc");
-                }
-              }}
-            >
-              <SelectTrigger className="h-10 w-full sm:w-[170px]">
-                <SelectValue placeholder="Sort" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="createdAt">Created on</SelectItem>
-                <SelectItem value="companyName">Company name</SelectItem>
-                <SelectItem value="email">Company email</SelectItem>
-                <SelectItem value="activeInternships">Active Projects</SelectItem>
-                <SelectItem value="lastPaymentAt">Last payment date</SelectItem>
-                <SelectItem value="upcomingPaymentAt">Upcoming payment date</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={sortDir} onValueChange={(v) => setSortDir(v as any)}>
-              <SelectTrigger className="h-10 w-full sm:w-[140px]">
-                <SelectValue placeholder="Order" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="desc">DESC</SelectItem>
-                <SelectItem value="asc">ASC</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    <AdminLayout title="Companies" description="Manage companies, view their details, and see associated interns.">
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Total Companies"
+            value={overview.total}
+            icon={<Building2 className="h-5 w-5" />}
+            subtitle={`${overview.active} active`}
+            variant="default"
+          />
+          <StatCard
+            title="Onboarding Complete"
+            value={overview.onboardingCompleted}
+            icon={<UserCheck className="h-5 w-5" />}
+            subtitle={`${overview.onboardingPending} pending`}
+            variant="success"
+          />
+          <StatCard
+            title="Pending Onboarding"
+            value={overview.onboardingPending}
+            icon={<Clock className="h-5 w-5" />}
+            subtitle="Awaiting completion"
+            variant="warning"
+          />
+          <StatCard
+            title="Total Revenue"
+            value={formatAmountMajor(overview.totalRevenue)}
+            icon={<DollarSign className="h-5 w-5" />}
+            subtitle={`${formatAmountMajor(overview.totalPending)} pending`}
+            variant="default"
+          />
         </div>
 
-        <div className="px-4 py-4">
-          <div className="relative w-full overflow-auto rounded-lg border">
-            <Table className="min-w-[1200px]">
-              <TableHeader className="sticky top-0 z-10 bg-background">
-                <TableRow className="bg-background">
-                  {columnVisibility.sno && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[0]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.companyName && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[1]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.email && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[2]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.country && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[3]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.city && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[4]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.spocName && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[5]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.phone && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[6]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.createdAt && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[7]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.activeInternships && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[8]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.lastPaymentAt && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[9]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.totalBilledAmount && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[10]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.totalPaidAmount && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[11]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.totalRemainingAmount && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[12]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.upcomingPaymentAmount && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[13]} />
-                    </TableHead>
-                  )
-                  }
-                  {columnVisibility.upcomingPaymentAt && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[14]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.proposalsTotal && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[15]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.proposalsSent && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[16]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.proposalsAccepted && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[17]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.proposalsRejected && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[18]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.proposalsExpired && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[19]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.totalHires && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[20]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.internationalFte && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[21]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.actions && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[22]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.status && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[23]} />
-                    </TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={24} className="py-8 text-center text-sm text-muted-foreground">
-                      Loading companies...
-                    </TableCell>
-                  </TableRow>
-                ) : error ? (
-                  <TableRow>
-                    <TableCell colSpan={24} className="py-8 text-center text-sm text-red-600">
-                      {error}
-                    </TableCell>
-                  </TableRow>
-                ) : paginated.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={24} className="py-8 text-center text-sm text-muted-foreground">
-                      No companies found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginated.map((company, index) => (
-                    <TableRow
-                      key={company.id || String(startIndex + index)}
-                      className={
-                        (startIndex + index) % 2 === 0
-                          ? "bg-background hover:bg-muted/40"
-                          : "bg-muted/20 hover:bg-muted/40"
-                      }
-                    >
-                      {columnVisibility.sno && <TableCell>{startIndex + index + 1}</TableCell>}
-                      {columnVisibility.companyName && (
-                        <TableCell className="font-medium whitespace-nowrap">{company.companyName}</TableCell>
-                      )}
-                      {columnVisibility.email && (
-                        <TableCell className="whitespace-nowrap">{company.email}</TableCell>
-                      )}
-                      {columnVisibility.country && <TableCell className="whitespace-nowrap">{company.country}</TableCell>}
-                      {columnVisibility.city && <TableCell className="whitespace-nowrap">{company.city}</TableCell>}
-                      {columnVisibility.spocName && <TableCell className="whitespace-nowrap">{company.spocName}</TableCell>}
-                      {columnVisibility.phone && <TableCell className="whitespace-nowrap">{company.phone}</TableCell>}
-                      {columnVisibility.createdAt && <TableCell className="whitespace-nowrap">{company.createdAt}</TableCell>}
-                      {columnVisibility.activeInternships && (
-                        <TableCell className="whitespace-nowrap">{company.activeInternships}</TableCell>
-                      )}
-                      {columnVisibility.lastPaymentAt && (
-                        <TableCell className="whitespace-nowrap">{formatDate(company.lastPaymentAt)}</TableCell>
-                      )}
-                      {columnVisibility.totalBilledAmount && (
-                        <TableCell className="whitespace-nowrap">{formatAmountMajor(company.totalBilledAmountMinor)}</TableCell>
-                      )}
-                      {columnVisibility.totalPaidAmount && (
-                        <TableCell className="whitespace-nowrap">{formatAmountMajor(company.totalPaidAmountMinor)}</TableCell>
-                      )}
-                      {columnVisibility.totalRemainingAmount && (
-                        <TableCell className="whitespace-nowrap">{formatAmountMajor(company.totalRemainingAmountMinor)}</TableCell>
-                      )}
-                      {columnVisibility.upcomingPaymentAmount && (
-                        <TableCell className="whitespace-nowrap">
-                          {formatAmount(company.upcomingPaymentAmountMinor, company.upcomingPaymentCurrency)}
-                        </TableCell>
-                      )}
-                      {columnVisibility.upcomingPaymentAt && (
-                        <TableCell className="whitespace-nowrap">{formatDate(company.upcomingPaymentAt)}</TableCell>
-                      )}
-                      {columnVisibility.proposalsTotal && (
-                        <TableCell className="whitespace-nowrap">{company.proposalsTotal}</TableCell>
-                      )}
-                      {columnVisibility.proposalsSent && (
-                        <TableCell className="whitespace-nowrap">{company.proposalsSent}</TableCell>
-                      )}
-                      {columnVisibility.proposalsAccepted && (
-                        <TableCell className="whitespace-nowrap">{company.proposalsAccepted}</TableCell>
-                      )}
-                      {columnVisibility.proposalsRejected && (
-                        <TableCell className="whitespace-nowrap">{company.proposalsRejected}</TableCell>
-                      )}
-                      {columnVisibility.proposalsExpired && (
-                        <TableCell className="whitespace-nowrap">{company.proposalsExpired}</TableCell>
-                      )}
-                      {columnVisibility.totalHires && (
-                        <TableCell className="whitespace-nowrap">{company.totalHires}</TableCell>
-                      )}
-                      {columnVisibility.internationalFte && (
-                        <TableCell className="whitespace-nowrap">
-                          {(() => {
-                            const s = String(company.internationalFteStatus ?? "none").trim().toLowerCase();
-                            const label = s === "approved" ? "Approved" : s === "applied" ? "Applied" : "—";
-                            const cls = s === "approved" ? "bg-[#0E6049]" : s === "applied" ? "bg-amber-500" : "bg-slate-500";
-                            return <Badge className={cls}>{label}</Badge>;
-                          })()}
-                        </TableCell>
-                      )}
-                      {columnVisibility.actions && (
-                        <TableCell>
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setLocation(`/admin/companies/${company.id}`)}
-                            >
-                              View profile
-                            </Button>
-                           
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant="outline" disabled={actionCompanyId === company.id}>
-                                  International FTE action
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start">
-                                <DropdownMenuLabel>Set status</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => void updateInternationalFteStatus(company.id, "none")}>
-                                  Set: None
-                                </DropdownMenuItem>
-                                
-                                <DropdownMenuItem onClick={() => void updateInternationalFteStatus(company.id, "approved")}>
-                                  Set: Approved
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => void toggleActive(company.id, !company.isActive)}
-                              disabled={actionCompanyId === company.id}
-                            >
-                              {company.isActive ? "Deactivate" : "Activate"}
-                            </Button>
-                          </div>
-                        </TableCell>
-                      )}
-                      {columnVisibility.status && (
-                        <TableCell>
-                          <Badge
-                            className={
-                              !company.isActive
-                                ? "bg-slate-500"
-                                : company.onboardingCompleted
-                                  ? "bg-[#0E6049]"
-                                  : "bg-amber-500"
-                            }
-                          >
-                            {!company.isActive
-                              ? "Deactivated"
-                              : company.onboardingCompleted
-                                ? "Active"
-                                : "Pending"}
-                          </Badge>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))
+        <Card className="border shadow-sm">
+          <div className="flex flex-col gap-4 border-b bg-muted/30 px-6 py-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Building2 className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Company Directory</h2>
+                <p className="text-sm text-muted-foreground">{total} companies found</p>
+              </div>
+            </div>
+            <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
+              <div className="relative flex-1 sm:flex-none sm:w-[320px]">
+                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search companies, emails, contacts..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-11 pl-11 pr-10 bg-white"
+                />
+                {search && (
+                  <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <X className="h-4 w-4" />
+                  </button>
                 )}
-              </TableBody>
-            </Table>
+              </div>
+
+              <Select value={profileStatus} onValueChange={(v) => setProfileStatus(v as any)}>
+                <SelectTrigger className="h-11 w-full sm:w-[180px] bg-white">
+                  <SelectValue placeholder="Profile status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Profiles</SelectItem>
+                  <SelectItem value="complete">Complete</SelectItem>
+                  <SelectItem value="incomplete">Incomplete</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={sortBy} onValueChange={(v) => { setSortBy(v as any); if (v === "upcomingPaymentAt") setSortDir("asc"); }}>
+                <SelectTrigger className="h-11 w-full sm:w-[160px] bg-white">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="createdAt">Created Date</SelectItem>
+                  <SelectItem value="companyName">Company Name</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="activeInternships">Projects</SelectItem>
+                  <SelectItem value="lastPaymentAt">Last Payment</SelectItem>
+                  <SelectItem value="upcomingPaymentAt">Upcoming Payment</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button variant="outline" size="icon" className="h-11 w-11" onClick={() => setSortDir(sortDir === "asc" ? "desc" : "asc")}>
+                {sortDir === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+              </Button>
+            </div>
           </div>
 
-          <Dialog
-            open={openFilterFor !== null}
-            onOpenChange={(open) => {
-              if (open) return;
-              setOpenFilterFor(null);
-              setFilterDraft("");
-            }}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>
-                  {openFilterFor
-                    ? `Filter: ${columns.find((c) => c.key === openFilterFor)?.label ?? openFilterFor}`
-                    : "Filter"}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-3">
+          <div className="relative">
+            {loading && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Loading companies...</p>
+                </div>
+              </div>
+            )}
+
+            <div className="overflow-auto">
+              <Table className="min-w-[1400px]">
+                <TableHeader>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    {columnVisibility.sno && (
+                      <TableHead className="w-[60px] text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[0]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.companyName && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[1]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.email && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[2]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.country && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[3]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.city && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[4]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.spocName && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[5]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.phone && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[6]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.createdAt && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[7]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.activeInternships && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[8]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.lastPaymentAt && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[9]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.totalBilledAmount && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[10]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.totalPaidAmount && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[11]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.totalRemainingAmount && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[12]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.upcomingPaymentAmount && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[13]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.upcomingPaymentAt && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[14]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.proposalsTotal && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[15]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.proposalsSent && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[16]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.proposalsAccepted && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[17]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.proposalsRejected && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[18]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.proposalsExpired && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[19]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.totalHires && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[20]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.internationalFte && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[21]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.actions && (
+                      <TableHead className="w-[200px] text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[22]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.status && (
+                      <TableHead className="w-[120px] text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[23]} />
+                      </TableHead>
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {error ? (
+                    <TableRow>
+                      <TableCell colSpan={24} className="py-12 text-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <AlertCircle className="h-8 w-8 text-rose-500" />
+                          <p className="font-medium text-rose-600">{error}</p>
+                          <p className="text-sm text-muted-foreground">Unable to load companies. Please try again.</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : paginated.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={24} className="py-12 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+                            <Building2 className="h-7 w-7 text-muted-foreground" />
+                          </div>
+                          <div>
+                            <p className="font-medium">No companies found</p>
+                            <p className="text-sm text-muted-foreground">
+                              {search ? `No results for "${search}"` : "Get started by adding your first company"}
+                            </p>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginated.map((company, index) => (
+                      <TableRow
+                        key={company.id || String(startIndex + index)}
+                        className="group transition-colors hover:bg-muted/30"
+                      >
+                        {columnVisibility.sno && (
+                          <TableCell className="font-mono text-sm text-muted-foreground">{startIndex + index + 1}</TableCell>
+                        )}
+                        {columnVisibility.companyName && (
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary font-semibold text-sm">
+                                {company.companyName.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-medium">{company.companyName}</span>
+                            </div>
+                          </TableCell>
+                        )}
+                        {columnVisibility.email && (
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="truncate max-w-[180px]">{company.email}</span>
+                            </div>
+                          </TableCell>
+                        )}
+                        {columnVisibility.country && (
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                              {company.country}
+                            </div>
+                          </TableCell>
+                        )}
+                        {columnVisibility.city && (
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-sm">
+                              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                              {company.city}
+                            </div>
+                          </TableCell>
+                        )}
+                        {columnVisibility.spocName && (
+                          <TableCell className="text-sm">{company.spocName}</TableCell>
+                        )}
+                        {columnVisibility.phone && (
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                              {company.phone}
+                            </div>
+                          </TableCell>
+                        )}
+                        {columnVisibility.createdAt && (
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Calendar className="h-3.5 w-3.5" />
+                              {company.createdAt}
+                            </div>
+                          </TableCell>
+                        )}
+                        {columnVisibility.activeInternships && (
+                          <TableCell>
+                            <Badge variant="outline" className="font-medium">
+                              <Briefcase className="h-3 w-3 mr-1" />
+                              {company.activeInternships}
+                            </Badge>
+                          </TableCell>
+                        )}
+                        {columnVisibility.lastPaymentAt && (
+                          <TableCell className="text-sm text-muted-foreground">{formatDate(company.lastPaymentAt)}</TableCell>
+                        )}
+                        {columnVisibility.totalBilledAmount && (
+                          <TableCell className="font-medium">{formatAmountMajor(company.totalBilledAmountMinor)}</TableCell>
+                        )}
+                        {columnVisibility.totalPaidAmount && (
+                          <TableCell className="text-emerald-600 font-medium">{formatAmountMajor(company.totalPaidAmountMinor)}</TableCell>
+                        )}
+                        {columnVisibility.totalRemainingAmount && (
+                          <TableCell className={company.totalRemainingAmountMinor > 0 ? "text-amber-600" : ""}>
+                            {formatAmountMajor(company.totalRemainingAmountMinor)}
+                          </TableCell>
+                        )}
+                        {columnVisibility.upcomingPaymentAmount && (
+                          <TableCell>
+                            {company.upcomingPaymentAmountMinor ? (
+                              <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 font-medium">
+                                {formatAmount(company.upcomingPaymentAmountMinor, company.upcomingPaymentCurrency)}
+                              </Badge>
+                            ) : "—"}
+                          </TableCell>
+                        )}
+                        {columnVisibility.upcomingPaymentAt && (
+                          <TableCell className="text-sm text-muted-foreground">{formatDate(company.upcomingPaymentAt)}</TableCell>
+                        )}
+                        {columnVisibility.proposalsTotal && (
+                          <TableCell className="text-sm">{company.proposalsTotal}</TableCell>
+                        )}
+                        {columnVisibility.proposalsSent && (
+                          <TableCell className="text-sm">{company.proposalsSent}</TableCell>
+                        )}
+                        {columnVisibility.proposalsAccepted && (
+                          <TableCell>
+                            <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 font-medium">
+                              {company.proposalsAccepted}
+                            </Badge>
+                          </TableCell>
+                        )}
+                        {columnVisibility.proposalsRejected && (
+                          <TableCell>
+                            <Badge variant="outline" className="text-rose-600 border-rose-200 bg-rose-50 font-medium">
+                              {company.proposalsRejected}
+                            </Badge>
+                          </TableCell>
+                        )}
+                        {columnVisibility.proposalsExpired && (
+                          <TableCell className="text-sm text-muted-foreground">{company.proposalsExpired}</TableCell>
+                        )}
+                        {columnVisibility.totalHires && (
+                          <TableCell>
+                            <Badge variant="outline" className="text-primary border-primary/20 bg-primary/5 font-medium">
+                              <Users className="h-3 w-3 mr-1" />
+                              {company.totalHires}
+                            </Badge>
+                          </TableCell>
+                        )}
+                        {columnVisibility.internationalFte && (
+                          <TableCell><InternationalFteBadge status={company.internationalFteStatus} /></TableCell>
+                        )}
+                        {columnVisibility.actions && (
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs"
+                                onClick={() => setLocation(`/admin/companies/${company.id}`)}
+                              >
+                                View <ArrowRight className="ml-1 h-3 w-3" />
+                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => void updateInternationalFteStatus(company.id, company.internationalFteStatus === "approved" ? "none" : "approved")}>
+                                    <Globe className="h-4 w-4 mr-2" />
+                                    {company.internationalFteStatus === "approved" ? "Remove FTE Status" : "Set FTE Approved"}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => void toggleActive(company.id, !company.isActive)}
+                                    className={company.isActive ? "text-rose-600" : "text-emerald-600"}
+                                  >
+                                    {company.isActive ? (
+                                      <>
+                                        <AlertCircle className="h-4 w-4 mr-2" />
+                                        Deactivate Company
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                                        Activate Company
+                                      </>
+                                    )}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </TableCell>
+                        )}
+                        {columnVisibility.status && (
+                          <TableCell>
+                            <StatusBadge
+                              status={
+                                !company.isActive ? "deactivated" :
+                                company.onboardingCompleted ? "active" : "pending"
+                              }
+                            />
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {!loading && !error && sorted.length > 0 && (
+              <div className="flex flex-col gap-4 border-t px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Showing <span className="font-medium">{startIndex + 1}</span> to{" "}
+                  <span className="font-medium">{endIndex}</span> of{" "}
+                  <span className="font-medium">{total}</span> companies
+                </p>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v) as 5 | 10 | 25 | 50)}>
+                    <SelectTrigger className="h-9 w-full sm:w-[130px]">
+                      <SelectValue placeholder="Rows per page" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5 / page</SelectItem>
+                      <SelectItem value="10">10 / page</SelectItem>
+                      <SelectItem value="25">25 / page</SelectItem>
+                      <SelectItem value="50">50 / page</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <div className="flex items-center gap-1.5">
+                    <Button size="sm" variant="outline" onClick={() => setPage(1)} disabled={safePage <= 1}>
+                      First
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1}>
+                      <ArrowUp className="h-4 w-4 rotate-90" />
+                    </Button>
+                    <div className="flex items-center gap-2 px-2 text-sm">
+                      <span className="text-muted-foreground">Page</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={totalPages}
+                        value={String(safePage)}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          if (v >= 1 && v <= totalPages) setPage(v);
+                        }}
+                        className="h-9 w-14 text-center"
+                      />
+                      <span className="text-muted-foreground">of {totalPages}</span>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages}>
+                      <ArrowDown className="h-4 w-4 rotate-90" />
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setPage(totalPages)} disabled={safePage >= totalPages}>
+                      Last
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        <Dialog open={openFilterFor !== null} onOpenChange={(open) => { if (!open) { setOpenFilterFor(null); setFilterDraft(""); } }}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Filter: {openFilterFor ? columns.find((c) => c.key === openFilterFor)?.label ?? openFilterFor : ""}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
                 <Input
-                  placeholder="Type to filter..."
+                  placeholder={`Enter ${openFilterFor ? columns.find((c) => c.key === openFilterFor)?.label : ""} to filter...`}
                   value={filterDraft}
                   onChange={(e) => setFilterDraft(e.target.value)}
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === "Enter") { setColumnFilters((prev) => ({ ...prev, [openFilterFor!]: filterDraft })); setOpenFilterFor(null); setFilterDraft(""); } }}
                 />
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      if (!openFilterFor) return;
-                      setColumnFilters((prev) => {
-                        const next = { ...prev } as any;
-                        delete next[openFilterFor];
-                        return next;
-                      });
-                      setOpenFilterFor(null);
-                      setFilterDraft("");
-                    }}
-                  >
-                    Clear
-                  </Button>
-                  <Button
-                    className="flex-1"
-                    onClick={() => {
-                      if (!openFilterFor) return;
-                      setColumnFilters((prev) => ({
-                        ...prev,
-                        [openFilterFor]: filterDraft,
-                      }));
-                      setOpenFilterFor(null);
-                      setFilterDraft("");
-                    }}
-                  >
-                    Apply
-                  </Button>
-                </div>
               </div>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog
-            open={ifteOpen}
-            onOpenChange={(open) => {
-              setIfteOpen(open);
-              if (!open) setIfteCompanyId("");
-            }}
-          >
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>International FTE</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-3 text-sm text-slate-700">
-                <p>Approve this company for International FTE (payroll-managed hiring).</p>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIfteOpen(false)}
-                  disabled={actionCompanyId === ifteCompanyId}
-                >
-                  Close
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => { if (!openFilterFor) return; setColumnFilters((prev) => { const next = { ...prev } as any; delete next[openFilterFor]; return next; }); setOpenFilterFor(null); setFilterDraft(""); }}>
+                  Clear
                 </Button>
-                <Button
-                  type="button"
-                  onClick={() => void approveInternationalFte(ifteCompanyId)}
-                  disabled={!ifteCompanyId || actionCompanyId === ifteCompanyId}
-                >
-                  Approve
+                <Button className="flex-1" onClick={() => { if (!openFilterFor) return; setColumnFilters((prev) => ({ ...prev, [openFilterFor]: filterDraft })); setOpenFilterFor(null); setFilterDraft(""); }}>
+                  Apply Filter
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {!loading && !error && sorted.length > 0 && (
-            <div className="mt-4 flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
-              <div className="text-sm text-muted-foreground">
-                Showing {startIndex + 1}-{Math.min(endIndex, total)} of {total}
-              </div>
-
-              <div className="flex flex-col gap-2 md:flex-row md:items-center">
-                <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v) as 5 | 10 | 25 | 50)}>
-                  <SelectTrigger className="w-full md:w-[140px]">
-                    <SelectValue placeholder="Rows" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5">5 / page</SelectItem>
-                    <SelectItem value="10">10 / page</SelectItem>
-                    <SelectItem value="25">25 / page</SelectItem>
-                    <SelectItem value="50">50 / page</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={safePage <= 1}
-                  >
-                    Prev
-                  </Button>
-                  <div className="min-w-[110px] text-center text-sm text-muted-foreground">
-                    Page {safePage} / {totalPages}
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={safePage >= totalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
               </div>
             </div>
-          )}
-        </div>
-      </Card>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={ifteOpen} onOpenChange={(open) => { setIfteOpen(open); if (!open) setIfteCompanyId(""); }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5 text-primary" />
+                International FTE Approval
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="rounded-lg bg-muted/50 p-4">
+                <p className="text-sm text-muted-foreground">
+                  Approve this company for International FTE (payroll-managed hiring). This will allow the company to hire international full-time employees through Findtern's managed payroll service.
+                </p>
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                <p className="text-sm text-amber-800">
+                  <strong>Note:</strong> This action can be reversed at any time from the company actions menu.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setIfteOpen(false)} disabled={actionCompanyId === ifteCompanyId}>
+                Cancel
+              </Button>
+              <Button onClick={() => void approveInternationalFte(ifteCompanyId)} disabled={!ifteCompanyId || actionCompanyId === ifteCompanyId}>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Approve FTE
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
     </AdminLayout>
   );
 }
-
-

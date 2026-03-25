@@ -22,10 +22,23 @@ import {
   AlertCircle,
   Briefcase,
   Building2,
+  User,
+  GraduationCap,
+  IndianRupee,
+  Star,
+  Award,
+  TrendingUp,
+  FileCheck,
+  Clock3,
+  MapPin,
+  Phone,
+  Code,
+  Bot,
+  Brain,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useRoute } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
 import {
   Select,
@@ -48,7 +61,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import findternLogo from "@assets/logo.png";
+import findternLogo from "/logo.png";
 import DOMPurify from "dompurify";
 import { cn } from "@/lib/utils";
 
@@ -267,6 +280,7 @@ export default function AdminInternDetailPage() {
   const [proposalSearch, setProposalSearch] = useState<string>("");
   const [openProposalDetails, setOpenProposalDetails] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<any | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("documents");
 
   const [timesheets, setTimesheets] = useState<any[]>([]);
   const [loadingTimesheets, setLoadingTimesheets] = useState(false);
@@ -1406,6 +1420,8 @@ export default function AdminInternDetailPage() {
       if (onboarding) {
         setIntern((prev) => (prev ? { ...prev, onboarding } : prev));
       }
+      await queryClient.invalidateQueries({ queryKey: ["/api/onboarding", internId] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/interns"] });
       setOpenEditSkills(false);
     } catch (e: any) {
       setSkillError(e?.message || "Failed to save skills.");
@@ -1584,137 +1600,217 @@ export default function AdminInternDetailPage() {
       description="Deep-dive into all data related to a specific intern."
     >
       <style>{scrollbarStyles}</style>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <Card className="p-5 border-emerald-100 bg-gradient-to-br from-emerald-50/70 to-white">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Overall score</p>
-              <p className="mt-2 text-3xl font-semibold tabular-nums text-emerald-800">{kpis.overall ?? "-"}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Avg of available ratings</p>
-            </div>
-            <div className="rounded-xl border bg-white px-2 py-1 text-[10px] font-semibold text-emerald-700">
-              FindScore
+      
+      {/* Modern Stats Cards */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
+        <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#0E6049]/5 to-transparent" />
+          <div className="relative p-5">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">FindScore</p>
+                <p className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0E6049]">{kpis.overall ?? "-"}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Overall Rating</p>
+              </div>
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-[#0E6049]/10 flex items-center justify-center shadow-sm">
+                <Star className="h-5 w-5 sm:h-6 sm:w-6 text-[#0E6049]" />
+              </div>
             </div>
           </div>
         </Card>
-        <Card className="p-5">
-          <p className="text-xs font-medium text-muted-foreground">Skills</p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums">{kpis.skills}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Top skills tracked</p>
+
+        <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent" />
+          <div className="relative p-5">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Skills</p>
+                <p className="text-2xl sm:text-3xl font-bold tracking-tight">{kpis.skills}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Top skills</p>
+              </div>
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-blue-100 flex items-center justify-center shadow-sm">
+                <Award className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
         </Card>
-        <Card className="p-5">
-          <p className="text-xs font-medium text-muted-foreground">Interviews</p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums">{kpis.interviews}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Interview attempts</p>
+
+        <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent" />
+          <div className="relative p-5">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Interviews</p>
+                <p className="text-2xl sm:text-3xl font-bold tracking-tight">{kpis.interviews}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Attempts</p>
+              </div>
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-purple-100 flex items-center justify-center shadow-sm">
+                <Clock3 className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
+              </div>
+            </div>
+          </div>
         </Card>
-        <Card className="p-5">
-          <p className="text-xs font-medium text-muted-foreground">Proposals</p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums">{kpis.proposals}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Company proposals</p>
+
+        <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent" />
+          <div className="relative p-5">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Proposals</p>
+                <p className="text-2xl sm:text-3xl font-bold tracking-tight">{kpis.proposals}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Received</p>
+              </div>
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-amber-100 flex items-center justify-center shadow-sm">
+                <FileCheck className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600" />
+              </div>
+            </div>
+          </div>
         </Card>
-        <Card className="p-5">
-          <p className="text-xs font-medium text-muted-foreground">Total payouts</p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums">
-            {kpis.currency} {kpis.totalPaid.toLocaleString()}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">Paid to candidate</p>
+
+        <Card className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent" />
+          <div className="relative p-5">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Total Payouts</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight text-emerald-600">{kpis.currency} {kpis.totalPaid.toLocaleString()}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Paid</p>
+              </div>
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-emerald-100 flex items-center justify-center shadow-sm">
+                <IndianRupee className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+              </div>
+            </div>
+          </div>
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.7fr),minmax(0,1.1fr)]">
-        {/* Summary card */}
-        <Card className="p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">{summary.name}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {summary.location}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Joined: {summary.joinedAt}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Badge variant="outline" className="border-emerald-500 bg-emerald-50 text-emerald-700">
-                  {summary.status}
-                </Badge>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2">
-                  <span className="text-muted-foreground">Communication</span>
-                  <span className="font-semibold text-emerald-700">{summary.ratings?.communication ?? "-"}</span>
+      <div className="grid gap-4 lg:grid-cols-1">
+        {/* Summary Card - Modern Design */}
+        <Card className="overflow-hidden border-0 shadow-md">
+          <div className="bg-gradient-to-r from-[#0E6049] to-[#0d7a5f] p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="h-16 w-16 overflow-hidden rounded-2xl border-4 border-white/30 bg-white shadow-lg flex items-center justify-center">
+                  <img
+                    src={profileImageSrc}
+                    alt="Profile"
+                    onError={() => {
+                      setProfileImageSrc(findternLogo);
+                      setProfileImageMode("contain");
+                    }}
+                    className={profileImageMode === "cover" ? "h-full w-full object-cover" : "h-full w-full object-contain p-1"}
+                  />
                 </div>
-                <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2">
-                  <span className="text-muted-foreground">Coding</span>
-                  <span className="font-semibold text-emerald-700">{summary.ratings?.coding ?? "-"}</span>
-                </div>
-                <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2">
-                  <span className="text-muted-foreground">Aptitude</span>
-                  <span className="font-semibold text-emerald-700">{summary.ratings?.aptitude ?? "-"}</span>
-                </div>
-                <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2">
-                  <span className="text-muted-foreground">AI Interview</span>
-                  <span className="font-semibold text-emerald-700">{summary.ratings?.interview ?? "-"}</span>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2 text-sm">
-              <div>
-                <p className="text-xs text-muted-foreground">Email</p>
-                <p>{summary.email}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Phone</p>
-                <p>{summary.phone}</p>
-              </div>
-              {summary.emergencyPhone && (
                 <div>
-                  <p className="text-xs text-muted-foreground">Emergency Contact</p>
-                  <p className="font-medium text-rose-600">
-                    {summary.emergencyName ? `${summary.emergencyName}: ` : ""}
-                    {summary.emergencyPhone}
-                  </p>
+                  <h2 className="text-xl font-bold text-white">{summary.name}</h2>
+                  <div className="flex items-center gap-2 mt-1">
+                    <MapPin className="h-3.5 w-3.5 text-white/70" />
+                    <p className="text-sm text-white/80">{summary.location}</p>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <CalendarDays className="h-3.5 w-3.5 text-white/70" />
+                    <p className="text-xs text-white/70">Joined: {summary.joinedAt}</p>
+                  </div>
                 </div>
-              )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="px-3 py-1.5 rounded-full bg-white/20 text-white text-xs font-medium backdrop-blur-sm border border-white/20">
+                  {summary.status}
+                </span>
+                <span className="px-3 py-1.5 rounded-full bg-white/20 text-white text-xs font-medium backdrop-blur-sm border border-white/20">
+                  FindScore: {kpis.overall ?? "-"}
+                </span>
+              </div>
             </div>
           </div>
-        </Card>
-
-        {/* Profile */}
-        <Card className="p-6">
-          <div className="flex flex-col items-center justify-center gap-3">
-            <div className="h-44 w-44 overflow-hidden rounded-2xl border bg-white flex items-center justify-center">
-              <img
-                src={profileImageSrc}
-                alt="Profile"
-                onError={() => {
-                  setProfileImageSrc(findternLogo);
-                  setProfileImageMode("contain");
-                }}
-                className={
-                  profileImageMode === "cover"
-                    ? "h-full w-full object-cover"
-                    : "h-full w-full "
-                }
-              />
+          
+          <div className="p-6 bg-gradient-to-b from-white to-muted/10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="flex items-center justify-between rounded-xl border bg-gradient-to-r from-blue-50/50 to-white p-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <TrendingUp className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <span className="text-xs font-medium text-muted-foreground">Communication</span>
+                </div>
+                <span className="text-lg font-bold text-blue-600">{summary.ratings?.communication ?? "-"}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border bg-gradient-to-r from-emerald-50/50 to-white p-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                    <Code className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <span className="text-xs font-medium text-muted-foreground">Coding</span>
+                </div>
+                <span className="text-lg font-bold text-emerald-600">{summary.ratings?.coding ?? "-"}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border bg-gradient-to-r from-purple-50/50 to-white p-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                    <Brain className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <span className="text-xs font-medium text-muted-foreground">Aptitude</span>
+                </div>
+                <span className="text-lg font-bold text-purple-600">{summary.ratings?.aptitude ?? "-"}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border bg-gradient-to-r from-amber-50/50 to-white p-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                    <Bot className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <span className="text-xs font-medium text-muted-foreground">AI Interview</span>
+                </div>
+                <span className="text-lg font-bold text-amber-600">{summary.ratings?.interview ?? "-"}</span>
+              </div>
             </div>
-            <p className="text-sm font-medium text-muted-foreground">Profile</p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+              <div className="flex items-center gap-3 rounded-xl border bg-white p-3">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm truncate">{summary.email}</span>
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border bg-white p-3">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">{summary.phone}</span>
+              </div>
+            </div>
+            
+            {summary.emergencyPhone && (
+              <div className="mt-3 flex items-center gap-3 rounded-xl border border-red-100 bg-red-50 p-3">
+                <AlertCircle className="h-4 w-4 text-red-500" />
+                <div className="flex-1">
+                  <span className="text-xs text-muted-foreground">Emergency: </span>
+                  <span className="text-sm font-medium text-red-700">
+                    {summary.emergencyName ? `${summary.emergencyName} - ` : ""}{summary.emergencyPhone}
+                  </span>
+                </div>
+              </div>
+              )}
           </div>
         </Card>
       </div>
 
+      {/* Charts Section - Modern Design */}
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Card className="p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">FindScore breakdown</p>
-              <p className="mt-1 text-sm text-muted-foreground">Communication, Coding, Aptitude, AI Interview</p>
+        <Card className="border-0 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden">
+          <div className="p-4 sm:p-5 border-b bg-gradient-to-r from-blue-500/5 to-transparent">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-sm sm:text-base flex items-center gap-2">
+                  <Star className="h-4 w-4 text-blue-600" />
+                  FindScore Breakdown
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Communication, Coding, Aptitude, AI Interview</p>
+              </div>
             </div>
           </div>
-          <div className="mt-4">
+          <div className="p-4 sm:p-5">
             {!findScoreChart.hasAny ? (
-              <p className="text-sm text-muted-foreground">No ratings available.</p>
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+                No ratings available
+              </div>
             ) : (
-              <ChartContainer config={findScoreChart.config as any} className="h-[260px] w-full">
+              <ChartContainer config={findScoreChart.config as any} className="h-[200px] sm:h-[240px] w-full">
                 <BarChart data={findScoreChart.data} margin={{ left: 8, right: 8 }}>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" />
                   <XAxis
@@ -1732,34 +1828,41 @@ export default function AdminInternDetailPage() {
                     domain={[0, 10]}
                   />
                   <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
-                  <Bar dataKey="score" radius={[6, 6, 0, 0]} fill="var(--color-score)" />
+                  <Bar dataKey="score" radius={[6, 6, 0, 0]} fill="#0E6049" />
                 </BarChart>
               </ChartContainer>
             )}
           </div>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">Payouts timeline</p>
-              <p className="mt-1 text-sm text-muted-foreground">Total paid per day</p>
+        <Card className="border-0 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden">
+          <div className="p-4 sm:p-5 border-b bg-gradient-to-r from-emerald-500/5 to-transparent">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-sm sm:text-base flex items-center gap-2">
+                  <IndianRupee className="h-4 w-4 text-emerald-600" />
+                  Payouts Timeline
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Total paid per day</p>
+              </div>
             </div>
           </div>
-          <div className="mt-4">
+          <div className="p-4 sm:p-5">
             {payoutsChart.data.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No payouts recorded.</p>
+              <div className="h-[200px] sm:h-[240px] flex items-center justify-center text-muted-foreground text-sm">
+                No payouts recorded
+              </div>
             ) : (
-              <ChartContainer config={payoutsChart.config as any} className="h-[260px] w-full">
+              <ChartContainer config={payoutsChart.config as any} className="h-[200px] sm:h-[240px] w-full">
                 <LineChart data={payoutsChart.data} margin={{ left: 8, right: 8 }}>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" />
                   <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
-                  <YAxis tickLine={false} axisLine={false} width={40} />
+                  <YAxis tickLine={false} axisLine={false} width={50} />
                   <ChartTooltip content={<ChartTooltipContent nameKey="date" />} />
                   <Line
                     type="monotone"
                     dataKey="amount"
-                    stroke="var(--color-amount)"
+                    stroke="#10b981"
                     strokeWidth={2}
                     dot={false}
                   />
@@ -1770,25 +1873,91 @@ export default function AdminInternDetailPage() {
         </Card>
       </div>
 
-      {/* Tabbed detail sections */}
-      <Card className="mt-4">
-        <Tabs defaultValue="documents" className="w-full">
-          <div className="mx-6 mt-4 overflow-x-auto custom-scrollbar-horizontal pb-2">
-            <TabsList className="flex w-fit bg-muted whitespace-nowrap">
-              <TabsTrigger value="documents">Documents</TabsTrigger>
-              <TabsTrigger value="profile">Profile</TabsTrigger>
-              <TabsTrigger value="interviews">Interviews</TabsTrigger>
-              <TabsTrigger value="proposals">Proposals</TabsTrigger>
-              <TabsTrigger value="timesheets">Timesheet</TabsTrigger>
-              <TabsTrigger value="payments">Payments</TabsTrigger>
-              <TabsTrigger value="bank">Bank Details</TabsTrigger>
+      {/* Tabbed detail sections - Modern Design */}
+      <Card className="mt-4 border-0 shadow-md overflow-hidden">
+        <div className="border-b bg-muted/30 px-4 sm:px-6">
+          <Tabs defaultValue="documents" className="w-full" onValueChange={(v) => setActiveTab(v)}>
+            <TabsList className="bg-transparent gap-1 h-auto p-0 -mb-px w-full justify-start overflow-x-auto">
+              <TabsTrigger value="documents" className={cn(
+                "capitalize px-4 py-3 border-b-2 border-transparent rounded-none transition-all whitespace-nowrap",
+                activeTab === "documents" 
+                  ? "border-[#0E6049] text-[#0E6049] bg-[#0E6049]/5 font-semibold" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}>
+                Documents
+              </TabsTrigger>
+              <TabsTrigger value="profile" className={cn(
+                "capitalize px-4 py-3 border-b-2 border-transparent rounded-none transition-all whitespace-nowrap",
+                activeTab === "profile" 
+                  ? "border-[#0E6049] text-[#0E6049] bg-[#0E6049]/5 font-semibold" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}>
+                Profile
+              </TabsTrigger>
+              <TabsTrigger value="interviews" className={cn(
+                "capitalize px-4 py-3 border-b-2 border-transparent rounded-none transition-all whitespace-nowrap",
+                activeTab === "interviews" 
+                  ? "border-[#0E6049] text-[#0E6049] bg-[#0E6049]/5 font-semibold" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}>
+                Interviews
+                <span className={cn(
+                  "ml-2 px-2 py-0.5 text-xs font-medium rounded-full",
+                  activeTab === "interviews" ? "bg-[#0E6049] text-white" : "bg-muted text-muted-foreground"
+                )}>
+                  {interviews.length}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="proposals" className={cn(
+                "capitalize px-4 py-3 border-b-2 border-transparent rounded-none transition-all whitespace-nowrap",
+                activeTab === "proposals" 
+                  ? "border-[#0E6049] text-[#0E6049] bg-[#0E6049]/5 font-semibold" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}>
+                Proposals
+                <span className={cn(
+                  "ml-2 px-2 py-0.5 text-xs font-medium rounded-full",
+                  activeTab === "proposals" ? "bg-[#0E6049] text-white" : "bg-muted text-muted-foreground"
+                )}>
+                  {proposals.length}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="timesheets" className={cn(
+                "capitalize px-4 py-3 border-b-2 border-transparent rounded-none transition-all whitespace-nowrap",
+                activeTab === "timesheets" 
+                  ? "border-[#0E6049] text-[#0E6049] bg-[#0E6049]/5 font-semibold" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}>
+                Timesheet
+              </TabsTrigger>
+              <TabsTrigger value="payments" className={cn(
+                "capitalize px-4 py-3 border-b-2 border-transparent rounded-none transition-all whitespace-nowrap",
+                activeTab === "payments" 
+                  ? "border-[#0E6049] text-[#0E6049] bg-[#0E6049]/5 font-semibold" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}>
+                Payments
+                <span className={cn(
+                  "ml-2 px-2 py-0.5 text-xs font-medium rounded-full",
+                  activeTab === "payments" ? "bg-[#0E6049] text-white" : "bg-muted text-muted-foreground"
+                )}>
+                  {payouts.length}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="bank" className={cn(
+                "capitalize px-4 py-3 border-b-2 border-transparent rounded-none transition-all whitespace-nowrap",
+                activeTab === "bank" 
+                  ? "border-[#0E6049] text-[#0E6049] bg-[#0E6049]/5 font-semibold" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}>
+                Bank Details
+              </TabsTrigger>
             </TabsList>
-          </div>
-
-          <TabsContent value="documents" className="px-6 pb-6 pt-4">
-            <ScrollArea className="h-[600px] pr-4">
-              <div className="w-full overflow-x-auto rounded-lg border custom-scrollbar-horizontal pb-3">
-                <Table className="min-w-[800px] border-collapse">
+            <TabsContent value="documents" className="m-0">
+          <div className="p-4 sm:p-6">
+            <ScrollArea className="h-[500px] pr-4">
+                <div className="w-full overflow-x-auto rounded-xl border custom-scrollbar-horizontal pb-3">
+                  <Table className="min-w-[800px] border-collapse">
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow className="bg-background">
                       <TableHead className="sticky left-0 z-40 bg-background border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Document</TableHead>
@@ -1845,14 +2014,16 @@ export default function AdminInternDetailPage() {
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
-              </div>
-            </ScrollArea>
+                  </Table>
+                </div>
+              </ScrollArea>
+            </div>
           </TabsContent>
 
-          <TabsContent value="payments" className="px-6 pb-6 pt-4">
-            <div className="h-[700px] overflow-y-auto pr-2 custom-scrollbar-horizontal">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <TabsContent value="payments" className="m-0">
+            <div className="p-4 sm:p-6">
+              <div className="h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Payout schedule</p>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -2283,11 +2454,13 @@ export default function AdminInternDetailPage() {
                 </DialogContent>
               </Dialog>
             </div>
+            </div>
           </TabsContent>
 
-          <TabsContent value="timesheets" className="px-6 pb-6 pt-4">
-            <ScrollArea className="h-[600px] pr-4">
-              <div className="flex items-start justify-between gap-2">
+          <TabsContent value="timesheets" className="m-0">
+            <div className="p-4 sm:p-6">
+              <ScrollArea className="h-[500px]">
+                <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="text-sm text-muted-foreground">Only approved timesheets are shown here.</p>
                   {timesheetsError ? <p className="text-xs text-rose-600 mt-1">{timesheetsError}</p> : null}
@@ -2601,11 +2774,13 @@ export default function AdminInternDetailPage() {
                 </DialogContent>
               </Dialog>
             </ScrollArea>
+            </div>
           </TabsContent>
 
-          <TabsContent value="profile" className="px-6 pb-6 pt-4">
-            <ScrollArea className="h-[600px] pr-4">
-              <div className="grid gap-4 md:grid-cols-2">
+          <TabsContent value="profile" className="m-0">
+            <div className="p-4 sm:p-6">
+              <ScrollArea className="h-[500px]">
+                <div className="grid gap-4 md:grid-cols-2">
                 <Card className="p-4 md:col-span-2">
                   <p className="text-sm font-medium text-muted-foreground">About Me</p>
                   <div className="mt-2 space-y-3 text-sm">
@@ -3007,11 +3182,13 @@ export default function AdminInternDetailPage() {
                 </Card>
               </div>
             </ScrollArea>
+            </div>
           </TabsContent>
 
-          <TabsContent value="interviews" className="px-6 pb-6 pt-4">
-            <ScrollArea className="h-[600px] pr-4">
-              <Dialog
+          <TabsContent value="interviews" className="m-0">
+            <div className="p-4 sm:p-6">
+              <ScrollArea className="h-[500px]">
+                <Dialog
                 open={openInterviewDetails}
                 onOpenChange={(next) => {
                   setOpenInterviewDetails(next);
@@ -3382,11 +3559,13 @@ export default function AdminInternDetailPage() {
                 )}
               </div>
             </ScrollArea>
+            </div>
           </TabsContent>
 
-          <TabsContent value="proposals" className="px-6 pb-6 pt-4">
-            <ScrollArea className="h-[600px] pr-4">
-              <Dialog
+          <TabsContent value="proposals" className="m-0">
+            <div className="p-4 sm:p-6">
+              <ScrollArea className="h-[500px]">
+                <Dialog
                 open={openProposalDetails}
                 onOpenChange={(next) => {
                   setOpenProposalDetails(next);
@@ -3801,12 +3980,18 @@ export default function AdminInternDetailPage() {
                 )}
               </div>
             </ScrollArea>
+            </div>
           </TabsContent>
 
-          <TabsContent value="bank" className="px-6 pb-6 pt-4">
-            <ScrollArea className="h-[600px] pr-4">
-              <Card className="p-4">
-                <div className="grid gap-3 md:grid-cols-2 text-sm">
+          <TabsContent value="bank" className="m-0">
+            <div className="p-4 sm:p-6">
+              <ScrollArea className="h-[500px] pr-4">
+                <Card className="p-5 border-0 shadow-md">
+                  <h3 className="font-semibold mb-4 flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-[#0E6049]" />
+                    Bank Details
+                  </h3>
+                  <div className="grid gap-4 md:grid-cols-2 text-sm">
                   <div>
                     <p className="text-xs text-muted-foreground">Bank Name</p>
                     <p>{String((summary as any)?.bankDetails?.bankName ?? "-")}</p>
@@ -3828,10 +4013,12 @@ export default function AdminInternDetailPage() {
                     <p>{String((summary as any)?.bankDetails?.upiId ?? "-")}</p>
                   </div>
                 </div>
-              </Card>
-            </ScrollArea>
+                </Card>
+              </ScrollArea>
+            </div>
           </TabsContent>
         </Tabs>
+        </div>
       </Card>
 
       <Dialog

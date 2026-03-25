@@ -462,10 +462,7 @@ export default function OnboardingPage() {
         }));
       });
 
-      setSkills((prev) => {
-        if (Array.isArray(prev) && prev.length > 0) return prev;
-        return normalizeSkills(onboarding.skills);
-      });
+      setSkills(normalizeSkills(onboarding.skills));
 
       setLanguagesData((prev) => {
         if (Array.isArray(prev) && prev.length > 0) return prev;

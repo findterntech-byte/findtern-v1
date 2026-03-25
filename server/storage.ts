@@ -284,6 +284,7 @@ export interface IStorage {
   deleteAdmin(id: string): Promise<void>;
 
   listAdmins(): Promise<Admin[]>;
+  updateAdmin(id: string, data: Partial<{ firstName: string; lastName: string; email: string }>): Promise<Admin | undefined>;
   updateAdminRoleKey(adminId: string, roleKey: string | null): Promise<Admin | undefined>;
   updateAdminPassword(adminId: string, password: string): Promise<Admin | undefined>;
   listAdminRoles(): Promise<AdminRole[]>;
@@ -980,6 +981,17 @@ export class PostgresStorage implements IStorage {
 
   async listAdmins(): Promise<Admin[]> {
     return db.select().from(admins).orderBy(desc(admins.createdAt));
+  }
+
+  async updateAdmin(id: string, data: Partial<{ firstName: string; lastName: string; email: string }>): Promise<Admin | undefined> {
+    const aid = String(id ?? "").trim();
+    if (!aid) return undefined;
+    const [admin] = await db
+      .update(admins)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(eq(admins.id, aid))
+      .returning();
+    return admin;
   }
 
   async updateAdminRoleKey(adminId: string, roleKey: string | null): Promise<Admin | undefined> {

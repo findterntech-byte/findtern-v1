@@ -780,11 +780,11 @@ export default function AdminInternsPage() {
     }
 
     if (internPayoutFilter) {
+      const paidTillNowMinor = Number(intern.paidTillNowMinor ?? 0) || 0;
       const toPayMinor = Number(intern.toPayMinor ?? 0) || 0;
       const hasUpcoming = Boolean(String(intern.upcomingPaymentDueAt ?? "").trim());
-      const payoutTotal = Number(intern.payoutTotalCount ?? 0) || 0;
-      const isNotStarted = payoutTotal <= 0;
-      const isComplete = !isNotStarted && (!hasUpcoming || toPayMinor <= 0);
+      const isNotStarted = paidTillNowMinor <= 0;
+      const isComplete = !isNotStarted && !hasUpcoming;
       const status = isNotStarted ? "Not started" : isComplete ? "Completed" : "Pending";
       if (status !== internPayoutFilter) return false;
     }
