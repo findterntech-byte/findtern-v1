@@ -47,6 +47,7 @@ import {
   Check,
   AlertCircle,
   X,
+  History,
 } from "lucide-react";
 import findternLogo from "/logo-1.jpg";
 import React, { ReactNode, useState, useCallback } from "react";
@@ -82,6 +83,7 @@ const navItems: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/admin/dashboard", required: "dashboard:read" },
   { label: "Proposal Tracker", icon: FolderKanban, href: "/admin/proposal-tracker", required: ["interns:read", "companies:read"] },
   { label: "Notifications", icon: Bell, href: "/admin/notifications", required: "notifications:read" },
+  { label: "Notification History", icon: History, href: "/admin/notification-history", required: "notifications:read" },
   { label: "Contact Messages", icon: FolderKanban, href: "/admin/contact", required: ["contact:intern:read", "contact:employer:read"] },
   { label: "Roles", icon: Shield, href: "/admin/roles", required: "roles:write" },
 ];

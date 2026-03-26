@@ -428,6 +428,7 @@ export interface IStorage {
     limit?: number,
   ): Promise<Notification[]>;
   markNotificationRead(id: string): Promise<Notification | undefined>;
+  getAllNotifications(): Promise<Notification[]>;
 
   // Profile views (Employer -> Intern)
   recordProfileView(data: InsertProfileView): Promise<ProfileView>;
@@ -2342,6 +2343,13 @@ export class PostgresStorage implements IStorage {
       .returning({ id: notifications.id } as any);
 
     return Array.isArray(updated) ? updated.length : 0;
+  }
+
+  async getAllNotifications(): Promise<Notification[]> {
+    return db
+      .select()
+      .from(notifications)
+      .orderBy(desc(notifications.createdAt));
   }
 
   async recordProfileView(data: InsertProfileView): Promise<ProfileView> {

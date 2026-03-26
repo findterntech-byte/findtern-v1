@@ -64,6 +64,7 @@ import AdminTransactionsPage from "@/pages/admin/admin-transactions";
 import AdminWebsitePage from "@/pages/admin/admin-website";
 import AdminContactMessagesPage from "@/pages/admin/admin-contact-messages";
 import AdminNotificationsPage from "@/pages/admin/admin-notifications";
+import NotificationHistoryPage from "@/pages/admin/notification-history";
 import AdminInternTermsPage from "@/pages/admin/admin-intern-terms";
 import AdminCompanyTermsPage from "@/pages/admin/admin-company-terms";
 import AdminInternNonDisclosureClausesPage from "@/pages/admin/admin-intern-non-disclosure-clauses";
@@ -794,6 +795,11 @@ function Router() {
           <Route path="/admin/notifications">
             <AdminRouteGuard>
               <AdminNotificationsPage />
+            </AdminRouteGuard>
+          </Route>
+          <Route path="/admin/notification-history">
+            <AdminRouteGuard>
+              <NotificationHistoryPage />
             </AdminRouteGuard>
           </Route>
           <Route path="/admin/reports">

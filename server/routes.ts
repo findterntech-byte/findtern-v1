@@ -9253,6 +9253,76 @@ export async function registerRoutes(
     }
   });
 
+  // Admin: notification history
+  app.get("/api/admin/notifications/history", requirePermission("notifications:read"), async (req, res) => {
+    try {
+      const page = Math.max(1, parseInt(String(req.query.page ?? "1")) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? "20")) || 20));
+      const offset = (page - 1) * limit;
+
+      const notifications = await storage.getAllNotifications();
+      
+      const users = await storage.getUsers();
+      const employers = await storage.getEmployers();
+      
+      const userById = new Map<string, any>();
+      for (const u of users as any[]) {
+        userById.set(String(u.id), u);
+      }
+      
+      const employerById = new Map<string, any>();
+      for (const e of employers as any[]) {
+        employerById.set(String(e.id), e);
+      }
+
+      const enriched = (notifications as any[]).map((n) => {
+        const recipientId = String(n.recipientId ?? "").trim();
+        const recipientType = String(n.recipientType ?? "").toLowerCase();
+        
+        let recipientName = recipientId;
+        let recipientEmail: string | undefined;
+        let recipientCompany: string | undefined;
+
+        if (recipientType === "intern") {
+          const user = userById.get(recipientId);
+          if (user) {
+            recipientName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || recipientId;
+            recipientEmail = user.email;
+          }
+        } else if (recipientType === "employer") {
+          const employer = employerById.get(recipientId);
+          if (employer) {
+            recipientName = employer.companyName ?? employer.name ?? recipientId;
+            recipientCompany = employer.companyName;
+            recipientEmail = employer.companyEmail;
+          }
+        }
+
+        return {
+          ...n,
+          recipientName,
+          recipientEmail,
+          recipientCompany,
+          sentAt: n.createdAt ?? n.sentAt ?? new Date().toISOString(),
+        };
+      });
+
+      enriched.sort((a, b) => {
+        const dateA = new Date(a.sentAt).getTime();
+        const dateB = new Date(b.sentAt).getTime();
+        return dateB - dateA;
+      });
+
+      const total = enriched.length;
+      const items = enriched.slice(offset, offset + limit);
+
+      return res.json({ items, total, page, limit });
+    } catch (error) {
+      console.error("Admin notification history error:", error);
+      return res.status(500).json({ message: "An error occurred while fetching notification history" });
+    }
+  });
+
   // Admin: list all projects
   app.get("/api/admin/projects", requirePermission("companies:read"), async (_req, res) => {
     try {
