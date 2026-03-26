@@ -406,7 +406,7 @@ export default function AdminNotificationsPage() {
                     <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-0.5" />
                     <div>
                       <p className="text-sm font-bold text-emerald-800">Success!</p>
-                      <p className="text-xs text-emerald-700 mt-0.5">{result}</p>
+                      {/* <p className="text-xs text-emerald-700 mt-0.5">{result}</p> */}
                     </div>
                   </div>
                 )}

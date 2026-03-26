@@ -1197,10 +1197,7 @@ export default function AdminDashboardPage() {
                               <span className="text-[10px] text-muted-foreground uppercase font-medium">Proposals</span>
                             </div>
                             <div className="h-8 w-[1px] bg-slate-100 dark:bg-slate-800" />
-                            <div className="flex flex-col">
-                              <span className="text-xs font-bold">{(user as any)?.onboardingStatus === 'onboarded' ? 'Yes' : 'No'}</span>
-                              <span className="text-[10px] text-muted-foreground uppercase font-medium">Onboarded</span>
-                            </div>
+                            
                           </div>
                         </TableCell>
                         <TableCell>
