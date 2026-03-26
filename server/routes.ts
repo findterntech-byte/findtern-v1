@@ -7172,6 +7172,28 @@ export async function registerRoutes(
         storage.getEmployers(),
       ]);
 
+      const excludedEmployerIds = new Set<string>();
+      for (const e of employers as any[]) {
+        const id = String(e?.id ?? "").trim();
+        if (!id) continue;
+        if (id.toLowerCase() === "admin") {
+          excludedEmployerIds.add(id.toLowerCase());
+          continue;
+        }
+        const email = String(e?.companyEmail ?? "").trim().toLowerCase();
+        if (email === "ai-interview@findtern.ai") excludedEmployerIds.add(id.toLowerCase());
+      }
+
+      const filteredInterviews = (interviews as any[]).filter((i) => {
+        const employerId = String(i?.employerId ?? i?.employer_id ?? "").trim().toLowerCase();
+        return !excludedEmployerIds.has(employerId);
+      });
+
+      const filteredProposals = (proposals as any[]).filter((p) => {
+        const employerId = String(p?.employerId ?? p?.employer_id ?? "").trim().toLowerCase();
+        return !excludedEmployerIds.has(employerId);
+      });
+
       const internUsersById = new Map<string, any>();
       for (const u of users as any[]) {
         if (String(u?.role ?? "").toLowerCase() === "intern") {
@@ -7192,8 +7214,8 @@ export async function registerRoutes(
       }
 
       return res.json({
-        proposals,
-        interviews,
+        proposals: filteredProposals,
+        interviews: filteredInterviews,
         interns: Array.from(internUsersById.values()),
         employers: Array.from(employersById.values()),
         projects: Array.from(projectsById.values()),
@@ -8493,6 +8515,7 @@ export async function registerRoutes(
       const proposalCountByInternId = new Map<string, number>();
       const proposalCountByProjectId = new Map<string, number>();
       let selectedCount = 0;
+      const proposalStatusCounts: Record<string, number> = {};
 
       for (const p of proposals as any[]) {
         const internId = String(p?.internId ?? p?.intern_id ?? "").trim();
@@ -8507,6 +8530,8 @@ export async function registerRoutes(
         }
 
         if (status === "accepted") selectedCount += 1;
+
+        proposalStatusCounts[status] = (proposalStatusCounts[status] || 0) + 1;
       }
 
       const nowMs = Date.now();
@@ -9022,6 +9047,7 @@ export async function registerRoutes(
           activeInternships,
           pendingApplications: scheduledInterviewCount,
           completedInterviews: completedInterviewsCount,
+          proposalStatusCounts,
         },
         users: {
           items: previewUsers,

@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Eye, Filter, Calendar, Building2, GraduationCap, FolderKanban, Info, Link as LinkIcon, FileText, Clock, User, Briefcase, Activity, CheckCircle2, XCircle, AlertCircle, CalendarRange, X } from "lucide-react";
+import { Search, Eye, Filter, Calendar, Building2, GraduationCap, FolderKanban, Info, Link as LinkIcon, FileText, Clock, User, Briefcase, Activity, CheckCircle2, XCircle, AlertCircle, CalendarRange, X, Send } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { format, isAfter, isBefore, startOfDay, endOfDay, subDays, startOfWeek, startOfMonth } from "date-fns";
 
@@ -211,14 +211,14 @@ export default function AdminProposalTrackerPage() {
       const intern = internsById.get(p.internId);
       const employer = employersById.get(p.employerId);
       const project = projectsById.get(p.projectId);
-      
+
       const searchStr = `${intern?.firstName} ${intern?.lastName} ${employer?.companyName} ${project?.projectName} ${p.status}`.toLowerCase();
       const matchesSearch = searchStr.includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === "all" || p.status === statusFilter;
       const matchesIntern = internFilter === "all" || p.internId === internFilter;
       const matchesEmployer = employerFilter === "all" || p.employerId === employerFilter;
       const matchesDate = isWithinDateRange(p.createdAt);
-      
+
       return matchesSearch && matchesStatus && matchesIntern && matchesEmployer && matchesDate;
     });
   }, [proposals, searchQuery, statusFilter, internFilter, employerFilter, startDate, endDate, internsById, employersById, projectsById]);
@@ -228,14 +228,14 @@ export default function AdminProposalTrackerPage() {
       const intern = internsById.get(i.internId);
       const employer = employersById.get(i.employerId);
       const project = i.projectId ? projectsById.get(i.projectId) : null;
-      
+
       const searchStr = `${intern?.firstName} ${intern?.lastName} ${employer?.companyName} ${project?.projectName || ""} ${i.status}`.toLowerCase();
       const matchesSearch = searchStr.includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === "all" || i.status === statusFilter;
       const matchesIntern = internFilter === "all" || i.internId === internFilter;
       const matchesEmployer = employerFilter === "all" || i.employerId === employerFilter;
       const matchesDate = isWithinDateRange(i.createdAt);
-      
+
       return matchesSearch && matchesStatus && matchesIntern && matchesEmployer && matchesDate;
     });
   }, [interviews, searchQuery, statusFilter, internFilter, employerFilter, startDate, endDate, internsById, employersById, projectsById]);
@@ -252,6 +252,7 @@ export default function AdminProposalTrackerPage() {
       case "rejected":
       case "cancelled":
       case "expired":
+      case "withdrawn":
         return <Badge className="bg-rose-100 text-rose-700 border-rose-200 flex items-center gap-1 w-fit"><XCircle className="h-3 w-3" />{status}</Badge>;
       case "sent":
       case "pending":
@@ -301,34 +302,194 @@ export default function AdminProposalTrackerPage() {
   return (
     <AdminLayout title="Advanced Tracker" description="Manage and monitor all intern proposals and interviews in one place.">
       <div className="space-y-6">
-        {/* Stats Bar */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          <Card className="p-3 bg-emerald-50 border-emerald-100">
-            <p className="text-[10px] font-bold text-emerald-700 uppercase mb-1">Total Proposals</p>
-            <p className="text-xl font-bold text-emerald-900">{proposals.length}</p>
-          </Card>
-          <Card className="p-3 bg-blue-50 border-blue-100">
-            <p className="text-[10px] font-bold text-blue-700 uppercase mb-1">Total Interviews</p>
-            <p className="text-xl font-bold text-blue-900">{interviews.length}</p>
-          </Card>
-          <Card className="p-3 bg-slate-50 border-slate-200">
-            <p className="text-[10px] font-bold text-slate-600 uppercase mb-1">Sent</p>
-            <p className="text-xl font-bold text-slate-900">{proposalStatusCounts["sent"] || 0}</p>
-          </Card>
-          <Card className="p-3 bg-slate-50 border-slate-200">
-            <p className="text-[10px] font-bold text-slate-600 uppercase mb-1">Scheduled</p>
-            <p className="text-xl font-bold text-slate-900">{interviewStatusCounts["scheduled"] || 0}</p>
-          </Card>
-          <Card className="p-3 bg-emerald-50 border-emerald-100">
-            <p className="text-[10px] font-bold text-emerald-700 uppercase mb-1">Accepted/Hired</p>
-            <p className="text-xl font-bold text-emerald-900">{(proposalStatusCounts["accepted"] || 0) + (proposalStatusCounts["hired"] || 0)}</p>
-          </Card>
-          <Card className="p-3 bg-rose-50 border-rose-100">
-            <p className="text-[10px] font-bold text-rose-700 uppercase mb-1">Expired/Rejected</p>
-            <p className="text-xl font-bold text-rose-900">{(proposalStatusCounts["expired"] || 0) + (proposalStatusCounts["rejected"] || 0)}</p>
-          </Card>
-        </div>
+        {/* Premium Stats Dashboard */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Proposals Card */}
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-700"></div>
+            <Card className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-0 overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg shadow-indigo-500/30">
+                    <FileText className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Proposals</h3>
+                    <p className="text-xs text-slate-400">Application pipeline</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-3xl font-black bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">{proposals.length}</p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider">Total Sent</p>
+                </div>
+              </div>
+              
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-3 p-4">
+                <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-sm hover:from-white/15 hover:to-white/10 transition-all duration-300 group/card">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-cyan-500/20 rounded-lg">
+                      <Send className="h-4 w-4 text-cyan-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Sent</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">{proposalStatusCounts["sent"] || 0}</p>
+                  <div className="mt-2 h-1 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 rounded-full" style={{ width: `${proposals.length > 0 ? ((proposalStatusCounts["sent"] || 0) / proposals.length * 100) : 0}%` }}></div>
+                  </div>
+                </div>
+                
+                <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-sm hover:from-white/15 hover:to-white/10 transition-all duration-300 group/card">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-emerald-500/20 rounded-lg">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Accepted</span>
+                  </div>
+                  <p className="text-2xl font-bold text-emerald-400">{proposalStatusCounts["accepted"] || 0}</p>
+                  <div className="mt-2 h-1 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full" style={{ width: `${proposals.length > 0 ? ((proposalStatusCounts["accepted"] || 0) / proposals.length * 100) : 0}%` }}></div>
+                  </div>
+                </div>
+                
+                <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-sm hover:from-white/15 hover:to-white/10 transition-all duration-300 group/card">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-teal-500/20 rounded-lg">
+                      <Briefcase className="h-4 w-4 text-teal-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Hired</span>
+                  </div>
+                  <p className="text-2xl font-bold text-teal-400">{proposalStatusCounts["hired"] || 0}</p>
+                  <div className="mt-2 h-1 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full" style={{ width: `${proposals.length > 0 ? ((proposalStatusCounts["hired"] || 0) / proposals.length * 100) : 0}%` }}></div>
+                  </div>
+                </div>
+                
+                <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-sm hover:from-white/15 hover:to-white/10 transition-all duration-300 group/card">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-amber-500/20 rounded-lg">
+                      <Clock className="h-4 w-4 text-amber-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Expired</span>
+                  </div>
+                  <p className="text-2xl font-bold text-amber-400">{proposalStatusCounts["expired"] || 0}</p>
+                  <div className="mt-2 h-1 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full" style={{ width: `${proposals.length > 0 ? ((proposalStatusCounts["expired"] || 0) / proposals.length * 100) : 0}%` }}></div>
+                  </div>
+                </div>
+                
+                <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-sm hover:from-white/15 hover:to-white/10 transition-all duration-300 group/card">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-rose-500/20 rounded-lg">
+                      <XCircle className="h-4 w-4 text-rose-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Rejected</span>
+                  </div>
+                  <p className="text-2xl font-bold text-rose-400">{proposalStatusCounts["rejected"] || 0}</p>
+                  <div className="mt-2 h-1 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-rose-500 to-rose-400 rounded-full" style={{ width: `${proposals.length > 0 ? ((proposalStatusCounts["rejected"] || 0) / proposals.length * 100) : 0}%` }}></div>
+                  </div>
+                </div>
+                
+                <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-sm hover:from-white/15 hover:to-white/10 transition-all duration-300 group/card">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-orange-500/20 rounded-lg">
+                      <X className="h-4 w-4 text-orange-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Withdrawn</span>
+                  </div>
+                  <p className="text-2xl font-bold text-orange-400">{proposalStatusCounts["withdrawn"] || 0}</p>
+                  <div className="mt-2 h-1 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full" style={{ width: `${proposals.length > 0 ? ((proposalStatusCounts["withdrawn"] || 0) / proposals.length * 100) : 0}%` }}></div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
 
+          {/* Interviews Card */}
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-700"></div>
+            <Card className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-0 overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl shadow-lg shadow-blue-500/30">
+                    <Calendar className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Interviews</h3>
+                    <p className="text-xs text-slate-400">Interview sessions</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-3xl font-black bg-gradient-to-r from-blue-400 via-cyan-400 to-teal-400 bg-clip-text text-transparent">{interviews.length}</p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider">Total Sessions</p>
+                </div>
+              </div>
+              
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-3 p-4">
+                <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-sm hover:from-white/15 hover:to-white/10 transition-all duration-300 group/card">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-amber-500/20 rounded-lg">
+                      <Clock className="h-4 w-4 text-amber-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Pending</span>
+                  </div>
+                  <p className="text-2xl font-bold text-amber-400">{interviewStatusCounts["pending"] || 0}</p>
+                  <div className="mt-2 h-1 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full" style={{ width: `${interviews.length > 0 ? ((interviewStatusCounts["pending"] || 0) / interviews.length * 100) : 0}%` }}></div>
+                  </div>
+                </div>
+                
+                <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-sm hover:from-white/15 hover:to-white/10 transition-all duration-300 group/card">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-blue-500/20 rounded-lg">
+                      <Calendar className="h-4 w-4 text-blue-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Scheduled</span>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-400">{interviewStatusCounts["scheduled"] || 0}</p>
+                  <div className="mt-2 h-1 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full" style={{ width: `${interviews.length > 0 ? ((interviewStatusCounts["scheduled"] || 0) / interviews.length * 100) : 0}%` }}></div>
+                  </div>
+                </div>
+                
+                <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-sm hover:from-white/15 hover:to-white/10 transition-all duration-300 group/card col-span-2">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-emerald-500/20 rounded-lg">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Completed</span>
+                  </div>
+                  <div className="flex items-end justify-between">
+                    <p className="text-3xl font-bold text-emerald-400">{interviewStatusCounts["completed"] || 0}</p>
+                    <div className="flex-1 ml-4 h-2 bg-slate-700 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500" style={{ width: `${interviews.length > 0 ? ((interviewStatusCounts["completed"] || 0) / interviews.length * 100) : 0}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-sm hover:from-white/15 hover:to-white/10 transition-all duration-300 group/card col-span-2">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-rose-500/20 rounded-lg">
+                      <XCircle className="h-4 w-4 text-rose-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Cancelled</span>
+                  </div>
+                  <div className="flex items-end justify-between">
+                    <p className="text-3xl font-bold text-rose-400">{interviewStatusCounts["cancelled"] || 0}</p>
+                    <div className="flex-1 ml-4 h-2 bg-slate-700 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-rose-500 to-pink-400 rounded-full transition-all duration-500" style={{ width: `${interviews.length > 0 ? ((interviewStatusCounts["cancelled"] || 0) / interviews.length * 100) : 0}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
         {/* Global Filters */}
         <Card className="p-4 bg-slate-50/50 border-slate-200 shadow-sm">
           <div className="space-y-4">
@@ -394,25 +555,25 @@ export default function AdminProposalTrackerPage() {
                 </Select>
 
                 <div className={`flex items-center gap-2 transition-all duration-300 ${dateRangeOption === "custom" ? "opacity-100 translate-x-0" : "opacity-50 pointer-events-none"}`}>
-                  <Input 
-                    type="date" 
-                    value={startDate} 
+                  <Input
+                    type="date"
+                    value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                     className="h-9 text-xs w-[140px] bg-white"
                   />
                   <span className="text-xs text-muted-foreground">to</span>
-                  <Input 
-                    type="date" 
-                    value={endDate} 
+                  <Input
+                    type="date"
+                    value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                     className="h-9 text-xs w-[140px] bg-white"
                   />
                 </div>
 
                 {(startDate || endDate) && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="h-8 text-[10px] text-rose-600 hover:text-rose-700 hover:bg-rose-50"
                     onClick={() => {
                       setDateRangeOption("all");
@@ -461,7 +622,7 @@ export default function AdminProposalTrackerPage() {
                 filteredInterns.map(intern => {
                   const internProposals = proposals.filter(p => p.internId === intern.id && isWithinDateRange(p.createdAt));
                   const internInterviews = interviews.filter(i => i.internId === intern.id && isWithinDateRange(i.createdAt));
-                  const lastActivity = [...internProposals, ...internInterviews].sort((a, b) => 
+                  const lastActivity = [...internProposals, ...internInterviews].sort((a, b) =>
                     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
                   )[0];
 
@@ -475,7 +636,7 @@ export default function AdminProposalTrackerPage() {
                           <Eye className="h-4 w-4 text-emerald-600" />
                         </Button>
                       </div>
-                      
+
                       <div className="flex items-center gap-3 mb-4">
                         <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold">
                           {intern.firstName[0]}{intern.lastName[0]}
@@ -535,7 +696,7 @@ export default function AdminProposalTrackerPage() {
                 filteredEmployers.map(employer => {
                   const employerProposals = proposals.filter(p => p.employerId === employer.id && isWithinDateRange(p.createdAt));
                   const employerInterviews = interviews.filter(i => i.employerId === employer.id && isWithinDateRange(i.createdAt));
-                  const lastActivity = [...employerProposals, ...employerInterviews].sort((a, b) => 
+                  const lastActivity = [...employerProposals, ...employerInterviews].sort((a, b) =>
                     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
                   )[0];
 
@@ -549,7 +710,7 @@ export default function AdminProposalTrackerPage() {
                           <Eye className="h-4 w-4 text-blue-600" />
                         </Button>
                       </div>
-                      
+
                       <div className="flex items-center gap-3 mb-4">
                         <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
                           {employer.companyName[0]}
@@ -608,13 +769,14 @@ export default function AdminProposalTrackerPage() {
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
-                  <SelectItem value="all">All Status ({proposals.length})</SelectItem>
-                  <SelectItem value="sent">Sent ({proposalStatusCounts["sent"] || 0})</SelectItem>
-                  <SelectItem value="accepted">Accepted ({proposalStatusCounts["accepted"] || 0})</SelectItem>
-                  <SelectItem value="rejected">Rejected ({proposalStatusCounts["rejected"] || 0})</SelectItem>
-                  <SelectItem value="hired">Hired ({proposalStatusCounts["hired"] || 0})</SelectItem>
-                  <SelectItem value="expired">Expired ({proposalStatusCounts["expired"] || 0})</SelectItem>
-                </SelectContent>
+                    <SelectItem value="all">All Status ({proposals.length})</SelectItem>
+                    <SelectItem value="sent">Sent ({proposalStatusCounts["sent"] || 0})</SelectItem>
+                    <SelectItem value="accepted">Accepted ({proposalStatusCounts["accepted"] || 0})</SelectItem>
+                    <SelectItem value="rejected">Rejected ({proposalStatusCounts["rejected"] || 0})</SelectItem>
+                    <SelectItem value="withdrawn">Withdrawn ({proposalStatusCounts["withdrawn"] || 0})</SelectItem>
+                    <SelectItem value="hired">Hired ({proposalStatusCounts["hired"] || 0})</SelectItem>
+                    <SelectItem value="expired">Expired ({proposalStatusCounts["expired"] || 0})</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
             </div>
@@ -688,12 +850,12 @@ export default function AdminProposalTrackerPage() {
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
-                  <SelectItem value="all">All Status ({interviews.length})</SelectItem>
-                  <SelectItem value="pending">Pending ({interviewStatusCounts["pending"] || 0})</SelectItem>
-                  <SelectItem value="scheduled">Scheduled ({interviewStatusCounts["scheduled"] || 0})</SelectItem>
-                  <SelectItem value="completed">Completed ({interviewStatusCounts["completed"] || 0})</SelectItem>
-                  <SelectItem value="cancelled">Cancelled ({interviewStatusCounts["cancelled"] || 0})</SelectItem>
-                </SelectContent>
+                    <SelectItem value="all">All Status ({interviews.length})</SelectItem>
+                    <SelectItem value="pending">Pending ({interviewStatusCounts["pending"] || 0})</SelectItem>
+                    <SelectItem value="scheduled">Scheduled ({interviewStatusCounts["scheduled"] || 0})</SelectItem>
+                    <SelectItem value="completed">Completed ({interviewStatusCounts["completed"] || 0})</SelectItem>
+                    <SelectItem value="cancelled">Cancelled ({interviewStatusCounts["cancelled"] || 0})</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
             </div>
@@ -751,7 +913,7 @@ export default function AdminProposalTrackerPage() {
                                 <div className="flex flex-wrap gap-1">
                                   {[i.slot1, i.slot2, i.slot3].map((s, idx) => s && (
                                     <Badge key={idx} variant="outline" className="text-[9px] font-normal py-0 h-5 border-slate-200 bg-white">
-                                      S{idx+1}: {formatDate(s, true)}
+                                      S{idx + 1}: {formatDate(s, true)}
                                     </Badge>
                                   ))}
                                   {!i.slot1 && !i.slot2 && !i.slot3 && <span className="text-[10px] text-muted-foreground italic">No slots provided yet</span>}
@@ -863,9 +1025,9 @@ export default function AdminProposalTrackerPage() {
                               </span>
                               <div className="text-sm">
                                 {isValueHTML ? (
-                                  <div 
+                                  <div
                                     className="prose prose-sm max-w-none prose-emerald"
-                                    dangerouslySetInnerHTML={{ __html: valStr }} 
+                                    dangerouslySetInnerHTML={{ __html: valStr }}
                                   />
                                 ) : (
                                   <span className="font-medium">{valStr}</span>
@@ -990,9 +1152,9 @@ export default function AdminProposalTrackerPage() {
                     <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 flex items-center justify-between">
                       <div className="flex flex-col gap-1">
                         <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Join Link</span>
-                        <a 
+                        <a
                           href={selectedInterview.meetingLink.startsWith('http') ? selectedInterview.meetingLink : `https://${selectedInterview.meetingLink}`}
-                          target="_blank" 
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm text-emerald-700 font-medium hover:underline break-all"
                         >

@@ -46,6 +46,9 @@ import {
   ExternalLink,
   ChevronRight,
   ViewIcon,
+  Send,
+  X,
+  XCircle,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -86,6 +89,7 @@ type AdminDashboardResponse = {
     completedInterviews: number;
     totalSignups?: number;
     incompleteProfiles?: number;
+    proposalStatusCounts?: Record<string, number>;
   };
   users: {
     items: Array<{
@@ -272,6 +276,8 @@ export default function AdminDashboardPage() {
 
   const incompleteProfiles = Number((dashboard?.stats as any)?.incompleteProfiles ?? 0);
   const totalSignups = Number((dashboard?.stats as any)?.totalSignups ?? 0);
+  const proposalStatusCounts = (dashboard?.stats as any)?.proposalStatusCounts ?? {};
+  const totalProposalsCount = Object.values(proposalStatusCounts).reduce((sum: number, v: any) => sum + Number(v || 0), 0);
 
   const internships = dashboard?.internships?.items ?? [];
   const projectsTotal = dashboard?.internships?.total ?? 0;
@@ -625,7 +631,7 @@ export default function AdminDashboardPage() {
           <StatCard
             title="Total Companies"
             value={dashboardLoading ? "..." : activeCompanies}
-            subValue={!dashboardLoading && incompleteProfiles > 0 ? `${incompleteProfiles} pending setup` : "All setup completed"}
+            subValue="Setup completed"
             icon={Building2}
             color="emerald"
             onClick={() => setLocation("/admin/companies")}
@@ -740,78 +746,98 @@ export default function AdminDashboardPage() {
           </Card>
 
           <Card className="p-6 shadow-sm border-slate-200 dark:border-slate-800">
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Placement Stats</h3>
-                <p className="text-2xl font-bold tracking-tight mt-1">Hiring Distribution</p>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Proposal Pipeline</h3>
+                <p className="text-2xl font-bold tracking-tight mt-1">Status Distribution</p>
               </div>
-              <div className="p-2 bg-slate-50 dark:bg-slate-900 rounded-lg">
-                <TrendingUp className="h-4 w-4 text-slate-400" />
-              </div>
-            </div>
-            <div className="flex items-center justify-center gap-8">
-              <div className="relative">
-                <ResponsiveContainer width={160} height={160}>
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: "Full-time", value: hiredFullTime.length, color: "#3b82f6" },
-                        { name: "Internship", value: hiredInternship.length, color: "#8b5cf6" },
-                      ]}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={70}
-                      paddingAngle={4}
-                      dataKey="value"
-                    >
-                      {[
-                        { name: "Full-time", value: hiredFullTime.length, color: "#3b82f6" },
-                        { name: "Internship", value: hiredInternship.length, color: "#8b5cf6" },
-                      ].map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <span className="text-2xl font-bold">{hiredFullTime.length + hiredInternship.length}</span>
-                    <p className="text-[10px] text-muted-foreground">Total</p>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-3 w-3 rounded-full bg-blue-500" />
-                  <div>
-                    <span className="text-sm font-bold">{hiredFullTime.length}</span>
-                    <p className="text-[10px] text-muted-foreground">Full-time Hires</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="h-3 w-3 rounded-full bg-purple-500" />
-                  <div>
-                    <span className="text-sm font-bold">{hiredInternship.length}</span>
-                    <p className="text-[10px] text-muted-foreground">Internship Hires</p>
-                  </div>
-                </div>
+              <div className="text-right">
+                <p className="text-3xl font-black bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">{totalProposalsCount}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total</p>
               </div>
             </div>
-            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{totalProposals}</p>
-                  <p className="text-[10px] text-muted-foreground">Total Proposals</p>
+            <div className="flex items-center justify-center">
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: "Sent", value: proposalStatusCounts["sent"] || 0, color: "#06b6d4" },
+                      { name: "Accepted", value: proposalStatusCounts["accepted"] || 0, color: "#10b981" },
+                      { name: "Hired", value: proposalStatusCounts["hired"] || 0, color: "#14b8a6" },
+                      { name: "Expired", value: proposalStatusCounts["expired"] || 0, color: "#f59e0b" },
+                      { name: "Rejected", value: proposalStatusCounts["rejected"] || 0, color: "#f43f5e" },
+                      { name: "Withdrawn", value: proposalStatusCounts["withdrawn"] || 0, color: "#f97316" },
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {[
+                      { name: "Sent", value: proposalStatusCounts["sent"] || 0, color: "#06b6d4" },
+                      { name: "Accepted", value: proposalStatusCounts["accepted"] || 0, color: "#10b981" },
+                      { name: "Hired", value: proposalStatusCounts["hired"] || 0, color: "#14b8a6" },
+                      { name: "Expired", value: proposalStatusCounts["expired"] || 0, color: "#f59e0b" },
+                      { name: "Rejected", value: proposalStatusCounts["rejected"] || 0, color: "#f43f5e" },
+                      { name: "Withdrawn", value: proposalStatusCounts["withdrawn"] || 0, color: "#f97316" },
+                    ].map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="grid grid-cols-3 gap-2 mt-4">
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-cyan-50 dark:bg-cyan-950/30">
+                <div className="h-2.5 w-2.5 rounded-full bg-cyan-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-muted-foreground truncate">Sent</p>
+                  <p className="text-sm font-bold text-cyan-600 dark:text-cyan-400">{proposalStatusCounts["sent"] || 0}</p>
                 </div>
-                <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                  <p className="text-lg font-bold text-purple-600 dark:text-purple-400">{totalAIInterviews}</p>
-                  <p className="text-[10px] text-muted-foreground">All Interviews</p>
+              </div>
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
+                <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-muted-foreground truncate">Accepted</p>
+                  <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{proposalStatusCounts["accepted"] || 0}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-teal-50 dark:bg-teal-950/30">
+                <div className="h-2.5 w-2.5 rounded-full bg-teal-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-muted-foreground truncate">Hired</p>
+                  <p className="text-sm font-bold text-teal-600 dark:text-teal-400">{proposalStatusCounts["hired"] || 0}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30">
+                <div className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-muted-foreground truncate">Expired</p>
+                  <p className="text-sm font-bold text-amber-600 dark:text-amber-400">{proposalStatusCounts["expired"] || 0}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-rose-50 dark:bg-rose-950/30">
+                <div className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-muted-foreground truncate">Rejected</p>
+                  <p className="text-sm font-bold text-rose-600 dark:text-rose-400">{proposalStatusCounts["rejected"] || 0}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-orange-50 dark:bg-orange-950/30">
+                <div className="h-2.5 w-2.5 rounded-full bg-orange-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-muted-foreground truncate">Withdrawn</p>
+                  <p className="text-sm font-bold text-orange-600 dark:text-orange-400">{proposalStatusCounts["withdrawn"] || 0}</p>
                 </div>
               </div>
             </div>
           </Card>
         </div>
+
+
 
         {/* Hired Interns Sections */}
         <div className="grid gap-6 lg:grid-cols-2">
