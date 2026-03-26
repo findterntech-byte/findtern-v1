@@ -15379,25 +15379,190 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
       const internIds = Array.from(new Set(hiredProposals.map((p: any) => String(p?.internId ?? p?.intern_id ?? "").trim()).filter(Boolean)));
       const internEmployerDues = [];
 
+      const monthsFromDuration = (duration: unknown) => {
+        switch (String(duration ?? "").trim().toLowerCase()) {
+          case "2m": return 2;
+          case "3m": return 3;
+          case "6m": return 6;
+          default: return 1;
+        }
+      };
+
+      const addMonthsToIso = (iso: string, months: number) => {
+        const s = String(iso ?? "").trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+        const [yy, mm, dd] = s.split("-").map((v) => Number(v));
+        const base = new Date(yy, mm - 1, dd);
+        if (Number.isNaN(base.getTime())) return "";
+        const d = new Date(base);
+        d.setMonth(d.getMonth() + Math.max(0, months));
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      };
+
       for (const internId of internIds) {
         try {
-          const duesRes = await fetch(`${req.protocol}://${req.get("host")}/api/admin/interns/${internId}/employer-dues`, {
-            headers: { Cookie: req.get("Cookie") || "" },
+          const internOnboarding = await storage.getInternOnboardingByUserId(internId).catch(() => undefined);
+          const findternScoreRaw = (internOnboarding as any)?.extraData?.findternScore;
+          const findternScoreNum = Number(findternScoreRaw ?? 0);
+          const findternScore = Number.isFinite(findternScoreNum) ? findternScoreNum : 0;
+          const isLowScore = findternScore > 0 && findternScore < 6;
+
+          const internProposals = proposals.filter((p: any) => String(p?.internId ?? p?.intern_id ?? "") === internId);
+          const internHired = internProposals.filter((p: any) => {
+            const status = String(p?.status ?? "").trim().toLowerCase();
+            if (status === "hired") return true;
+            const offer = (p as any)?.offerDetails ?? (p as any)?.offer_details ?? {};
+            const ft = (offer as any)?.fullTimeOffer ?? null;
+            const hasFullTimeOffer = !!ft && typeof ft === "object";
+            return hasFullTimeOffer;
           });
-          if (duesRes.ok) {
-            const duesData = await duesRes.json();
-            const dues = Array.isArray(duesData.employerDues) ? duesData.employerDues : [];
-            for (const d of dues) {
-              if (String(d?.employerId ?? "") === employerId) {
-                internEmployerDues.push({
-                  ...d,
-                  internId,
-                  internName: getInternName(hiredProposals.find((p: any) => String(p?.internId ?? p?.intern_id ?? "") === internId)),
-                });
-              }
+
+          const internPayments = await storage.listEmployerPaymentsByEmployerId(employerId, { status: "paid", limit: 1000 }).catch(() => []);
+
+          const orderProposalIds = (row: any) => {
+            const raw = (row as any)?.raw ?? {};
+            const notes = raw?.notes ?? raw?.order?.notes ?? {};
+            const idsRaw = (notes as any)?.proposalIds ?? (notes as any)?.proposal_ids ?? (raw as any)?.proposalIds ?? (raw as any)?.proposal_ids ?? [];
+            if (Array.isArray(idsRaw)) return idsRaw.map((v: any) => String(v ?? "").trim()).filter(Boolean);
+            const s = String(idsRaw ?? "").trim();
+            if (!s) return [];
+            if (s.includes(",")) return s.split(",").map((v) => String(v ?? "").trim()).filter(Boolean);
+            return [s];
+          };
+
+          const orderPurpose = (row: any) => {
+            const raw = (row as any)?.raw ?? {};
+            const notes = raw?.notes ?? raw?.order?.notes ?? {};
+            return String((notes as any)?.purpose ?? "").trim().toLowerCase();
+          };
+
+          for (const p of internHired) {
+            const proposalId = String(p?.id ?? "").trim();
+            const offer = (p?.offerDetails ?? p?.offer_details ?? {}) as any;
+            const fullTimeOffer = (offer as any)?.fullTimeOffer ?? null;
+            const hasFullTimeOffer = !!fullTimeOffer && typeof fullTimeOffer === "object";
+            const startDate = String(offer?.startDate ?? offer?.start_date ?? "").trim();
+            const duration = hasFullTimeOffer ? "full-time" : String(offer?.duration ?? "").trim();
+            const totalMonths = hasFullTimeOffer ? 1 : Math.max(1, monthsFromDuration(duration));
+
+            const currencyRaw = String(
+              (hasFullTimeOffer ? (fullTimeOffer as any)?.ctcCurrency : offer?.currency) ?? p?.currency ?? "INR",
+            ).trim().toUpperCase();
+            const currency = currencyRaw === "USD" ? "USD" : "INR";
+
+            const annualCtc = Number((fullTimeOffer as any)?.annualCtc ?? 0);
+            const fullTimeFeeMajor = hasFullTimeOffer && Number.isFinite(annualCtc) && annualCtc > 0
+              ? Math.max(0, Math.round((annualCtc * 8.33) / 100)) : 0;
+
+            const monthlyMajorRaw = Number(offer?.monthlyAmount ?? offer?.monthly_amount ?? 0);
+            const monthlyMajor = Number.isFinite(monthlyMajorRaw) ? Math.max(0, monthlyMajorRaw) : 0;
+
+            const totalPriceMajorRaw = Number(offer?.totalPrice ?? offer?.total_price ?? 0);
+            const totalPriceMajor = Number.isFinite(totalPriceMajorRaw) ? Math.max(0, totalPriceMajorRaw) : 0;
+
+            const effectiveMonthlyMajor = monthlyMajor > 0 ? monthlyMajor : totalPriceMajor > 0 ? totalPriceMajor / Math.max(1, totalMonths) : 0;
+
+            let monthlyAmountMinor = hasFullTimeOffer ? 0 : Math.round(Math.max(0, effectiveMonthlyMajor) * 100);
+            let totalAmountMinorRaw = hasFullTimeOffer
+              ? Math.round(fullTimeFeeMajor * 100)
+              : totalPriceMajor > 0
+                ? Math.round(Math.max(0, totalPriceMajor) * 100)
+                : monthlyAmountMinor * totalMonths;
+
+            if (currency === "USD") {
+              monthlyAmountMinor = Math.round(monthlyAmountMinor * 100);
+              totalAmountMinorRaw = Math.round(totalAmountMinorRaw * 100);
             }
+
+            const internMonthlyAmountMinorBase = Math.floor(monthlyAmountMinor / 2);
+            const internMonthlyAmountMinor = isLowScore ? 0 : internMonthlyAmountMinorBase;
+            const internTotalAmountMinor = internMonthlyAmountMinor * totalMonths;
+
+            const employerPaidPayments = internPayments.filter((o: any) => {
+              if (String(o?.status ?? "").trim().toLowerCase() !== "paid") return false;
+              const purpose = orderPurpose(o);
+              if (purpose !== "employer_monthly_payment" && purpose !== "employer_checkout") return false;
+              if (purpose === "employer_checkout") return orderProposalIds(o).includes(proposalId);
+              if (purpose === "employer_monthly_payment") return orderProposalIds(o).includes(proposalId);
+              return false;
+            });
+
+            const hasTotalCheckoutPaid = employerPaidPayments.some((o: any) => {
+              const raw = (o as any)?.raw ?? {};
+              const notes = raw?.notes ?? raw?.order?.notes ?? {};
+              return orderPurpose(o) === "employer_checkout" && String((notes as any)?.paymentMode ?? "").trim().toLowerCase() === "total";
+            });
+
+            const paidAmountMinor = employerPaidPayments.reduce((sum: number, o: any) => {
+              const amt = Number((o as any)?.amountMinor ?? 0);
+              const payCur = String((o as any)?.currency ?? "INR").trim().toUpperCase();
+              const inrAmt = payCur === "USD" ? Math.round(amt * 100) : amt;
+              return sum + (Number.isFinite(inrAmt) ? Math.max(0, inrAmt) : 0);
+            }, 0);
+
+            const paidMonths = hasFullTimeOffer
+              ? (paidAmountMinor >= totalAmountMinorRaw && totalAmountMinorRaw > 0) ? 1 : 0
+              : hasTotalCheckoutPaid
+                ? totalMonths
+                : employerPaidPayments.reduce((count: number, o: any) => {
+                    const purpose = orderPurpose(o);
+                    if (purpose === "employer_monthly_payment") return count + 1;
+                    if (purpose === "employer_checkout") {
+                      const raw = (o as any)?.raw ?? {};
+                      const notes = raw?.notes ?? raw?.order?.notes ?? {};
+                      if (String((notes as any)?.paymentMode ?? "").trim().toLowerCase() === "monthly") return count + 1;
+                    }
+                    return count;
+                  }, 0);
+
+            const remainingMonths = hasFullTimeOffer
+              ? paidMonths >= 1 ? 0 : 1
+              : hasTotalCheckoutPaid ? 0 : Math.max(0, totalMonths - Math.max(0, paidMonths));
+
+            const totalAmountMinor = hasFullTimeOffer ? totalAmountMinorRaw
+              : (hasTotalCheckoutPaid && totalMonths > 1) ? Math.max(0, Math.round(totalAmountMinorRaw * 0.9)) : totalAmountMinorRaw;
+
+            const dueAmountMinor = hasFullTimeOffer
+              ? Math.max(0, totalAmountMinor - paidAmountMinor)
+              : hasTotalCheckoutPaid ? 0 : monthlyAmountMinor * remainingMonths;
+
+            const nextMonthIndex = Math.max(1, paidMonths + 1);
+            const upcomingPaymentDate = hasFullTimeOffer ? "" : dueAmountMinor <= 0 ? "" : startDate ? addMonthsToIso(startDate, nextMonthIndex) : "";
+
+            const projectId = String(p?.projectId ?? p?.project_id ?? "").trim();
+            const proj = projectById.get(projectId);
+            const projectName = String(
+              p?.projectName ?? p?.project_name ?? (proj as any)?.projectName ?? (proj as any)?.project_name ?? (proj as any)?.name ?? offer?.roleTitle ?? ""
+            ).trim() || null;
+
+            const status = remainingMonths > 0 ? "active" : "completed";
+
+            internEmployerDues.push({
+              proposalId,
+              employerId,
+              internId,
+              projectId: projectId || null,
+              projectName,
+              startDate: startDate || null,
+              duration: duration || null,
+              totalMonths,
+              paidMonths,
+              remainingMonths,
+              status,
+              upcomingPaymentDate: upcomingPaymentDate || null,
+              currency,
+              monthlyAmountMinor,
+              totalAmountMinor,
+              dueAmountMinor,
+              internMonthlyAmountMinor,
+              internTotalAmountMinor,
+              internDueAmountMinor,
+              internName: getInternName(p),
+            });
           }
-        } catch {}
+        } catch (e) {
+          console.error("Error computing intern employer dues:", e);
+        }
       }
 
       return res.json({
@@ -15944,6 +16109,8 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
             "",
         ).trim() || null;
 
+        const status = remainingMonths > 0 ? "active" : "completed";
+
         return {
           proposalId,
           employerId,
@@ -15955,6 +16122,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           totalMonths,
           paidMonths,
           remainingMonths,
+          status,
           internPaidMonths: internPaidMonthsTotal,
           internRemainingMonths,
           upcomingPaymentDate: upcomingPaymentDate || null,

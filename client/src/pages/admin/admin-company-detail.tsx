@@ -1023,7 +1023,7 @@ export default function AdminCompanyDetailPage() {
                         </div>
                       </Card>
                     )}
-                    {jd && <Card className="p-5"><h4 className="font-bold mb-3">Job Description</h4><p className="text-sm text-muted-foreground whitespace-pre-wrap">{jd}</p></Card>}
+                    {jd && <Card className="p-5"><h4 className="font-bold mb-3">Job Description</h4><div className="text-sm text-muted-foreground [&>p]:mb-3" dangerouslySetInnerHTML={{ __html: jd }} /></Card>}
                     <div className="flex items-center justify-between pt-4 border-t bg-slate-50 -mx-1 px-4 py-3 rounded-b-xl">
                       <div className="text-sm text-muted-foreground"><span className="font-medium">Created:</span> {createdAt}</div>
                       <Button disabled={!internId} onClick={() => { if (!internId) return; setLocation(`/admin/interns/${encodeURIComponent(internId)}`); }}><User className="h-4 w-4 mr-2" /> View Candidate</Button>
