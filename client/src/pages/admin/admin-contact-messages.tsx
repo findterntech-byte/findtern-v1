@@ -87,8 +87,9 @@ const parseSupportMeta = (message: string) => {
         .filter(Boolean)
     : [];
 
-  const kind = kindRaw && (kindRaw === "feedback" || kindRaw === "report") ? kindRaw : null;
-  const role = userTypeRaw && (userTypeRaw === "intern" || userTypeRaw === "employer") ? userTypeRaw : null;
+  const kind = kindRaw && (kindRaw === "feedback" || kindRaw === "report" || kindRaw === "website") ? kindRaw : null;
+  const validRoles = ["intern", "employer", "intern web app", "employer web app", "general", "hiring partner"];
+  const role = userTypeRaw && validRoles.includes(userTypeRaw.toLowerCase()) ? userTypeRaw : null;
 
   const body = bodyFromMeta ?? String(message ?? "");
   return { kind, role, video, attachments, metaMap, body };
@@ -132,13 +133,11 @@ export default function AdminContactMessagesPage() {
   const qc = useQueryClient();
   const [viewOpen, setViewOpen] = useState(false);
   const [selected, setSelected] = useState<ContactMessage | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const [filterRole, setFilterRole] = useState<string>("all");
   const [filterKind, setFilterKind] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [filterQueryType, setFilterQueryType] = useState<string>("all");
-  const [filterCountry, setFilterCountry] = useState<string>("all");
-  const [filterHasUploads, setFilterHasUploads] = useState<string>("all");
   const [search, setSearch] = useState<string>("");
 
   const { data, isLoading } = useQuery<{ items: ContactMessage[] }>({
@@ -176,21 +175,15 @@ export default function AdminContactMessagesPage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [enrichedItems]);
 
-  const countryOptions = useMemo(() => {
-    const set = new Set<string>();
-    enrichedItems.forEach((x) => {
-      const v = String(x.message.countryCode ?? "").trim();
-      if (v) set.add(v);
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [enrichedItems]);
-
   const filteredItems = useMemo(() => {
     const q = String(search ?? "").trim().toLowerCase();
 
     return enrichedItems.filter((x) => {
       const m = x.message;
       const meta = x.meta;
+
+      const subjectLower = String(m.subject ?? "").toLowerCase();
+      if (subjectLower.includes("full-time offer") || subjectLower.includes("full time offer")) return false;
 
       if (filterRole !== "all" && String(meta.role ?? "") !== filterRole) return false;
       if (filterKind !== "all" && String(meta.kind ?? "") !== filterKind) return false;
@@ -199,13 +192,6 @@ export default function AdminContactMessagesPage() {
         if (filterStatus === "new" && isRead) return false;
         if (filterStatus === "read" && !isRead) return false;
       }
-      if (filterQueryType !== "all" && String(m.queryType ?? "") !== filterQueryType) return false;
-      if (filterCountry !== "all" && String(m.countryCode ?? "") !== filterCountry) return false;
-      if (filterHasUploads !== "all") {
-        const has = x.uploads.length > 0;
-        if (filterHasUploads === "yes" && !has) return false;
-        if (filterHasUploads === "no" && has) return false;
-      }
 
       if (!q) return true;
       const hay = [
@@ -213,8 +199,6 @@ export default function AdminContactMessagesPage() {
         m.email,
         m.phone ?? "",
         m.subject ?? "",
-        m.queryType ?? "",
-        m.countryCode ?? "",
         meta.body ?? "",
       ]
         .map((v) => String(v ?? "").toLowerCase())
@@ -224,10 +208,7 @@ export default function AdminContactMessagesPage() {
     });
   }, [
     enrichedItems,
-    filterCountry,
-    filterHasUploads,
     filterKind,
-    filterQueryType,
     filterRole,
     filterStatus,
     search,
@@ -253,6 +234,28 @@ export default function AdminContactMessagesPage() {
     },
   });
 
+  const bulkMarkReadMutation = useMutation({
+    mutationFn: async ({ ids, isRead }: { ids: string[]; isRead: boolean }) => {
+      await Promise.all(ids.map(id => apiRequest("PUT", `/api/admin/contact/messages/${id}/read`, { isRead })));
+      return true;
+    },
+    onSuccess: async () => {
+      setSelectedIds(new Set());
+      await qc.invalidateQueries({ queryKey: ["/api/admin/contact/messages"] });
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map(id => apiRequest("DELETE", `/api/admin/contact/messages/${id}`)));
+      return true;
+    },
+    onSuccess: async () => {
+      setSelectedIds(new Set());
+      await qc.invalidateQueries({ queryKey: ["/api/admin/contact/messages"] });
+    },
+  });
+
   const selectedMeta = useMemo(() => {
     if (!selected) return null;
     return parseSupportMeta(selected.message);
@@ -266,7 +269,11 @@ export default function AdminContactMessagesPage() {
     return Array.from(new Set(list.filter(Boolean)));
   }, [selectedMeta]);
 
-  const newCount = items.filter(m => !m.isRead).length;
+  const filteredAllItems = items.filter(m => {
+    const subjectLower = String(m.subject ?? "").toLowerCase();
+    return !subjectLower.includes("full-time offer") && !subjectLower.includes("full time offer");
+  });
+  const newCount = filteredAllItems.filter(m => !m.isRead).length;
 
   const renderFormattedBody = (text: string) => {
     const lines = text.split("\n");
@@ -317,7 +324,7 @@ export default function AdminContactMessagesPage() {
     <AdminLayout title="Inbox" description="Manage and respond to messages from users.">
       <div className="space-y-6">
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="p-4 flex items-center gap-4 bg-emerald-50 border-emerald-100 shadow-sm">
             <div className="p-3 bg-emerald-100 rounded-xl text-emerald-700">
               <Inbox className="h-5 w-5" />
@@ -333,7 +340,7 @@ export default function AdminContactMessagesPage() {
             </div>
             <div>
               <p className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Total Inbox</p>
-              <p className="text-2xl font-bold text-blue-900">{items.length}</p>
+              <p className="text-2xl font-bold text-blue-900">{filteredAllItems.length}</p>
             </div>
           </Card>
           <Card className="p-4 flex items-center gap-4 bg-amber-50 border-amber-100 shadow-sm">
@@ -342,16 +349,7 @@ export default function AdminContactMessagesPage() {
             </div>
             <div>
               <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Reports</p>
-              <p className="text-2xl font-bold text-amber-900">{items.filter(m => parseSupportMeta(m.message).kind === "report").length}</p>
-            </div>
-          </Card>
-          <Card className="p-4 flex items-center gap-4 bg-slate-50 border-slate-200 shadow-sm">
-            <div className="p-3 bg-slate-200 rounded-xl text-slate-700">
-              <Paperclip className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-800 uppercase tracking-wider">With Uploads</p>
-              <p className="text-2xl font-bold text-slate-900">{enrichedItems.filter(x => x.uploads.length > 0).length}</p>
+              <p className="text-2xl font-bold text-amber-900">{filteredAllItems.filter(m => parseSupportMeta(m.message).kind === "report").length}</p>
             </div>
           </Card>
         </div>
@@ -376,10 +374,8 @@ export default function AdminContactMessagesPage() {
                   setFilterRole("all");
                   setFilterKind("all");
                   setFilterStatus("all");
-                  setFilterQueryType("all");
-                  setFilterCountry("all");
-                  setFilterHasUploads("all");
                   setSearch("");
+                  setSelectedIds(new Set());
                 }}
               >
                 <RotateCcw className="h-4 w-4 mr-2 text-slate-500" />
@@ -387,7 +383,7 @@ export default function AdminContactMessagesPage() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="bg-slate-50 border-slate-200 h-10 text-xs font-medium">
                   <SelectValue placeholder="Status" />
@@ -405,8 +401,11 @@ export default function AdminContactMessagesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
+                  <SelectItem value="intern web app">Intern Web App</SelectItem>
+                  <SelectItem value="employer web app">Employer Web App</SelectItem>
                   <SelectItem value="intern">Intern</SelectItem>
-                  <SelectItem value="employer">Employer</SelectItem>
+                  <SelectItem value="general">General</SelectItem>
+                  <SelectItem value="hiring partner">Hiring Partner</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -418,36 +417,57 @@ export default function AdminContactMessagesPage() {
                   <SelectItem value="all">All Kinds</SelectItem>
                   <SelectItem value="feedback">Feedback</SelectItem>
                   <SelectItem value="report">Report</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={filterQueryType} onValueChange={setFilterQueryType}>
-                <SelectTrigger className="bg-slate-50 border-slate-200 h-10 text-xs font-medium">
-                  <SelectValue placeholder="Query Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Query Types</SelectItem>
-                  {queryTypeOptions.map((qt) => (
-                    <SelectItem key={qt} value={qt}>{qt}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              
-
-              <Select value={filterHasUploads} onValueChange={setFilterHasUploads}>
-                <SelectTrigger className="bg-slate-50 border-slate-200 h-10 text-xs font-medium">
-                  <SelectValue placeholder="Attachments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Inbox</SelectItem>
-                  <SelectItem value="yes">With Uploads</SelectItem>
-                  <SelectItem value="no">No Uploads</SelectItem>
+                  <SelectItem value="website">Website</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
         </Card>
+
+        {/* Bulk Actions Bar */}
+        {selectedIds.size > 0 && (
+          <Card className="p-4 bg-emerald-50 border-emerald-200 shadow-md">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Badge className="bg-emerald-600 text-white">{selectedIds.size} selected</Badge>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="h-8 bg-white border-emerald-200 hover:bg-emerald-100 text-emerald-700"
+                    onClick={() => bulkMarkReadMutation.mutate({ ids: Array.from(selectedIds), isRead: true })}
+                    disabled={bulkMarkReadMutation.isPending}
+                  >
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Mark as Read
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="h-8 bg-white border-rose-200 hover:bg-rose-50 text-rose-600"
+                    onClick={() => {
+                      if (window.confirm(`Delete ${selectedIds.size} messages?`)) {
+                        bulkDeleteMutation.mutate(Array.from(selectedIds));
+                      }
+                    }}
+                    disabled={bulkDeleteMutation.isPending}
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+              <Button 
+                size="sm" 
+                variant="ghost"
+                className="h-8 text-slate-500"
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Clear Selection
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {/* Messages Table */}
         <Card className="border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -455,6 +475,20 @@ export default function AdminContactMessagesPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
+                  <TableHead className="w-[50px]">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      checked={selectedIds.size === filteredItems.length && filteredItems.length > 0}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(new Set(filteredItems.map(x => x.message.id)));
+                        } else {
+                          setSelectedIds(new Set());
+                        }
+                      }}
+                    />
+                  </TableHead>
                   <TableHead className="w-[100px] font-bold text-slate-700 uppercase tracking-wider text-[10px]">Status</TableHead>
                   <TableHead className="w-[180px] font-bold text-slate-700 uppercase tracking-wider text-[10px]">Sender</TableHead>
                   <TableHead className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Subject & Message</TableHead>
@@ -466,7 +500,7 @@ export default function AdminContactMessagesPage() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-20 text-center">
+                    <TableCell colSpan={7} className="py-20 text-center">
                       <div className="flex flex-col items-center gap-2">
                         <Loader2 className="h-8 w-8 text-emerald-600 animate-spin" />
                         <p className="text-muted-foreground animate-pulse font-medium">Loading inbox...</p>
@@ -475,7 +509,7 @@ export default function AdminContactMessagesPage() {
                   </TableRow>
                 ) : filteredItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-20 text-center">
+                    <TableCell colSpan={7} className="py-20 text-center">
                       <div className="flex flex-col items-center gap-2 text-muted-foreground">
                         <FilterX className="h-10 w-10 opacity-20" />
                         <p className="font-medium">No messages match your criteria.</p>
@@ -492,13 +526,25 @@ export default function AdminContactMessagesPage() {
                     return (
                       <TableRow 
                         key={m.id} 
-                        className={`group cursor-pointer hover:bg-slate-50/80 transition-all ${!m.isRead ? 'bg-emerald-50/20 border-l-4 border-l-emerald-500' : 'border-l-4 border-l-transparent'}`}
-                        onClick={() => {
-                          setSelected(m);
-                          setViewOpen(true);
-                        }}
+                        className={`group transition-all ${selectedIds.has(m.id) ? 'bg-emerald-50/50' : !m.isRead ? 'bg-emerald-50/20 border-l-4 border-l-emerald-500' : 'border-l-4 border-l-transparent'}`}
                       >
-                        <TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                            checked={selectedIds.has(m.id)}
+                            onChange={() => {
+                              const newSelected = new Set(selectedIds);
+                              if (newSelected.has(m.id)) {
+                                newSelected.delete(m.id);
+                              } else {
+                                newSelected.add(m.id);
+                              }
+                              setSelectedIds(newSelected);
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell onClick={() => { setSelected(m); setViewOpen(true); }}>
                           {!m.isRead ? (
                             <Badge className="bg-emerald-600 text-white border-transparent shadow-sm">New</Badge>
                           ) : (
@@ -547,12 +593,13 @@ export default function AdminContactMessagesPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-tight">
-                              <FileText className="h-3 w-3" />
-                              {m.queryType || "Support"}
-                            </div>
+                            {meta.role && (
+                              <Badge variant="outline" className={`w-fit text-[9px] h-4 font-bold ${meta.role === 'employer' || meta.role === 'employer web app' ? 'bg-blue-50 text-blue-700 border-blue-100' : meta.role === 'hiring partner' ? 'bg-purple-50 text-purple-700 border-purple-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
+                                {meta.role}
+                              </Badge>
+                            )}
                             {meta.kind && (
-                              <Badge className={`w-fit text-[9px] h-4 font-bold ${meta.kind === 'report' ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                              <Badge className={`w-fit text-[9px] h-4 font-bold ${meta.kind === 'report' ? 'bg-rose-100 text-rose-700 border-rose-200' : meta.kind === 'website' ? 'bg-cyan-100 text-cyan-700 border-cyan-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
                                 {meta.kind}
                               </Badge>
                             )}
@@ -618,7 +665,7 @@ export default function AdminContactMessagesPage() {
           </div>
           <div className="bg-slate-50 px-6 py-4 border-t border-slate-200">
             <p className="text-xs text-slate-500 font-medium italic text-center">
-              Total {items.length} messages found • Showing {filteredItems.length} after filters
+              Total {filteredAllItems.length} messages found • Showing {filteredItems.length} after filters
             </p>
           </div>
         </Card>
@@ -670,18 +717,25 @@ export default function AdminContactMessagesPage() {
                   {/* Context Badges */}
                   <div className="flex flex-wrap gap-2">
                     {selectedMeta.role && (
-                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-100 px-3 py-1 font-bold uppercase tracking-tighter">
+                      <Badge variant="outline" className={`px-3 py-1 font-bold uppercase tracking-tighter ${
+                        selectedMeta.role === 'employer' || selectedMeta.role === 'employer web app' 
+                          ? 'bg-blue-50 text-blue-700 border-blue-100' 
+                          : selectedMeta.role === 'hiring partner' 
+                            ? 'bg-purple-50 text-purple-700 border-purple-100'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                      }`}>
                         {selectedMeta.role}
                       </Badge>
                     )}
                     {selectedMeta.kind && (
-                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-100 px-3 py-1 font-bold uppercase tracking-tighter">
+                      <Badge variant="outline" className={`px-3 py-1 font-bold uppercase tracking-tighter ${
+                        selectedMeta.kind === 'report' 
+                          ? 'bg-rose-50 text-rose-700 border-rose-100'
+                          : selectedMeta.kind === 'website'
+                            ? 'bg-cyan-50 text-cyan-700 border-cyan-100'
+                            : 'bg-amber-50 text-amber-700 border-amber-100'
+                      }`}>
                         {selectedMeta.kind}
-                      </Badge>
-                    )}
-                    {selected.queryType && (
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-100 px-3 py-1 font-bold uppercase tracking-tighter">
-                        {selected.queryType}
                       </Badge>
                     )}
                     {selected.countryCode && (
@@ -695,9 +749,9 @@ export default function AdminContactMessagesPage() {
                   {/* Message Body */}
                   <div className="bg-slate-50/50 rounded-2xl border border-slate-100 relative shadow-inner overflow-hidden">
                     <MessageSquare className="absolute -top-3 -left-3 h-8 w-8 text-emerald-100" />
-                    <ScrollArea className="h-[350px] w-full p-6">
+                    <div className="p-6 overflow-y-auto max-h-[400px]">
                       {renderFormattedBody(String(selectedMeta.body ?? ""))}
-                    </ScrollArea>
+                    </div>
                   </div>
 
                   {/* Metadata Grid */}
