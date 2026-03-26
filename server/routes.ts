@@ -15379,15 +15379,6 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
       const internIds = Array.from(new Set(hiredProposals.map((p: any) => String(p?.internId ?? p?.intern_id ?? "").trim()).filter(Boolean)));
       const internEmployerDues = [];
 
-      const monthsFromDuration = (duration: unknown) => {
-        switch (String(duration ?? "").trim().toLowerCase()) {
-          case "2m": return 2;
-          case "3m": return 3;
-          case "6m": return 6;
-          default: return 1;
-        }
-      };
-
       const addMonthsToIso = (iso: string, months: number) => {
         const s = String(iso ?? "").trim();
         if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
