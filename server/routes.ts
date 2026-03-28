@@ -9262,6 +9262,21 @@ export async function registerRoutes(
 
       const notifications = await storage.getAllNotifications();
       
+      const autoNotificationTypes = [
+        "weekly_hire_tip",
+        "employer_profile_completion_nudge",
+        "timesheet_reminder",
+        "payment_reminder",
+        "interview_reminder",
+        "intern_onboarding_reminder",
+      ];
+      
+      const filteredNotifications = (notifications as any[]).filter((n) => {
+        const type = String(n.type ?? "").toLowerCase();
+        if (autoNotificationTypes.includes(type)) return false;
+        return true;
+      });
+      
       const users = await storage.getUsers();
       const employers = await storage.getEmployers();
       
@@ -9275,7 +9290,7 @@ export async function registerRoutes(
         employerById.set(String(e.id), e);
       }
 
-      const enriched = (notifications as any[]).map((n) => {
+      const enriched = filteredNotifications.map((n) => {
         const recipientId = String(n.recipientId ?? "").trim();
         const recipientType = String(n.recipientType ?? "").toLowerCase();
         

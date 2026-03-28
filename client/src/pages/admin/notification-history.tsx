@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AdminLayout } from "@/pages/admin/admin-layout";
 import { Card } from "@/components/ui/card";
@@ -64,13 +64,20 @@ export default function NotificationHistoryPage() {
   const [pageSize, setPageSize] = useState(20);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery<{ items: NotificationRecord[]; total: number }>({
-    queryKey: ["/api/admin/notifications/history"],
+  const { data, isLoading, refetch } = useQuery<{ items: NotificationRecord[]; total: number; page: number; limit: number }>({
+    queryKey: ["/api/admin/notifications/history", page, pageSize],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/notifications/history?page=${page}&limit=${pageSize}`);
+      if (!res.ok) throw new Error("Failed to fetch notifications");
+      return res.json();
+    },
   });
 
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
+
+  useEffect(() => { setPage(1); }, [search, filterType, filterRecipientType, filterStatus, filterSenderRole]);
 
   const typeOptions = useMemo(() => {
     const types = new Set(items.map(i => i.type).filter(Boolean));
@@ -104,7 +111,7 @@ export default function NotificationHistoryPage() {
   }, [items, search, filterType, filterRecipientType, filterStatus, filterSenderRole]);
 
   const stats = useMemo(() => ({
-    total: filteredItems.length,
+    total: total,
     sent: filteredItems.filter(i => i.status === "sent").length,
     delivered: filteredItems.filter(i => i.status === "delivered").length,
     failed: filteredItems.filter(i => i.status === "failed").length,
@@ -112,7 +119,7 @@ export default function NotificationHistoryPage() {
       acc[role] = filteredItems.filter(i => i.senderRole === role).length;
       return acc;
     }, {} as Record<string, number>),
-  }), [filteredItems, senderRoleOptions]);
+  }), [total, filteredItems, senderRoleOptions]);
 
   const getRecipientIcon = (type: string) => {
     switch (type?.toLowerCase()) {
