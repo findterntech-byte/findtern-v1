@@ -754,7 +754,8 @@ export class PostgresStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const normalizedEmail = email.toLowerCase().trim();
+    const [user] = await db.select().from(users).where(sql`LOWER(${users.email}) = ${normalizedEmail}`);
     return user;
   }
 
@@ -827,10 +828,11 @@ export class PostgresStorage implements IStorage {
   }
 
   async getEmployerByEmail(email: string): Promise<Employer | undefined> {
+    const normalizedEmail = email.toLowerCase().trim();
     const [employer] = await db
       .select()
       .from(employers)
-      .where(eq(employers.companyEmail, email));
+      .where(sql`LOWER(${employers.companyEmail}) = ${normalizedEmail}`);
     return employer;
   }
 
