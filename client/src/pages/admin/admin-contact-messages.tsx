@@ -42,7 +42,8 @@ import {
   Inbox,
   Calendar,
   FilterX,
-  Loader2
+  Loader2,
+  X
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -159,7 +160,15 @@ export default function AdminContactMessagesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const [search, setSearch] = useState<string>("");
-  const [queryTypeFilter, setQueryTypeFilter] = useState<string>("all");
+  const [queryTypeFilters, setQueryTypeFilters] = useState<string[]>([]);
+
+  const toggleFilter = (value: string) => {
+    setQueryTypeFilters(prev => 
+      prev.includes(value) 
+        ? prev.filter(f => f !== value)
+        : [...prev, value]
+    );
+  };
 
   const { data, isLoading } = useQuery<{ items: ContactMessage[] }>({
     queryKey: ["/api/admin/contact/messages"],
@@ -292,27 +301,111 @@ const employersMap = useMemo(() => {
     const roleOptions = Array.from(roleSet).sort((a, b) => a.localeCompare(b));
     const kindOptions = Array.from(kindSet).sort((a, b) => a.localeCompare(b));
     
-    const hasInternQuery = qtOptions.some(q => q.toLowerCase().includes("intern"));
-    const hasEmployerQuery = qtOptions.some(q => q.toLowerCase().includes("employer"));
-    const hasHiringQuery = qtOptions.some(q => q.toLowerCase().includes("hiring"));
+    const hasInternFeedback = enrichedItems.some(x => {
+      const qt = (x.message.queryType ?? "").toLowerCase();
+      return qt.includes("intern") && (qt.includes("feedback") || qt.includes("report"));
+    });
+    const hasEmployerFeedback = enrichedItems.some(x => {
+      const qt = (x.message.queryType ?? "").toLowerCase();
+      return qt.includes("employer") && (qt.includes("feedback") || qt.includes("report"));
+    });
+    const hasInternFeedbackData = enrichedItems.some(x => {
+      const qt = (x.message.queryType ?? "").toLowerCase();
+      return qt.includes("intern") && qt.includes("feedback");
+    });
+    const hasInternReportData = enrichedItems.some(x => {
+      const qt = (x.message.queryType ?? "").toLowerCase();
+      return qt.includes("intern") && qt.includes("report");
+    });
+    const hasEmployerFeedbackData = enrichedItems.some(x => {
+      const qt = (x.message.queryType ?? "").toLowerCase();
+      return qt.includes("employer") && qt.includes("feedback");
+    });
+    const hasEmployerReportData = enrichedItems.some(x => {
+      const qt = (x.message.queryType ?? "").toLowerCase();
+      return qt.includes("employer") && qt.includes("report");
+    });
+    const hasHiringData = enrichedItems.some(x => {
+      const qt = (x.message.queryType ?? "").toLowerCase();
+      const firstName = (x.message.firstName ?? "").toLowerCase();
+      return qt.includes("hiring") && firstName !== "employer";
+    });
+    const hasInternQuery = enrichedItems.some(x => {
+      const qt = (x.message.queryType ?? "").toLowerCase();
+      const firstName = (x.message.firstName ?? "").toLowerCase();
+      return qt.includes("intern") && !qt.includes("feedback") && !qt.includes("report") && firstName !== "intern";
+    });
+    const hasEmployerQuery = enrichedItems.some(x => {
+      const qt = (x.message.queryType ?? "").toLowerCase();
+      const firstName = (x.message.firstName ?? "").toLowerCase();
+      return qt.includes("employer") && !qt.includes("feedback") && !qt.includes("report") && firstName !== "employer";
+    });
     const hasInternRole = roleOptions.some(r => r.toLowerCase().includes("intern"));
     const hasEmployerRole = roleOptions.some(r => r.toLowerCase().includes("employer"));
     
-    const allQt = [...qtOptions];
+    const allQt: string[] = [];
     const allRoles = [...roleOptions];
     
+    if (hasInternFeedbackData) allQt.push("Intern Feedback");
+    if (hasInternReportData) allQt.push("Intern Report");
+    if (hasEmployerFeedbackData) allQt.push("Employer Feedback");
+    if (hasEmployerReportData) allQt.push("Employer Report");
+    if (hasHiringData) allQt.push("hiring");
     if (hasInternQuery) allQt.push("intern");
     if (hasEmployerQuery) allQt.push("employer");
-    if (hasHiringQuery) allQt.push("hiring");
     if (hasInternRole) allRoles.push("intern");
     if (hasEmployerRole) allRoles.push("employer");
     
     return { qt: Array.from(new Set(allQt)).sort((a, b) => a.localeCompare(b)), roles: Array.from(new Set(allRoles)).sort((a, b) => a.localeCompare(b)), kinds: kindOptions };
   }, [enrichedItems]);
 
+  const checkFilterMatch = (item: typeof enrichedItems[0], filter: string): boolean => {
+    const m = item.message;
+    const msgQt = String(m.queryType ?? "").trim().toLowerCase();
+    const msgRole = item.meta.role?.toLowerCase();
+    const msgKind = item.meta.kind;
+    const firstName = String(m.firstName ?? "").toLowerCase();
+    
+    if (filter.startsWith("qt:")) {
+      const qtVal = filter.replace("qt:", "").toLowerCase();
+      
+      if (qtVal === "intern feedback") {
+        return msgQt.includes("intern") && msgQt.includes("feedback");
+      } else if (qtVal === "intern report") {
+        return msgQt.includes("intern") && msgQt.includes("report");
+      } else if (qtVal === "employer feedback") {
+        return msgQt.includes("employer") && msgQt.includes("feedback");
+      } else if (qtVal === "employer report") {
+        return msgQt.includes("employer") && msgQt.includes("report");
+      } else if (qtVal === "hiring") {
+        return msgQt.includes("hiring") && firstName !== "employer";
+      } else if (qtVal === "intern") {
+        return !msgQt.includes("support") && !msgQt.includes("report") && msgQt.includes("intern") && firstName !== "intern";
+      } else if (qtVal === "employer") {
+        return !msgQt.includes("support") && !msgQt.includes("report") && msgQt.includes("employer") && firstName !== "employer";
+      } else if (!msgQt.includes("support") && !msgQt.includes("report") && msgQt === qtVal) {
+        return true;
+      }
+    } else if (filter.startsWith("role:")) {
+      const roleVal = filter.replace("role:", "").toLowerCase();
+      if (!msgQt.includes("support") && !msgQt.includes("report")) {
+        if (roleVal === "intern") {
+          return msgRole && msgRole.includes("intern") && !msgRole.includes("partner");
+        } else if (roleVal === "employer") {
+          return msgRole && msgRole.includes("employer");
+        } else if (msgRole === roleVal) {
+          return true;
+        }
+      }
+    } else if (queryTypeOptions.kinds.includes(filter)) {
+      return !msgQt.includes("support") && !msgQt.includes("report") && msgKind === filter;
+    }
+    
+    return false;
+  };
+
   const filteredItems = useMemo(() => {
     const q = String(search ?? "").trim().toLowerCase();
-    const qt = queryTypeFilter !== "all" ? queryTypeFilter : null;
 
     return enrichedItems.filter((x) => {
       const m = x.message;
@@ -321,42 +414,9 @@ const employersMap = useMemo(() => {
       const subjectLower = String(m.subject ?? "").toLowerCase();
       if (subjectLower.includes("full-time offer") || subjectLower.includes("full time offer")) return false;
 
-      if (qt) {
-        const msgQt = String(m.queryType ?? "").trim().toLowerCase();
-        const msgRole = meta.role?.toLowerCase();
-        const msgKind = meta.kind;
-        
-        let matches = false;
-        
-        if (qt.startsWith("qt:")) {
-          const qtVal = qt.replace("qt:", "").toLowerCase();
-          const hasSupportOrReport = msgQt.includes("support") || msgQt.includes("report");
-          
-          if (qtVal === "intern") {
-            if (!hasSupportOrReport && msgQt.includes("intern")) matches = true;
-          } else if (qtVal === "employer") {
-            if (!hasSupportOrReport && msgQt.includes("employer")) matches = true;
-          } else if (qtVal === "hiring") {
-            if (!hasSupportOrReport && msgQt.includes("hiring")) matches = true;
-          } else if (!hasSupportOrReport && msgQt === qtVal) {
-            matches = true;
-          }
-        } else if (qt.startsWith("role:")) {
-          const roleVal = qt.replace("role:", "").toLowerCase();
-          if (roleVal === "intern") {
-            if (msgRole && msgRole.includes("intern") && !msgRole.includes("partner")) matches = true;
-          } else if (roleVal === "employer") {
-            if (msgRole && msgRole.includes("employer")) matches = true;
-          } else if (roleVal === "hiring") {
-            if (msgRole && msgRole.includes("hiring")) matches = true;
-          } else if (msgRole === roleVal) {
-            matches = true;
-          }
-        } else if (queryTypeOptions.kinds.includes(qt)) {
-          if (msgKind === qt) matches = true;
-        }
-        
-        if (!matches) return false;
+      if (queryTypeFilters.length > 0) {
+        const matchesAny = queryTypeFilters.some(filter => checkFilterMatch(x, filter));
+        if (!matchesAny) return false;
       }
 
       if (!q) return true;
@@ -375,7 +435,7 @@ const employersMap = useMemo(() => {
   }, [
     enrichedItems,
     search,
-    queryTypeFilter,
+    queryTypeFilters,
   ]);
 
   const markReadMutation = useMutation({
@@ -530,10 +590,27 @@ const employersMap = useMemo(() => {
                 className="pl-12 bg-slate-50 border-slate-200 focus-visible:ring-emerald-500 h-12 text-base"
               />
             </div>
-            <Select value={queryTypeFilter} onValueChange={setQueryTypeFilter}>
-              <SelectTrigger className="w-[200px] bg-slate-50 border-slate-200 focus-visible:ring-emerald-500 h-12">
-                <SelectValue placeholder="Query Type" />
-              </SelectTrigger>
+            <div className="flex items-center gap-2">
+              <Select value={queryTypeFilters.length === 0 ? "all" : "custom"} onValueChange={(val) => { 
+                if (val === "all") setQueryTypeFilters([]);
+                else if (val && val !== "custom") toggleFilter(val);
+              }}>
+                <SelectTrigger className="w-[280px] bg-slate-50 border-slate-200 focus-visible:ring-emerald-500 h-12">
+                  <SelectValue>
+                    {queryTypeFilters.length === 0 ? (
+                      "Query Type"
+                    ) : (
+                      <span className="flex items-center gap-1">
+                        <Badge variant="secondary" className="h-5 text-xs bg-emerald-100 text-emerald-700">
+                          {queryTypeFilters.length}
+                        </Badge>
+                        <span className="truncate max-w-[180px]">
+                          {queryTypeFilters.map(f => f.replace('qt:', '').replace('role:', '')).join(', ')}
+                        </span>
+                      </span>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Query Types</SelectItem>
                 {queryTypeOptions.qt.length > 0 && (
@@ -541,7 +618,7 @@ const employersMap = useMemo(() => {
                     <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase">Query Types</div>
                     {queryTypeOptions.qt.map((qt) => (
                       <SelectItem key={`qt:${qt}`} value={`qt:${qt}`}>
-                        {qt}
+                        {qt} {queryTypeFilters.includes(`qt:${qt}`) ? "✓" : ""}
                       </SelectItem>
                     ))}
                   </>
@@ -551,7 +628,7 @@ const employersMap = useMemo(() => {
                     <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase">User Type</div>
                     {queryTypeOptions.roles.map((role) => (
                       <SelectItem key={`role:${role}`} value={`role:${role}`}>
-                        {role}
+                        {role} {queryTypeFilters.includes(`role:${role}`) ? "✓" : ""}
                       </SelectItem>
                     ))}
                   </>
@@ -561,14 +638,20 @@ const employersMap = useMemo(() => {
                     <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase">Category</div>
                     {queryTypeOptions.kinds.map((kind) => (
                       <SelectItem key={kind} value={kind}>
-                        {kind}
+                        {kind} {queryTypeFilters.includes(kind) ? "✓" : ""}
                       </SelectItem>
                     ))}
                   </>
                 )}
               </SelectContent>
-            </Select>
-          </div>
+              </Select>
+              {queryTypeFilters.length > 0 && (
+                <Button variant="ghost" size="sm" onClick={() => setQueryTypeFilters([])} className="h-12 px-3 text-slate-500 hover:text-red-600">
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            </div>
         </Card>
 
         {/* Bulk Actions Bar */}

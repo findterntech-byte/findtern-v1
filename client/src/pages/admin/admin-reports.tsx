@@ -63,7 +63,7 @@ type AdminReportsAnalyticsResponse = {
   conversionFunnelData: Array<{ stage: string; value: number; percentage: number }>;
   industryDistributionData: Array<{ name: string; value: number; color: string }>;
   skillDemandData: Array<{ skill: string; demand: number }>;
-  topCompanies: Array<{ name: string; projects: number; hires: number; rating: number; status: string }>;
+  topCompanies: Array<{ name: string; projects: number; hires: number; internshipHires?: number; fullTimeHires?: number; totalHires?: number; rating: number; status: string }>;
   topInterns: Array<{ name: string; applications: number; interviews: number; offers: number; status: string }>;
   geographicData: Array<{ city: string; users: number; percentage: number }>;
   applicationStatusData: Array<{ name: string; value: number; color: string }>;
@@ -168,6 +168,16 @@ export default function AdminReportsPage() {
   const payablesFilter: "candidate" = "candidate";
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
+  const [hiredFilter, setHiredFilter] = useState<"all" | "fulltime" | "internship">("all");
+  const [hiredSearch, setHiredSearch] = useState("");
+  const [hiredDateFrom, setHiredDateFrom] = useState("");
+  const [hiredDateTo, setHiredDateTo] = useState("");
+  const [hiredPage, setHiredPage] = useState(1);
+  const hiredPerPage = 10;
+  
+  const [companyFilter, setCompanyFilter] = useState<"all" | "active" | "inactive">("all");
+  const [companySearch, setCompanySearch] = useState("");
+  const [conversionTab, setConversionTab] = useState<"interns" | "employers">("interns");
 
   const queryString = useMemo(() => {
     const qs = new URLSearchParams({ range: dateRange });
@@ -195,9 +205,65 @@ export default function AdminReportsPage() {
   const regionWiseDemandData = data?.regionWiseDemandData ?? [];
   const employerBehaviorAnalytics = data?.employerBehaviorAnalytics ?? null;
   const topCompanies = data?.topCompanies ?? [];
+  
+  const filteredCompanies = useMemo(() => {
+    let companies = [...topCompanies];
+    
+    if (companyFilter !== "all") {
+      companies = companies.filter(c => c.status === companyFilter);
+    }
+    
+    if (companySearch.trim()) {
+      const search = companySearch.toLowerCase();
+      companies = companies.filter(c => c.name?.toLowerCase().includes(search));
+    }
+    
+    return companies;
+  }, [topCompanies, companyFilter, companySearch]);
   const topInterns = data?.topInterns ?? [];
   const hiredFullTime = data?.hiredInterns?.fullTime ?? [];
   const hiredInternship = data?.hiredInterns?.internship ?? [];
+  
+  const filteredHires = useMemo(() => {
+    let hires: typeof hiredFullTime = [];
+    
+    if (hiredFilter === "all") {
+      hires = [...hiredFullTime, ...hiredInternship];
+    } else if (hiredFilter === "fulltime") {
+      hires = hiredFullTime;
+    } else {
+      hires = hiredInternship;
+    }
+    
+    hires = hires.sort((a, b) => 
+      new Date(b.hiredAt).getTime() - new Date(a.hiredAt).getTime()
+    );
+    
+    if (hiredSearch.trim()) {
+      const search = hiredSearch.toLowerCase();
+      hires = hires.filter(h => 
+        h.internName?.toLowerCase().includes(search) ||
+        h.companyName?.toLowerCase().includes(search)
+      );
+    }
+    
+    if (hiredDateFrom) {
+      const fromDate = new Date(hiredDateFrom);
+      fromDate.setHours(0, 0, 0, 0);
+      hires = hires.filter(h => new Date(h.hiredAt) >= fromDate);
+    }
+    
+    if (hiredDateTo) {
+      const toDate = new Date(hiredDateTo);
+      toDate.setHours(23, 59, 59, 999);
+      hires = hires.filter(h => new Date(h.hiredAt) <= toDate);
+    }
+    
+    return hires;
+  }, [hiredFullTime, hiredInternship, hiredFilter, hiredSearch, hiredDateFrom, hiredDateTo]);
+  
+  const hiredTotalPages = Math.ceil(filteredHires.length / hiredPerPage);
+  const paginatedHires = filteredHires.slice((hiredPage - 1) * hiredPerPage, hiredPage * hiredPerPage);
   const geographicData = data?.geographicData ?? [];
   const applicationStatusData = data?.applicationStatusData ?? [];
   const derived = data?.derivedMetrics ?? { avgAppsPerUser: 0, placementRate: 0, projectsPerCompany: 0, hiresPerCompany: 0, successRate: 0, avgHireTimeDays: null, interviewRate: 0, profileCompletionRate: 0, applicationSuccessRate: 0, newCompanies: 0, newProjects: 0, fullTimeProposalCount: 0, internshipProposalCount: 0 };
@@ -340,49 +406,84 @@ export default function AdminReportsPage() {
                   </Card>
                 </div>
 
-                <div className="grid gap-6 lg:grid-cols-2">
+                <div className="grid gap-6 lg:grid-cols-1">
                   <Card className="p-6">
                     <div className="flex items-center justify-between mb-4">
                       <div><h3 className="font-semibold">Conversion Analytics</h3><p className="text-xs text-muted-foreground">Funnel conversion rates</p></div>
-                      <Target className="h-5 w-5 text-primary" />
-                    </div>
-                    {conversionAnalytics ? (
-                      <div className="space-y-4">
-                        {[
-                          { label: "Signup → Paid", value: conversionAnalytics.signupToPaid, count: conversionAnalytics.signupCount, color: "bg-emerald-500" },
-                          { label: "Paid → Interview", value: conversionAnalytics.paidToInterview, count: conversionAnalytics.paidCount, color: "bg-blue-500" },
-                          { label: "Interview → Hire", value: conversionAnalytics.interviewToHire, count: conversionAnalytics.interviewCount, color: "bg-purple-500" },
-                        ].map((item) => (
-                          <div key={item.label} className="space-y-2">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="font-medium">{item.label}</span>
-                              <span className="text-muted-foreground">{item.count.toLocaleString()} ({item.value}%)</span>
-                            </div>
-                            <div className="h-2 bg-muted rounded-full overflow-hidden">
-                              <div className={cn("h-full rounded-full transition-all", item.color)} style={{ width: `${item.value}%` }} />
-                            </div>
-                          </div>
-                        ))}
-                        <div className="grid grid-cols-4 gap-3 pt-4 border-t">
-                          <div className="text-center p-3 bg-muted/50 rounded-lg"><p className="text-lg font-bold">{conversionAnalytics.signupCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">Signups</p></div>
-                          <div className="text-center p-3 bg-muted/50 rounded-lg"><p className="text-lg font-bold">{conversionAnalytics.paidCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">Paid</p></div>
-                          <div className="text-center p-3 bg-muted/50 rounded-lg"><p className="text-lg font-bold">{conversionAnalytics.interviewCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">Interviews</p></div>
-                          <div className="text-center p-3 bg-muted/50 rounded-lg"><p className="text-lg font-bold">{conversionAnalytics.hireCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">Hires</p></div>
-                        </div>
+                      <div className="flex gap-1">
+                        <Button
+                          variant={conversionTab === "interns" ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setConversionTab("interns")}
+                          className="text-xs"
+                        >
+                          Interns
+                        </Button>
+                        <Button
+                          variant={conversionTab === "employers" ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setConversionTab("employers")}
+                          className="text-xs"
+                        >
+                          Employers
+                        </Button>
                       </div>
-                    ) : <EmptyState icon={Target} title="No data" description="Conversion data will appear here" />}
+                    </div>
+                    {conversionTab === "interns" ? (
+                      conversionAnalytics ? (
+                        <div className="space-y-4">
+                          {[
+                            { label: "Signup → Paid", value: conversionAnalytics.signupToPaid, count: conversionAnalytics.signupCount, color: "bg-emerald-500" },
+                            { label: "Paid → Interview", value: conversionAnalytics.paidToInterview, count: conversionAnalytics.paidCount, color: "bg-blue-500" },
+                            { label: "Interview → Hire", value: conversionAnalytics.interviewToHire, count: conversionAnalytics.interviewCount, color: "bg-purple-500" },
+                          ].map((item) => (
+                            <div key={item.label} className="space-y-2">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="font-medium">{item.label}</span>
+                                <span className="text-muted-foreground">{item.count.toLocaleString()} ({item.value}%)</span>
+                              </div>
+                              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                <div className={cn("h-full rounded-full transition-all", item.color)} style={{ width: `${item.value}%` }} />
+                              </div>
+                            </div>
+                          ))}
+                          <div className="grid grid-cols-4 gap-3 pt-4 border-t">
+                            <div className="text-center p-3 bg-muted/50 rounded-lg"><p className="text-lg font-bold">{conversionAnalytics.signupCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">Signups</p></div>
+                            <div className="text-center p-3 bg-muted/50 rounded-lg"><p className="text-lg font-bold">{conversionAnalytics.paidCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">Paid</p></div>
+                            <div className="text-center p-3 bg-muted/50 rounded-lg"><p className="text-lg font-bold">{conversionAnalytics.interviewCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">Interviews</p></div>
+                            <div className="text-center p-3 bg-muted/50 rounded-lg"><p className="text-lg font-bold">{conversionAnalytics.hireCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">Hires</p></div>
+                          </div>
+                        </div>
+                      ) : <EmptyState icon={Target} title="No data" description="Conversion data will appear here" />
+                    ) : (
+                      employerBehaviorAnalytics ? (
+                        <div className="space-y-4">
+                          {[
+                            { label: "Posted Projects → Received Proposals", value: employerBehaviorAnalytics.dropOffRate > 0 ? Math.round((1 - employerBehaviorAnalytics.dropOffRate / 100) * 100) : 100, count: platformMetrics.activeProjects, color: "bg-emerald-500" },
+                            { label: "Proposals → Interviews", value: 0, count: 0, color: "bg-blue-500" },
+                            { label: "Interviews → Hires", value: 0, count: 0, color: "bg-purple-500" },
+                          ].map((item) => (
+                            <div key={item.label} className="space-y-2">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="font-medium">{item.label}</span>
+                                <span className="text-muted-foreground">{item.count.toLocaleString()} ({item.value}%)</span>
+                              </div>
+                              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                <div className={cn("h-full rounded-full transition-all", item.color)} style={{ width: `${item.value}%` }} />
+                              </div>
+                            </div>
+                          ))}
+                          <div className="grid grid-cols-3 gap-3 pt-4 border-t">
+                            <div className="text-center p-3 bg-muted/50 rounded-lg"><p className="text-lg font-bold">{platformMetrics.activeProjects}</p><p className="text-xs text-muted-foreground">Active Projects</p></div>
+                            <div className="text-center p-3 bg-muted/50 rounded-lg"><p className="text-lg font-bold">{employerBehaviorAnalytics.activeEmployers}</p><p className="text-xs text-muted-foreground">Active Employers</p></div>
+                            <div className="text-center p-3 bg-muted/50 rounded-lg"><p className="text-lg font-bold">{employerBehaviorAnalytics.repeatEmployers}</p><p className="text-xs text-muted-foreground">Repeat Employers</p></div>
+                          </div>
+                        </div>
+                      ) : <EmptyState icon={Target} title="No data" description="Employer conversion data will appear here" />
+                    )}
                   </Card>
 
-                  <Card className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div><h3 className="font-semibold">Employer Insights</h3><p className="text-xs text-muted-foreground">Hiring behavior</p></div>
-                      <Building2 className="h-5 w-5 text-emerald-500" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <MetricCard icon={Clock} iconBg="bg-amber-100" iconColor="text-amber-600" label="Avg Hire Time" value={employerBehaviorAnalytics?.avgHireTimeDays != null ? `${employerBehaviorAnalytics.avgHireTimeDays}d` : "—"} />
-                      <MetricCard icon={Building2} iconBg="bg-emerald-100" iconColor="text-emerald-600" label="Repeat Employers" value={employerBehaviorAnalytics?.repeatEmployers?.toLocaleString() ?? "—"} />
-                    </div>
-                  </Card>
+                
                 </div>
 
                 <div className="grid gap-6 lg:grid-cols-2">
@@ -432,61 +533,126 @@ export default function AdminReportsPage() {
 
               {/* Interns Tab */}
               <TabsContent value="interns" className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-4">
                   <MetricCard icon={Users} iconBg="bg-primary/10" iconColor="text-primary" label="Total Interns" value={platformMetrics.totalUsers.toLocaleString()} sublabel={`${platformMetrics.activeUsers.toLocaleString()} active`} />
                   <MetricCard icon={Briefcase} iconBg="bg-emerald-100" iconColor="text-emerald-600" label="Avg Proposals/Intern" value={derived.avgAppsPerUser} sublabel={`${derived.internshipProposalCount} internship | ${derived.fullTimeProposalCount} full-time`} />
-                  <MetricCard icon={Target} iconBg="bg-purple-100" iconColor="text-purple-600" label="Placement Rate" value={`${derived.placementRate}%`} />
+                  <MetricCard icon={Target} iconBg="bg-purple-100" iconColor="text-purple-600" label="Internship Hired" value={hiredInternship.length} />
+                  <MetricCard icon={CheckCircle2} iconBg="bg-amber-100" iconColor="text-amber-600" label="Full-time Hired" value={hiredFullTime.length} />
                 </div>
 
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <Card className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div><h3 className="font-semibold">Full-time Hired</h3><p className="text-xs text-muted-foreground">PPO placements</p></div>
-                      <Badge className="bg-purple-100 text-purple-700">Full-time</Badge>
+<Card className="p-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
+                    <div>
+                      <h3 className="font-semibold">Hired Interns</h3>
+                      <p className="text-xs text-muted-foreground">All placements ({filteredHires.length} total)</p>
                     </div>
-                    {hiredFullTime.length === 0 && !isLoading ? (
-                      <EmptyState icon={Users} title="No full-time hires" description="Full-time hires will appear here" />
-                    ) : (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="relative">
+                        <Input
+                          type="text"
+                          placeholder="Search intern or company..."
+                          value={hiredSearch}
+                          onChange={(e) => { setHiredSearch(e.target.value); setHiredPage(1); }}
+                          className="h-9 w-[200px] pl-3"
+                        />
+                      </div>
+                      <Input
+                        type="date"
+                        value={hiredDateFrom}
+                        onChange={(e) => { setHiredDateFrom(e.target.value); setHiredPage(1); }}
+                        className="h-9 w-[140px]"
+                        placeholder="From Date"
+                      />
+                      <Input
+                        type="date"
+                        value={hiredDateTo}
+                        onChange={(e) => { setHiredDateTo(e.target.value); setHiredPage(1); }}
+                        className="h-9 w-[140px]"
+                        placeholder="To Date"
+                      />
+                      <Select value={hiredFilter} onValueChange={(v) => { setHiredFilter(v as any); setHiredPage(1); }}>
+                        <SelectTrigger className="h-9 w-[160px]">
+                          <SelectValue placeholder="Filter" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Hires</SelectItem>
+                          <SelectItem value="fulltime"> Full-time Hired</SelectItem>
+                          <SelectItem value="internship">Internship Hired</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {(hiredSearch || hiredDateFrom || hiredDateTo) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { setHiredSearch(""); setHiredDateFrom(""); setHiredDateTo(""); setHiredPage(1); }}
+                        >
+Clear
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {filteredHires.length === 0 && !isLoading ? (
+                    <EmptyState icon={Users} title="No hires" description="Hires will appear here" />
+                  ) : (
+                    <>
                       <Table>
-                        <TableHeader><TableRow className="bg-muted/40"><TableHead className="text-xs">Intern</TableHead><TableHead className="text-xs">Company</TableHead><TableHead className="text-xs">Status</TableHead><TableHead className="text-xs">Date</TableHead></TableRow></TableHeader>
+                        <TableHeader>
+                          <TableRow className="bg-muted/40">
+                            <TableHead className="text-xs">Intern</TableHead>
+                            <TableHead className="text-xs">Company</TableHead>
+                            <TableHead className="text-xs">Type</TableHead>
+                            <TableHead className="text-xs">Status</TableHead>
+                            <TableHead className="text-xs">Date</TableHead>
+                          </TableRow>
+                        </TableHeader>
                         <TableBody>
-                          {hiredFullTime.slice(0, 5).map((r) => (
-                            <TableRow key={`ft-${r.internId}`} className="hover:bg-muted/30 transition-colors">
-                              <TableCell className="text-sm font-medium">{r.internName}</TableCell>
-                              <TableCell className="text-sm">{r.companyName ?? "—"}</TableCell>
-                              <TableCell><Badge className="bg-emerald-100 text-emerald-700">{r.status}</Badge></TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{new Date(r.hiredAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</TableCell>
-                            </TableRow>
-                          ))}
+                          {paginatedHires.map((r, idx) => {
+                            const isFullTime = hiredFullTime.some(ft => ft.internId === r.internId && ft.hiredAt === r.hiredAt);
+                            return (
+                              <TableRow key={`${r.internId}-${r.hiredAt}-${idx}`} className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium">{r.internName}</TableCell>
+                                <TableCell className="text-sm">{r.companyName ?? "—"}</TableCell>
+                                <TableCell>
+                                  <Badge className={isFullTime ? "bg-purple-100 text-purple-700" : "bg-emerald-100 text-emerald-700"}>
+                                    {isFullTime ? "Full-time" : "Internship"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell><Badge className="bg-emerald-100 text-emerald-700">{r.status}</Badge></TableCell>
+                                <TableCell className="text-sm text-muted-foreground">{new Date(r.hiredAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</TableCell>
+                              </TableRow>
+                            );
+                          })}
                         </TableBody>
                       </Table>
-                    )}
-                  </Card>
-
-                  <Card className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div><h3 className="font-semibold">Internship Hired</h3><p className="text-xs text-muted-foreground">Internship placements</p></div>
-                      <Badge className="bg-emerald-100 text-emerald-700">Internship</Badge>
-                    </div>
-                    {hiredInternship.length === 0 && !isLoading ? (
-                      <EmptyState icon={Briefcase} title="No internship hires" description="Internship hires will appear here" />
-                    ) : (
-                      <Table>
-                        <TableHeader><TableRow className="bg-muted/40"><TableHead className="text-xs">Intern</TableHead><TableHead className="text-xs">Company</TableHead><TableHead className="text-xs">Status</TableHead><TableHead className="text-xs">Date</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                          {hiredInternship.slice(0, 5).map((r) => (
-                            <TableRow key={`int-${r.internId}`} className="hover:bg-muted/30 transition-colors">
-                              <TableCell className="text-sm font-medium">{r.internName}</TableCell>
-                              <TableCell className="text-sm">{r.companyName ?? "—"}</TableCell>
-                              <TableCell><Badge className="bg-emerald-100 text-emerald-700">{r.status}</Badge></TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{new Date(r.hiredAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </Card>
-                </div>
+                      {hiredTotalPages > 1 && (
+                        <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                          <p className="text-sm text-muted-foreground">
+                            Showing {(hiredPage - 1) * hiredPerPage + 1} to {Math.min(hiredPage * hiredPerPage, filteredHires.length)} of {filteredHires.length}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setHiredPage(p => Math.max(1, p - 1))}
+                              disabled={hiredPage === 1}
+                            >
+                              Previous
+                            </Button>
+                            <span className="text-sm">Page {hiredPage} of {hiredTotalPages}</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setHiredPage(p => Math.min(hiredTotalPages, p + 1))}
+                              disabled={hiredPage === hiredTotalPages}
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </Card>
 
                 <Card className="p-6">
                   <div className="flex items-center justify-between mb-4">
@@ -520,18 +686,41 @@ export default function AdminReportsPage() {
                 </div>
 
                 <Card className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div><h3 className="font-semibold">Top Performing Companies</h3><p className="text-xs text-muted-foreground">By projects and hires</p></div>
-                    <Building2 className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
+                    <div>
+                      <h3 className="font-semibold">Top Performing Companies</h3>
+                      <p className="text-xs text-muted-foreground">By projects and hires ({filteredCompanies.length} companies)</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Input
+                        type="text"
+                        placeholder="Search company..."
+                        value={companySearch}
+                        onChange={(e) => setCompanySearch(e.target.value)}
+                        className="h-9 w-[180px]"
+                      />
+                      <Select value={companyFilter} onValueChange={setCompanyFilter}>
+                        <SelectTrigger className="h-9 w-[140px]">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <Table>
-                    <TableHeader><TableRow className="bg-muted/40"><TableHead className="text-xs">Company</TableHead><TableHead className="text-xs">Projects</TableHead><TableHead className="text-xs hidden md:table-cell">Hires</TableHead><TableHead className="text-xs">Status</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow className="bg-muted/40"><TableHead className="text-xs">Company</TableHead><TableHead className="text-xs">Projects</TableHead><TableHead className="text-xs">Internship Hires</TableHead><TableHead className="text-xs">Full-time Hires</TableHead><TableHead className="text-xs">Total Hires</TableHead><TableHead className="text-xs">Status</TableHead></TableRow></TableHeader>
                     <TableBody>
-                      {topCompanies.map((company) => (
+                      {filteredCompanies.map((company) => (
                         <TableRow key={company.name} className="hover:bg-muted/30 transition-colors">
                           <TableCell className="font-medium text-sm">{company.name}</TableCell>
                           <TableCell className="text-sm">{company.projects}</TableCell>
-                          <TableCell className="text-sm hidden md:table-cell">{company.hires}</TableCell>
+                          <TableCell className="text-sm">{(company as any).internshipHires ?? 0}</TableCell>
+                          <TableCell className="text-sm">{(company as any).fullTimeHires ?? 0}</TableCell>
+                          <TableCell className="text-sm font-medium">{(company as any).totalHires ?? company.hires}</TableCell>
                           <TableCell><StatusBadge status={company.status} /></TableCell>
                         </TableRow>
                       ))}
@@ -547,7 +736,7 @@ export default function AdminReportsPage() {
                     {applicationStatusData.map((item) => (
                       <div key={item.name} className="text-center p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors">
                         <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2" style={{ backgroundColor: `${item.color}20` }}>
-                          {item.name === "Applied" && <FileText className="h-5 w-5" style={{ color: item.color }} />}
+                          {(item.name === "Sent" || item.name === "Applied" || item.name === "Draft") && <FileText className="h-5 w-5" style={{ color: item.color }} />}
                           {item.name === "Under Review" && <Clock className="h-5 w-5" style={{ color: item.color }} />}
                           {item.name === "Interviewed" && <Users className="h-5 w-5" style={{ color: item.color }} />}
                           {(item.name === "Hired (Internship)" || item.name === "Hired (Full-time)") && <CheckCircle2 className="h-5 w-5" style={{ color: item.color }} />}

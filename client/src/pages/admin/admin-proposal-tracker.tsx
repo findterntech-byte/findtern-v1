@@ -250,7 +250,7 @@ export default function AdminProposalTrackerPage() {
       case "scheduled":
         return <Badge className="bg-blue-100 text-blue-700 border-blue-200 flex items-center gap-1 w-fit"><Calendar className="h-3 w-3" />{status}</Badge>;
       case "rejected":
-      case "cancelled":
+    
       case "expired":
       case "withdrawn":
         return <Badge className="bg-rose-100 text-rose-700 border-rose-200 flex items-center gap-1 w-fit"><XCircle className="h-3 w-3" />{status}</Badge>;
@@ -270,6 +270,23 @@ export default function AdminProposalTrackerPage() {
     } catch {
       return dateStr;
     }
+  };
+
+  const getHiredDisplayLabel = (activity: Proposal | Interview) => {
+    if ((activity as Proposal).projectId) {
+      const proj = projectsById.get((activity as Proposal).projectId);
+      if (proj && (proj as any).fullTimeOffer) {
+        return "Full-time Hired";
+      }
+    }
+    return "Internship Hired";
+  };
+
+  const getActivityDisplayStatus = (activity: Proposal | Interview) => {
+    if (activity.status === "hired") {
+      return getHiredDisplayLabel(activity);
+    }
+    return activity.status;
   };
 
   const proposalStatusCounts = useMemo(() => {
@@ -472,17 +489,19 @@ export default function AdminProposalTrackerPage() {
                   </div>
                 </div>
                 
-                <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-sm hover:from-white/15 hover:to-white/10 transition-all duration-300 group/card col-span-2">
+            
+                
+                <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-sm hover:from-white/15 hover:to-white/10 transition-all duration-300 group/card">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 bg-rose-500/20 rounded-lg">
-                      <XCircle className="h-4 w-4 text-rose-400" />
+                    <div className="p-2 bg-orange-500/20 rounded-lg">
+                      <Clock className="h-4 w-4 text-orange-400" />
                     </div>
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Cancelled</span>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Expired</span>
                   </div>
                   <div className="flex items-end justify-between">
-                    <p className="text-3xl font-bold text-rose-400">{interviewStatusCounts["cancelled"] || 0}</p>
+                    <p className="text-3xl font-bold text-orange-400">{interviewStatusCounts["expired"] || 0}</p>
                     <div className="flex-1 ml-4 h-2 bg-slate-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-rose-500 to-pink-400 rounded-full transition-all duration-500" style={{ width: `${interviews.length > 0 ? ((interviewStatusCounts["cancelled"] || 0) / interviews.length * 100) : 0}%` }}></div>
+                      <div className="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full transition-all duration-500" style={{ width: `${interviews.length > 0 ? ((interviewStatusCounts["expired"] || 0) / interviews.length * 100) : 0}%` }}></div>
                     </div>
                   </div>
                 </div>
@@ -669,7 +688,7 @@ export default function AdminProposalTrackerPage() {
                         {lastActivity ? (
                           <div className="flex items-center justify-between bg-slate-50/50 p-2 rounded-md border border-slate-100">
                             <span className="text-xs font-medium truncate max-w-[120px]">
-                              {lastActivity.status}
+                              {getActivityDisplayStatus(lastActivity)}
                             </span>
                             <span className="text-[10px] text-muted-foreground">
                               {formatDate(lastActivity.updatedAt, true)}
@@ -743,7 +762,7 @@ export default function AdminProposalTrackerPage() {
                         {lastActivity ? (
                           <div className="flex items-center justify-between bg-slate-50/50 p-2 rounded-md border border-slate-100">
                             <span className="text-xs font-medium truncate max-w-[120px]">
-                              {lastActivity.status}
+                              {getActivityDisplayStatus(lastActivity)}
                             </span>
                             <span className="text-[10px] text-muted-foreground">
                               {formatDate(lastActivity.updatedAt, true)}
@@ -854,7 +873,7 @@ export default function AdminProposalTrackerPage() {
                     <SelectItem value="pending">Pending ({interviewStatusCounts["pending"] || 0})</SelectItem>
                     <SelectItem value="scheduled">Scheduled ({interviewStatusCounts["scheduled"] || 0})</SelectItem>
                     <SelectItem value="completed">Completed ({interviewStatusCounts["completed"] || 0})</SelectItem>
-                    <SelectItem value="cancelled">Cancelled ({interviewStatusCounts["cancelled"] || 0})</SelectItem>
+                    <SelectItem value="expired">Expired ({interviewStatusCounts["expired"] || 0})</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

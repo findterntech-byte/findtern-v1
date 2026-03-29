@@ -6250,22 +6250,67 @@ export async function registerRoutes(
         projectsByEmployer.set(id, list);
       }
 
+      const projectsById = new Map<string, any>();
+      for (const p of projects as any[]) {
+        const pid = String((p as any)?.id ?? "");
+        if (pid) projectsById.set(pid, p);
+      }
+
       const topCompanies = Array.from(employerById.entries())
         .map(([employerId, e]) => {
           const projCount = (projectsByEmployer.get(employerId) ?? []).length;
-          const hires = (proposalsByEmployer.get(employerId) ?? []).filter(
-            (p) => {
-              const st = String((p as any)?.status ?? "").toLowerCase();
-              return st === "accepted" || st === "hired";
-            },
-          ).length;
-          const sent = (proposalsByEmployer.get(employerId) ?? []).length;
+          
+          let internshipHires = 0;
+          let fullTimeHires = 0;
+          
+          for (const p of proposalsInRange as any[]) {
+            const st = String((p as any)?.status ?? "").toLowerCase();
+            const propEmployerId = String((p as any)?.employerId ?? (p as any)?.employer_id ?? "").trim();
+            if (propEmployerId !== employerId) continue;
+            if (!(st === "accepted" || st === "hired")) continue;
+            
+            const proposalId = String((p as any)?.id ?? "").trim();
+            const paidAtMs = proposalId ? proposalPaidAtById.get(proposalId) : undefined;
+            if (paidAtMs == null) continue;
+            if (paidAtMs < since.getTime() || paidAtMs > now.getTime()) continue;
+            
+            const isFullTime = (() => {
+              try {
+                const offer = (p as any)?.offerDetails ?? (p as any)?.offer_details ?? {};
+                const ft = (offer as any)?.fullTimeOffer;
+                if (ft === true || (ft && typeof ft === "object" && Object.keys(ft).length > 0)) return true;
+                if (ft === false) return false;
+                const duration = String(offer?.duration ?? offer?.internshipDuration ?? "").toLowerCase();
+                if (duration && (duration.includes("month") || /^\d+m$/.test(duration))) {
+                  return false;
+                }
+                const projectId = String((p as any)?.projectId ?? (p as any)?.project_id ?? "").trim();
+                const proj = projectId ? projectsById.get(projectId) : null;
+                return Boolean((proj as any)?.fullTimeOffer);
+              } catch {
+                return false;
+              }
+            })();
+            
+            if (isFullTime) {
+              fullTimeHires++;
+            } else {
+              internshipHires++;
+            }
+          }
+          
+          const allProposals = proposalsByEmployer.get(employerId) ?? [];
+          const hires = internshipHires + fullTimeHires;
+          const sent = allProposals.length;
           const rating = Math.min(5, Math.max(3.5, 3.5 + (sent ? hires / sent : 0) * 1.5));
           const status = projCount > 0 ? "active" : "inactive";
           return {
             name: String((e as any)?.companyName ?? (e as any)?.name ?? employerId),
             projects: projCount,
             hires,
+            internshipHires,
+            fullTimeHires,
+            totalHires: hires,
             rating: Number(rating.toFixed(1)),
             status,
           };
@@ -6396,14 +6441,14 @@ export async function registerRoutes(
           if (raw === "under_review" || raw === "review" || raw === "reviewing") return "Under Review";
           if (raw === "withdrawn" || raw === "expired") return "Withdrawn";
           // includes 'sent', 'draft' etc.
-          return "Applied";
+          return "Sent";
         })();
 
         statusCounts.set(bucket, (statusCounts.get(bucket) ?? 0) + 1);
       }
 
       const statusColor: Record<string, string> = {
-        Applied: "hsl(217, 91%, 60%)",
+        Sent: "hsl(217, 91%, 60%)",
         "Under Review": "hsl(43, 96%, 56%)",
         Interviewed: "hsl(262, 83%, 58%)",
         "Hired (Internship)": "hsl(152, 61%, 40%)",

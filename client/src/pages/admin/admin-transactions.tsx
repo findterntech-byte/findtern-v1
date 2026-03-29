@@ -253,6 +253,191 @@ export default function AdminTransactionsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const getInvoiceNumber = (transaction: Transaction, index: number = 0) => {
+    if (transaction.referenceId && transaction.referenceId.includes('-')) {
+      const parts = transaction.referenceId.split('-');
+      if (parts.length >= 2) {
+        return transaction.referenceId;
+      }
+    }
+    const dateObj = transaction.date ? new Date(transaction.date) : new Date();
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const yy = String(dateObj.getFullYear() % 100).padStart(2, '0');
+    const seq = String(index + 1).padStart(2, '0');
+    return `${dd}${mm}${yy}-${seq}`;
+  };
+
+  const generateInvoiceHtml = (transaction: Transaction, invoiceNum: string) => {
+    const isCredit = transaction.type === "credit";
+    const currencyCode = String(transaction.currency || "INR").toUpperCase();
+    const amountFormatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: currencyCode, minimumFractionDigits: 0 }).format(transaction.amount);
+    
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Invoice - ${invoiceNum}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #1f2937; background: #f8fafc; }
+    .invoice-container { max-width: 900px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    .header { background: linear-gradient(135deg, #047857 0%, #065f46 100%); color: white; padding: 24px; }
+    .header-content { display: flex; justify-content: space-between; align-items: center; }
+    .company-info { display: flex; align-items: center; gap: 16px; }
+    .company-logo { height: 48px; width: auto; }
+    .company-details { }
+    .company-name { font-size: 16px; font-weight: 600; }
+    .company-address { font-size: 11px; opacity: 0.9; margin-top: 2px; }
+    .company-gst { font-size: 11px; opacity: 0.9; }
+    .invoice-title { text-align: right; }
+    .invoice-title h1 { font-size: 32px; font-weight: 700; letter-spacing: 2px; }
+    .body { padding: 24px; }
+    .info-section { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 24px; }
+    .info-box { }
+    .info-label { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+    .info-value { font-size: 14px; color: #0f172a; margin-top: 4px; font-weight: 500; }
+    .invoice-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    .invoice-table thead { background: #064e3b; color: white; }
+    .invoice-table th { padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .invoice-table th:last-child { text-align: right; }
+    .invoice-table td { padding: 16px; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+    .invoice-table td:last-child { text-align: right; font-weight: 600; }
+    .invoice-table .item-name { font-weight: 500; color: #0f172a; }
+    .invoice-table .item-desc { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .totals { display: flex; justify-content: flex-end; }
+    .totals-table { width: 280px; }
+    .totals-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
+    .totals-row.total { border-top: 2px solid #064e3b; margin-top: 8px; padding-top: 16px; font-weight: 700; font-size: 18px; color: #064e3b; }
+    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    .status-completed { background: #d1fae5; color: #065f46; }
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-failed { background: #fee2e2; color: #991b1b; }
+    .footer { padding: 20px 24px; background: #f1f5f9; border-top: 1px solid #e2e8f0; text-align: center; }
+    .footer p { font-size: 12px; color: #64748b; }
+    @media print { body { padding: 0; background: white; } .invoice-container { box-shadow: none; } }
+  </style>
+</head>
+<body>
+  <div class="invoice-container">
+    <div class="header">
+      <div class="header-content">
+        <div class="company-info">
+          <svg class="company-logo" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="40" height="40" rx="8" fill="white"/>
+            <path d="M12 28V12h8c4 0 6 2 6 5s-2 5-6 5h-5v6h-3zm3-10h5c2 0 3-1 3-3s-1-2-3-2h-5v5z" fill="#047857"/>
+            <text x="48" y="26" font-family="Arial" font-size="18" font-weight="bold" fill="white">Findtern</text>
+          </svg>
+          <div class="company-details">
+            <div class="company-name">Findtern Private Limited</div>
+            <div class="company-address">386, Jagatpura, Jaipur, Rajasthan (302017)</div>
+            <div class="company-gst">GST: 08AAGCF2512F1Z0</div>
+          </div>
+        </div>
+        <div class="invoice-title">
+          <h1>INVOICE</h1>
+        </div>
+      </div>
+    </div>
+    
+    <div class="body">
+      <div class="info-section">
+        <div class="info-box">
+          <div class="info-label">Invoice Number</div>
+          <div class="info-value">${invoiceNum}</div>
+          
+          <div class="info-label" style="margin-top: 16px;">Invoice Date</div>
+          <div class="info-value">${transaction.date}</div>
+          
+          <div class="info-label" style="margin-top: 16px;">Transaction ID</div>
+          <div class="info-value" style="font-family: monospace; font-size: 12px;">${transaction.id.slice(0, 12)}...</div>
+        </div>
+        
+        <div class="info-box">
+          <div class="info-label">Invoice To</div>
+          <div class="info-value">${transaction.companyName || '-'}</div>
+          
+          ${transaction.internName && transaction.internName !== '-' ? `
+          <div class="info-label" style="margin-top: 16px;">Intern</div>
+          <div class="info-value">${transaction.internName}</div>
+          ` : ''}
+          
+          <div class="info-label" style="margin-top: 16px;">Status</div>
+          <div class="info-value">
+            <span class="status-badge ${transaction.status === 'completed' ? 'status-completed' : transaction.status === 'pending' ? 'status-pending' : 'status-failed'}">
+              ${transaction.status}
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      <table class="invoice-table">
+        <thead>
+          <tr>
+            <th>Item Description</th>
+            <th>Amount (${currencyCode})</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <div class="item-name">${isCredit ? 'Payment Received' : 'Payment Made'}</div>
+              <div class="item-desc">
+                ${transaction.description || '-'}
+                ${transaction.paymentMethod ? ' | ' + transaction.paymentMethod : ''}
+                ${transaction.referenceId ? ' | Ref: ' + transaction.referenceId : ''}
+              </div>
+            </td>
+            <td>${amountFormatted}</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div class="totals">
+        <div class="totals-table">
+          <div class="totals-row total">
+            <span>Total</span>
+            <span>${amountFormatted}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <p>Thank you for using Findtern!</p>
+      <p style="margin-top: 4px;">This is a computer-generated invoice. Generated on ${new Date().toLocaleString('en-IN')}</p>
+    </div>
+  </div>
+</body>
+</html>`;
+  };
+
+  const openInvoiceInNewTab = (transaction: Transaction) => {
+    const index = transactions.findIndex(t => t.id === transaction.id);
+    const invoiceNum = getInvoiceNumber(transaction, index);
+    const invoiceHtml = generateInvoiceHtml(transaction, invoiceNum);
+    
+    const blob = new Blob([invoiceHtml], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+  };
+
+  const downloadInvoice = (transaction: Transaction) => {
+    const index = transactions.findIndex(t => t.id === transaction.id);
+    const invoiceNum = getInvoiceNumber(transaction, index);
+    const invoiceHtml = generateInvoiceHtml(transaction, invoiceNum);
+    
+    const blob = new Blob([invoiceHtml], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `invoice-${invoiceNum}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const { data, isLoading, error } = useQuery<AdminTransactionsResponse>({
     queryKey: [
       "/api/admin/transactions",
@@ -697,16 +882,6 @@ export default function AdminTransactionsPage() {
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
-                              <DropdownMenuItem onClick={() => setSelectedTransaction(transaction)} className="cursor-pointer">
-                                <Eye className="h-4 w-4 mr-2 text-muted-foreground" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer">
-                                <Download className="h-4 w-4 mr-2 text-muted-foreground" />
-                                Download Receipt
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
@@ -804,10 +979,12 @@ export default function AdminTransactionsPage() {
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Company</p>
                     <p className="text-sm font-medium">{selectedTransaction.companyName}</p>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Intern</p>
-                    <p className="text-sm font-medium">{selectedTransaction.internName}</p>
-                  </div>
+                  {selectedTransaction.internName && selectedTransaction.internName.toLowerCase() !== "intern" && (
+                    <div className="space-y-1">
+                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Intern</p>
+                      <p className="text-sm font-medium">{selectedTransaction.internName}</p>
+                    </div>
+                  )}
                   <div className="col-span-2 space-y-1">
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Payment Method</p>
                     <p className="text-sm font-medium">{selectedTransaction.paymentMethod}</p>
@@ -818,24 +995,18 @@ export default function AdminTransactionsPage() {
                   <Button 
                     variant="outline" 
                     className="flex-1 h-11"
-                    onClick={() => {
-                      if (selectedTransaction.source === "employer" && selectedTransaction.employerId) {
-                        window.open(`/api/employer/${selectedTransaction.employerId}/orders/${selectedTransaction.id}/invoice`, "_blank");
-                      } else {
-                        const blob = new Blob([JSON.stringify(selectedTransaction, null, 2)], { type: "application/json" });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `receipt-${selectedTransaction.id}.json`;
-                        document.body.appendChild(a);
-                        a.click();
-                        a.remove();
-                        URL.revokeObjectURL(url);
-                      }
-                    }}
+                    onClick={() => openInvoiceInNewTab(selectedTransaction)}
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    View Invoice
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 h-11"
+                    onClick={() => downloadInvoice(selectedTransaction)}
                   >
                     <Download className="mr-2 h-4 w-4" />
-                    Download Receipt
+                    Download Invoice
                   </Button>
                 </div>
               </div>
@@ -843,6 +1014,7 @@ export default function AdminTransactionsPage() {
           )}
         </DialogContent>
       </Dialog>
+
     </AdminLayout>
   );
 }
