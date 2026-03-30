@@ -96,6 +96,8 @@ type Company = {
   internationalFteStatus: string;
   isActive: boolean;
   onboardingCompleted: boolean;
+  projectCities: string[];
+  projectLocationTypes: string[];
 };
 
 type ColumnKey =
@@ -104,6 +106,8 @@ type ColumnKey =
   | "email"
   | "country"
   | "city"
+  | "projectCity"
+  | "projectLocation"
   | "spocName"
   | "phone"
   | "createdAt"
@@ -225,7 +229,9 @@ export default function AdminCompaniesPage() {
         { key: "companyName" as const, label: "Company name", sortKey: "companyName" as const, filterKey: "companyName" as const },
         { key: "email" as const, label: "Company email", sortKey: "email" as const, filterKey: "email" as const },
         { key: "country" as const, label: "Country", filterKey: "country" as const },
-        { key: "city" as const, label: "City", filterKey: "city" as const },
+        { key: "city" as const, label: "Company City", filterKey: "city" as const },
+        { key: "projectCity" as const, label: "Project City" },
+        { key: "projectLocation" as const, label: "Work Location" },
         { key: "spocName" as const, label: "FPOC Name", filterKey: "spocName" as const },
         { key: "phone" as const, label: "Phone", sortKey: "phone" as const, filterKey: "phone" as const },
         { key: "createdAt" as const, label: "Created on", sortKey: "createdAt" as const },
@@ -319,6 +325,8 @@ export default function AdminCompaniesPage() {
             internationalFteStatus: String(e?.internationalFteStatus ?? "none"),
             isActive: Boolean(e?.isActive ?? true),
             onboardingCompleted: Boolean(e?.onboardingCompleted ?? false),
+            projectCities: Array.isArray(e?.projectCities) ? e.projectCities : [],
+            projectLocationTypes: Array.isArray(e?.projectLocationTypes) ? e.projectLocationTypes : [],
           };
         });
 
@@ -684,99 +692,109 @@ export default function AdminCompaniesPage() {
                         <ColumnHeader col={columns[4]} />
                       </TableHead>
                     )}
-                    {columnVisibility.spocName && (
+                    {columnVisibility.projectCity && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[5]} />
                       </TableHead>
                     )}
-                    {columnVisibility.phone && (
+                    {columnVisibility.projectLocation && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[6]} />
                       </TableHead>
                     )}
-                    {columnVisibility.createdAt && (
+                    {columnVisibility.spocName && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[7]} />
                       </TableHead>
                     )}
-                    {columnVisibility.activeInternships && (
+                    {columnVisibility.phone && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[8]} />
                       </TableHead>
                     )}
-                    {columnVisibility.lastPaymentAt && (
+                    {columnVisibility.createdAt && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[9]} />
                       </TableHead>
                     )}
-                    {columnVisibility.totalBilledAmount && (
+                    {columnVisibility.activeInternships && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[10]} />
                       </TableHead>
                     )}
-                    {columnVisibility.totalPaidAmount && (
+                    {columnVisibility.lastPaymentAt && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[11]} />
                       </TableHead>
                     )}
-                    {columnVisibility.totalRemainingAmount && (
+                    {columnVisibility.totalBilledAmount && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[12]} />
                       </TableHead>
                     )}
-                    {columnVisibility.upcomingPaymentAmount && (
+                    {columnVisibility.totalPaidAmount && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[13]} />
                       </TableHead>
                     )}
-                    {columnVisibility.upcomingPaymentAt && (
+                    {columnVisibility.totalRemainingAmount && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[14]} />
                       </TableHead>
                     )}
-                    {columnVisibility.proposalsTotal && (
+                    {columnVisibility.upcomingPaymentAmount && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[15]} />
                       </TableHead>
                     )}
-                    {columnVisibility.proposalsSent && (
+                    {columnVisibility.upcomingPaymentAt && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[16]} />
                       </TableHead>
                     )}
-                    {columnVisibility.proposalsAccepted && (
+                    {columnVisibility.proposalsTotal && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[17]} />
                       </TableHead>
                     )}
-                    {columnVisibility.proposalsRejected && (
+                    {columnVisibility.proposalsSent && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[18]} />
                       </TableHead>
                     )}
-                    {columnVisibility.proposalsExpired && (
+                    {columnVisibility.proposalsAccepted && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[19]} />
                       </TableHead>
                     )}
-                    {columnVisibility.totalHires && (
+                    {columnVisibility.proposalsRejected && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[20]} />
                       </TableHead>
                     )}
-                    {columnVisibility.internationalFte && (
+                    {columnVisibility.proposalsExpired && (
                       <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ColumnHeader col={columns[21]} />
                       </TableHead>
                     )}
+                    {columnVisibility.totalHires && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[22]} />
+                      </TableHead>
+                    )}
+                    {columnVisibility.internationalFte && (
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ColumnHeader col={columns[23]} />
+                      </TableHead>
+                    )}
                     {columnVisibility.actions && (
                       <TableHead className="w-[200px] text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        <ColumnHeader col={columns[22]} />
+                        <ColumnHeader col={columns[24]} />
                       </TableHead>
                     )}
                     {columnVisibility.status && (
                       <TableHead className="w-[120px] text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        <ColumnHeader col={columns[23]} />
+                        <ColumnHeader col={columns[25]} />
                       </TableHead>
                     )}
                   </TableRow>
@@ -819,12 +837,15 @@ export default function AdminCompaniesPage() {
                         )}
                         {columnVisibility.companyName && (
                           <TableCell>
-                            <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => setLocation(`/admin/companies/${company.id}`)}
+                              className="flex items-center gap-3 hover:text-primary transition-colors text-left"
+                            >
                               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary font-semibold text-sm">
                                 {company.companyName.charAt(0).toUpperCase()}
                               </div>
-                              <span className="font-medium">{company.companyName}</span>
-                            </div>
+                              <span className="font-medium underline-offset-2 hover:underline">{company.companyName}</span>
+                            </button>
                           </TableCell>
                         )}
                         {columnVisibility.email && (
@@ -848,6 +869,28 @@ export default function AdminCompaniesPage() {
                             <div className="flex items-center gap-2 text-sm">
                               <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
                               {company.city}
+                            </div>
+                          </TableCell>
+                        )}
+                        {columnVisibility.projectCity && (
+                          <TableCell>
+                            <div className="text-sm">
+                              {company.projectCities.length > 0 ? company.projectCities.join(", ") : "—"}
+                            </div>
+                          </TableCell>
+                        )}
+                        {columnVisibility.projectLocation && (
+                          <TableCell>
+                            <div className="text-sm">
+                              {company.projectLocationTypes.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {company.projectLocationTypes.map((loc) => (
+                                    <Badge key={loc} variant="outline" className="text-[10px] capitalize">
+                                      {loc}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : "—"}
                             </div>
                           </TableCell>
                         )}

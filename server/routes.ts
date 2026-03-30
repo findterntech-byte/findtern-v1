@@ -9743,6 +9743,8 @@ export async function registerRoutes(
       const hiredInternIdsByEmployerId = new Map<string, Set<string>>();
       const hiredCountByEmployerId = new Map<string, number>();
       const fullTimeHiredCountByEmployerId = new Map<string, number>();
+      const projectCitiesByEmployerId = new Map<string, Set<string>>();
+      const projectLocationTypesByEmployerId = new Map<string, Set<string>>();
       for (const pr of proposals as any[]) {
         const employerId = String((pr as any)?.employerId ?? "").trim();
         if (!employerId) continue;
@@ -9778,6 +9780,23 @@ export async function registerRoutes(
             (fullTimeHiredCountByEmployerId.get(employerId) ?? 0) + 1,
           );
         }
+        if (projectId) {
+          const project = projectById.get(projectId);
+          if (project) {
+            const projCity = String((project as any)?.city ?? "").trim();
+            if (projCity) {
+              const citySet = projectCitiesByEmployerId.get(employerId) ?? new Set<string>();
+              citySet.add(projCity);
+              projectCitiesByEmployerId.set(employerId, citySet);
+            }
+            const projLocationType = String((project as any)?.locationType ?? "").trim();
+            if (projLocationType) {
+              const locSet = projectLocationTypesByEmployerId.get(employerId) ?? new Set<string>();
+              locSet.add(projLocationType);
+              projectLocationTypesByEmployerId.set(employerId, locSet);
+            }
+          }
+        }
       }
 
       const safeEmployers = (visibleEmployers as any[]).map((e) => {
@@ -9811,7 +9830,7 @@ export async function registerRoutes(
           upcomingPaymentAmountMinor: upcoming ? upcoming.amountMinor : null,
           upcomingPaymentCurrency: upcoming ? upcoming.currency : null,
           upcomingPaymentStatus: upcoming ? upcoming.status : null,
-          totalBilledAmountMinor: totalDealMinor,
+          totalBilledAmountMinor: totalBilledMinorByEmployerId.get(employerId) ?? 0,
           totalPaidAmountMinor: totalPaidMinor,
           totalRemainingAmountMinor: totalRemainingMinor,
           proposalsTotal,
@@ -9823,6 +9842,8 @@ export async function registerRoutes(
           totalHires: hiredCountByEmployerId.get(employerId) ?? 0,
           hiredResourcesCount,
           conversionRate,
+          projectCities: Array.from(projectCitiesByEmployerId.get(employerId) ?? []),
+          projectLocationTypes: Array.from(projectLocationTypesByEmployerId.get(employerId) ?? []),
         };
       });
 

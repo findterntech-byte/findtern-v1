@@ -20,6 +20,9 @@ type Project = {
   projectName: string;
   skills: string[];
   location: string;
+  city: string;
+  state: string;
+  preferredLocations: string[];
   scopeOfWork: string;
   locationType: string;
   pincode: string;
@@ -175,6 +178,11 @@ export default function AdminProjectsPage() {
           const skills = Array.isArray(p?.skills) ? p.skills.map((s: any) => String(s)) : [];
           const pincode = String(p?.pincode ?? "-") || "-";
           const timezone = String(p?.timezone ?? "-") || "-";
+          const rawCity = String(p?.city ?? "").trim();
+          const rawState = String(p?.state ?? "").trim().toLowerCase();
+          const city = rawCity && rawCity !== "null" ? rawCity : "-";
+          const state = rawState && rawState !== "active" && rawState !== "inactive" && rawState !== "draft" && rawState !== "null" ? String(p?.state ?? "-") : "-";
+          const preferredLocations = Array.isArray(p?.preferredLocations) ? p.preferredLocations.map((x: any) => String(x ?? "").trim()).filter(Boolean) : [];
           return {
             id: String(p?.id ?? ""),
             employerId: String(p?.employerId ?? p?.employer_id ?? ""),
@@ -182,6 +190,9 @@ export default function AdminProjectsPage() {
             projectName: String(p?.projectName ?? "-"),
             skills,
             location: String(location),
+            city,
+            state,
+            preferredLocations,
             scopeOfWork: String(p?.scopeOfWork ?? "-"),
             locationType: String(p?.locationType ?? "-"),
             pincode,
@@ -401,9 +412,12 @@ export default function AdminProjectsPage() {
                                   <TableRow className="bg-muted/40 hover:bg-muted/40">
                                     <TableHead className="font-semibold">Project</TableHead>
                                     <TableHead className="font-semibold">Skills</TableHead>
-                                    <TableHead className="font-semibold">Location</TableHead>
+                                    <TableHead className="font-semibold">City</TableHead>
+                                    <TableHead className="font-semibold">State</TableHead>
+                                    <TableHead className="font-semibold">Preferred Locations</TableHead>
+                                    <TableHead className="font-semibold">Work Mode</TableHead>
                                     <TableHead className="font-semibold">Scope</TableHead>
-                                    <TableHead className="font-semibold">Type</TableHead>
+                                    <TableHead className="font-semibold">Full-time Possible</TableHead>
                                     <TableHead className="font-semibold">Status</TableHead>
                                     <TableHead className="font-semibold">Created</TableHead>
                                   </TableRow>
@@ -430,12 +444,27 @@ export default function AdminProjectsPage() {
                                           )}
                                         </div>
                                       </TableCell>
+                                      <TableCell>{p.city}</TableCell>
+                                      <TableCell>{p.state}</TableCell>
                                       <TableCell>
-                                        <div className="flex items-center gap-1.5 text-sm">
-                                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                                          <span className="truncate max-w-[120px]">{p.location}</span>
-                                        </div>
+                                        {p.preferredLocations.length > 0 ? (
+                                          <div className="flex flex-wrap gap-1">
+                                            {p.preferredLocations.slice(0, 2).map((loc) => (
+                                              <Badge key={loc} variant="outline" className="text-[10px]">
+                                                {loc}
+                                              </Badge>
+                                            ))}
+                                            {p.preferredLocations.length > 2 && (
+                                              <Badge variant="outline" className="text-[10px]">
+                                                +{p.preferredLocations.length - 2}
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <span className="text-muted-foreground">—</span>
+                                        )}
                                       </TableCell>
+                                      <TableCell className="capitalize">{p.locationType}</TableCell>
                                       <TableCell>
                                         <Badge variant="outline" className="rounded-full">
                                           {p.scopeOfWork}
@@ -443,9 +472,9 @@ export default function AdminProjectsPage() {
                                       </TableCell>
                                       <TableCell>
                                         {p.fullTimeOffer ? (
-                                          <Badge className="bg-purple-100 text-purple-700 border-purple-200">Full-time</Badge>
+                                          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">Yes</Badge>
                                         ) : (
-                                          <Badge variant="outline">Internship</Badge>
+                                          <Badge variant="outline" className="text-muted-foreground">No</Badge>
                                         )}
                                       </TableCell>
                                       <TableCell><StatusBadge status={p.status} /></TableCell>

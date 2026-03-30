@@ -93,6 +93,8 @@ export default function AdminOrdersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currencyFilter, setCurrencyFilter] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [invoiceData, setInvoiceData] = useState<any | null>(null);
@@ -115,9 +117,23 @@ export default function AdminOrdersPage() {
         order.employer?.companyName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         order.orderId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         order.internName?.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesSearch;
+      
+      const orderDate = order.createdAt ? new Date(order.createdAt) : null;
+      let matchesDate = true;
+      if (fromDate && orderDate) {
+        const from = new Date(fromDate);
+        from.setHours(0, 0, 0, 0);
+        if (orderDate < from) matchesDate = false;
+      }
+      if (toDate && orderDate) {
+        const to = new Date(toDate);
+        to.setHours(23, 59, 59, 999);
+        if (orderDate > to) matchesDate = false;
+      }
+      
+      return matchesSearch && matchesDate;
     });
-  }, [orders, searchQuery]);
+  }, [orders, searchQuery, fromDate, toDate]);
 
   const formatCurrency = (amount: number, currency: string) => {
     const c = String(currency ?? "INR").toUpperCase();
@@ -595,6 +611,40 @@ export default function AdminOrdersPage() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 text-sm h-10"
                 />
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 bg-muted/30 rounded-lg px-3 py-1.5">
+                  <span className="text-[11px] text-muted-foreground font-medium">From</span>
+                  <Input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="h-8 w-[130px] text-xs border-0 bg-transparent p-0 focus:ring-0"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 bg-muted/30 rounded-lg px-3 py-1.5">
+                  <span className="text-[11px] text-muted-foreground font-medium">To</span>
+                  <Input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="h-8 w-[130px] text-xs border-0 bg-transparent p-0 focus:ring-0"
+                  />
+                </div>
+                {(fromDate || toDate) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      setFromDate("");
+                      setToDate("");
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </div>
 
               <div className="flex gap-2 flex-wrap">

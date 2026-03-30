@@ -38,6 +38,7 @@ type LoadedEmployer = {
   escalationContactEmail?: string | null;
   escalationContactPhone?: string | null;
   escalationContactRole?: string | null;
+  escalationContactCountryCode?: string | null;
   bankName?: string | null;
   accountNumber?: string | null;
   accountHolderName?: string | null;
@@ -507,7 +508,7 @@ export default function AdminCompanyDetailPage() {
                       <div className="flex justify-between"><span className="text-sm text-muted-foreground">Name</span><span className="text-sm font-medium">{employer?.escalationContactName || "—"}</span></div>
                       <div className="flex justify-between"><span className="text-sm text-muted-foreground">Email</span><span className="text-sm font-medium">{employer?.escalationContactEmail || "—"}</span></div>
                       <div className="flex justify-between"><span className="text-sm text-muted-foreground">Role</span><span className="text-sm font-medium">{employer?.escalationContactRole || "—"}</span></div>
-                      <div className="flex justify-between"><span className="text-sm text-muted-foreground">Phone</span><span className="text-sm font-medium">{employer?.escalationContactPhone || "—"}</span></div>
+                      <div className="flex justify-between"><span className="text-sm text-muted-foreground">Phone</span><span className="text-sm font-medium">{[employer?.escalationContactCountryCode, employer?.escalationContactPhone].filter(Boolean).join(" ") || "—"}</span></div>
                     </div>
                   </Card>
                 </div>
@@ -518,23 +519,25 @@ export default function AdminCompanyDetailPage() {
                   {tab === "projects" && (
                     <div className="rounded-lg border overflow-hidden">
                       <Table>
-                        <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40"><TableHead>Project</TableHead><TableHead>Skills</TableHead><TableHead>Scope</TableHead><TableHead>Location</TableHead><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40"><TableHead>Project</TableHead><TableHead>Skills</TableHead><TableHead>Scope</TableHead><TableHead>City</TableHead><TableHead>State</TableHead><TableHead>Location</TableHead><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead></TableRow></TableHeader>
                         <TableBody>
-                          {tabData.projectList.length === 0 ? <TableRow><TableCell colSpan={7}><EmptyState icon={Briefcase} title="No projects" description="This company hasn't created any projects yet." /></TableCell></TableRow> :
+                          {tabData.projectList.length === 0 ? <TableRow><TableCell colSpan={9}><EmptyState icon={Briefcase} title="No projects" description="This company hasn't created any projects yet." /></TableCell></TableRow> :
                             tabData.projectList.map((p: any, idx: number) => {
                               const createdAtRaw = p?.createdAt ?? p?.created_at ?? null;
                               const createdAt = createdAtRaw ? (() => { const d = new Date(createdAtRaw); return Number.isNaN(d.getTime()) ? String(createdAtRaw) : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); })() : "—";
                               const skills = Array.isArray(p?.skills) ? p.skills : [];
                               const projectCity = String(p?.city ?? "—") || "—";
-                              const employerCity = summary.location && summary.location !== "—" ? summary.location.split(",")[0].trim() : "";
-                              const city = projectCity && projectCity !== "—" ? projectCity : (employerCity || "—");
+                              const rawState = String(p?.state ?? "").trim().toLowerCase();
+                              const projectState = rawState && rawState !== "active" && rawState !== "inactive" && rawState !== "draft" ? String(p?.state ?? "—") : "—";
                               const status = String(p?.status ?? "—") || "—";
                               return (
                                 <TableRow key={String(p?.id ?? p?.projectName ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
                                   <TableCell className="font-medium">{String(p?.projectName ?? p?.title ?? "—")}</TableCell>
                                   <TableCell className="max-w-[200px]"><div className="flex flex-wrap gap-1">{skills.length === 0 ? <span className="text-xs text-muted-foreground">—</span> : skills.slice(0, 4).map((s: any) => <Badge key={String(s)} variant="outline" className="text-[10px] rounded-full">{String(s)}</Badge>)}{skills.length > 4 && <Badge variant="outline" className="text-[10px] rounded-full">+{skills.length - 4}</Badge>}</div></TableCell>
                                   <TableCell><Badge variant="outline">{String(p?.scopeOfWork ?? p?.scope_of_work ?? "—")}</Badge></TableCell>
-                                  <TableCell>{String(p?.locationType ?? p?.location_type ?? "—")}</TableCell>
+                                  <TableCell>{projectCity}</TableCell>
+                                  <TableCell>{projectState}</TableCell>
+                                  <TableCell className="capitalize">{String(p?.locationType ?? p?.location_type ?? "—")}</TableCell>
                                   <TableCell>{p?.fullTimeOffer ?? p?.full_time_offer ? "Full-time" : "Internship"}</TableCell>
                                   <TableCell><StatusBadge status={status} /></TableCell>
                                   <TableCell className="text-muted-foreground">{createdAt}</TableCell>

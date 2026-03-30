@@ -342,6 +342,10 @@ const employersMap = useMemo(() => {
     });
     const hasInternRole = roleOptions.some(r => r.toLowerCase().includes("intern"));
     const hasEmployerRole = roleOptions.some(r => r.toLowerCase().includes("employer"));
+    const hasGeneralQuery = enrichedItems.some(x => {
+      const qt = (x.message.queryType ?? "").toLowerCase();
+      return !qt.includes("support") && !qt.includes("report") && !qt.includes("feedback") && !qt.includes("intern") && !qt.includes("employer") && !qt.includes("hiring") && qt.length > 0;
+    });
     
     const allQt: string[] = [];
     const allRoles = [...roleOptions];
@@ -353,6 +357,7 @@ const employersMap = useMemo(() => {
     if (hasHiringData) allQt.push("hiring");
     if (hasInternQuery) allQt.push("intern");
     if (hasEmployerQuery) allQt.push("employer");
+    if (hasGeneralQuery) allQt.push("General");
     if (hasInternRole) allRoles.push("intern");
     if (hasEmployerRole) allRoles.push("employer");
     
@@ -383,6 +388,8 @@ const employersMap = useMemo(() => {
         return !msgQt.includes("support") && !msgQt.includes("report") && msgQt.includes("intern") && firstName !== "intern";
       } else if (qtVal === "employer") {
         return !msgQt.includes("support") && !msgQt.includes("report") && msgQt.includes("employer") && firstName !== "employer";
+      } else if (qtVal === "general") {
+        return !msgQt.includes("support") && !msgQt.includes("report") && !msgQt.includes("feedback") && !msgQt.includes("intern") && !msgQt.includes("employer") && !msgQt.includes("hiring") && msgQt.length > 0;
       } else if (!msgQt.includes("support") && !msgQt.includes("report") && msgQt === qtVal) {
         return true;
       }
@@ -590,25 +597,11 @@ const employersMap = useMemo(() => {
                 className="pl-12 bg-slate-50 border-slate-200 focus-visible:ring-emerald-500 h-12 text-base"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <Select value={queryTypeFilters.length === 0 ? "all" : "custom"} onValueChange={(val) => { 
-                if (val === "all") setQueryTypeFilters([]);
-                else if (val && val !== "custom") toggleFilter(val);
-              }}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Select onValueChange={(val) => { if (val === "all") setQueryTypeFilters([]); }}>
                 <SelectTrigger className="w-[280px] bg-slate-50 border-slate-200 focus-visible:ring-emerald-500 h-12">
-                  <SelectValue>
-                    {queryTypeFilters.length === 0 ? (
-                      "Query Type"
-                    ) : (
-                      <span className="flex items-center gap-1">
-                        <Badge variant="secondary" className="h-5 text-xs bg-emerald-100 text-emerald-700">
-                          {queryTypeFilters.length}
-                        </Badge>
-                        <span className="truncate max-w-[180px]">
-                          {queryTypeFilters.map(f => f.replace('qt:', '').replace('role:', '')).join(', ')}
-                        </span>
-                      </span>
-                    )}
+                  <SelectValue placeholder="Filter by Query Type">
+                    {queryTypeFilters.length === 0 ? "Query Type" : `${queryTypeFilters.length} filter(s) selected`}
                   </SelectValue>
                 </SelectTrigger>
               <SelectContent>
@@ -617,9 +610,19 @@ const employersMap = useMemo(() => {
                   <>
                     <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase">Query Types</div>
                     {queryTypeOptions.qt.map((qt) => (
-                      <SelectItem key={`qt:${qt}`} value={`qt:${qt}`}>
-                        {qt} {queryTypeFilters.includes(`qt:${qt}`) ? "✓" : ""}
-                      </SelectItem>
+                      <div 
+                        key={`qt:${qt}`}
+                        className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-100 cursor-pointer"
+                        onClick={() => toggleFilter(`qt:${qt}`)}
+                      >
+                        <input 
+                          type="checkbox" 
+                          checked={queryTypeFilters.includes(`qt:${qt}`)} 
+                          onChange={() => {}}
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                        <span className="text-sm">{qt}</span>
+                      </div>
                     ))}
                   </>
                 )}
@@ -627,9 +630,19 @@ const employersMap = useMemo(() => {
                   <>
                     <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase">User Type</div>
                     {queryTypeOptions.roles.map((role) => (
-                      <SelectItem key={`role:${role}`} value={`role:${role}`}>
-                        {role} {queryTypeFilters.includes(`role:${role}`) ? "✓" : ""}
-                      </SelectItem>
+                      <div 
+                        key={`role:${role}`}
+                        className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-100 cursor-pointer"
+                        onClick={() => toggleFilter(`role:${role}`)}
+                      >
+                        <input 
+                          type="checkbox" 
+                          checked={queryTypeFilters.includes(`role:${role}`)} 
+                          onChange={() => {}}
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                        <span className="text-sm">{role}</span>
+                      </div>
                     ))}
                   </>
                 )}
@@ -637,9 +650,19 @@ const employersMap = useMemo(() => {
                   <>
                     <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase">Category</div>
                     {queryTypeOptions.kinds.map((kind) => (
-                      <SelectItem key={kind} value={kind}>
-                        {kind} {queryTypeFilters.includes(kind) ? "✓" : ""}
-                      </SelectItem>
+                      <div 
+                        key={kind}
+                        className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-100 cursor-pointer"
+                        onClick={() => toggleFilter(kind)}
+                      >
+                        <input 
+                          type="checkbox" 
+                          checked={queryTypeFilters.includes(kind)} 
+                          onChange={() => {}}
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                        <span className="text-sm">{kind}</span>
+                      </div>
                     ))}
                   </>
                 )}
@@ -647,9 +670,21 @@ const employersMap = useMemo(() => {
               </Select>
               {queryTypeFilters.length > 0 && (
                 <Button variant="ghost" size="sm" onClick={() => setQueryTypeFilters([])} className="h-12 px-3 text-slate-500 hover:text-red-600">
-                  <X className="h-4 w-4" />
+                  <X className="h-4 w-4 mr-1" />
+                  Clear All
                 </Button>
               )}
+              {queryTypeFilters.map((filter) => (
+                <Badge key={filter} variant="secondary" className="h-8 px-3 gap-1 bg-emerald-100 text-emerald-700 border-emerald-200">
+                  {filter.replace('qt:', '').replace('role:', '')}
+                  <button 
+                    onClick={() => toggleFilter(filter)} 
+                    className="ml-1 hover:text-red-600"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
             </div>
             </div>
         </Card>

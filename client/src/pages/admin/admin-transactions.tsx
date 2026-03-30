@@ -185,6 +185,7 @@ const ChartCard = ({
 
 export default function AdminTransactionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
@@ -192,6 +193,8 @@ export default function AdminTransactionsPage() {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [sortBy, setSortBy] = useState<"date" | "amount" | "companyName">("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   const downloadCsv = (rows: Transaction[], fileName: string) => {
@@ -465,11 +468,41 @@ export default function AdminTransactionsPage() {
   }, [transactions, currencyFilter, currencyForTotals]);
 
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((transaction) => {
+    let filtered = transactions.filter((transaction) => {
       const matchesType = typeFilter === "all" || transaction.type === typeFilter;
-      return matchesType;
+      
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch = !q || 
+        String(transaction.id ?? "").toLowerCase().includes(q) ||
+        String(transaction.description ?? "").toLowerCase().includes(q) ||
+        String(transaction.referenceId ?? "").toLowerCase().includes(q) ||
+        String(transaction.internName ?? "").toLowerCase().includes(q);
+      
+      const companyQ = companyFilter.toLowerCase().trim();
+      const matchesCompany = !companyQ || 
+        String(transaction.companyName ?? "").toLowerCase().includes(companyQ);
+      
+      return matchesType && matchesSearch && matchesCompany;
     });
-  }, [transactions, typeFilter]);
+
+    const dir = sortDir === "asc" ? 1 : -1;
+    filtered.sort((a, b) => {
+      if (sortBy === "date") {
+        const dateA = a.date ? new Date(a.date).getTime() : 0;
+        const dateB = b.date ? new Date(b.date).getTime() : 0;
+        return (dateA - dateB) * dir;
+      }
+      if (sortBy === "amount") {
+        return ((a.amount ?? 0) - (b.amount ?? 0)) * dir;
+      }
+      if (sortBy === "companyName") {
+        return String(a.companyName ?? "").localeCompare(String(b.companyName ?? "")) * dir;
+      }
+      return 0;
+    });
+
+    return filtered;
+  }, [transactions, typeFilter, searchQuery, companyFilter, sortBy, sortDir]);
 
   const formatCurrency = (amount: number, currency: string) => {
     const c = String(currency ?? "INR").toUpperCase();
@@ -728,6 +761,29 @@ export default function AdminTransactionsPage() {
                 />
               </div>
               
+              <div className="relative min-w-[200px]">
+                <Input
+                  placeholder="Filter by company..."
+                  value={companyFilter}
+                  onChange={(e) => setCompanyFilter(e.target.value)}
+                  className="text-sm h-10"
+                />
+              </div>
+
+              <Select value={`${sortBy}-${sortDir}`} onValueChange={(v) => { const [by, dir] = v.split("-") as [typeof sortBy, typeof sortDir]; setSortBy(by); setSortDir(dir); }}>
+                <SelectTrigger className="w-[150px] h-10 text-xs">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date-desc">Date (Newest)</SelectItem>
+                  <SelectItem value="date-asc">Date (Oldest)</SelectItem>
+                  <SelectItem value="amount-desc">Amount (High to Low)</SelectItem>
+                  <SelectItem value="amount-asc">Amount (Low to High)</SelectItem>
+                  <SelectItem value="companyName-asc">Company (A-Z)</SelectItem>
+                  <SelectItem value="companyName-desc">Company (Z-A)</SelectItem>
+                </SelectContent>
+              </Select>
+              
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex items-center gap-1.5 bg-muted/30 rounded-lg px-3 py-1.5">
                   <span className="text-[11px] text-muted-foreground font-medium">From</span>
@@ -882,6 +938,12 @@ export default function AdminTransactionsPage() {
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={() => setSelectedTransaction(transaction)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
@@ -991,24 +1053,7 @@ export default function AdminTransactionsPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-2">
-                  <Button 
-                    variant="outline" 
-                    className="flex-1 h-11"
-                    onClick={() => openInvoiceInNewTab(selectedTransaction)}
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    View Invoice
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="flex-1 h-11"
-                    onClick={() => downloadInvoice(selectedTransaction)}
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Download Invoice
-                  </Button>
-                </div>
+
               </div>
             </ScrollArea>
           )}
