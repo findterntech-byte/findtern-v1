@@ -15567,6 +15567,8 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         const remainingMonths = Math.max(0, months - Math.floor(paidAmountMinor / (monthlyAmount || 1)));
         
         const paymentsForProposal = proposalPayments.length;
+        const paidMonths = monthlyAmount > 0 ? Math.floor(paidAmountMinor / monthlyAmount) : 0;
+        const remainingMonthsCalc = months - paidMonths;
         
         internEmployerDues.push({
           id: proposal?.id ?? "",
@@ -15586,8 +15588,8 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           startDate: startDateStr,
           duration: months,
           totalMonths: months,
-          paidMonths: Math.floor(paidAmountMinor / (monthlyAmount || 1)),
-          remainingMonths,
+          paidMonths,
+          remainingMonths: remainingMonthsCalc,
           status: remainingAmountMinor <= 0 ? "completed" : "active",
         });
       }

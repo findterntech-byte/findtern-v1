@@ -686,7 +686,7 @@ export default function AdminCompanyDetailPage() {
                           <div className="flex flex-wrap gap-3">
                             {(() => {
                               const active = tabData.upcomingPaymentsList.filter((d: any) => {
-                                const isCompleted = (d?.remainingMonths ?? 1) <= 0 || d?.status === "paid";
+                                const isCompleted = (d?.remainingMonths ?? 1) <= 0 && (d?.dueAmountMinor ?? 0) <= 0;
                                 return !isCompleted;
                               }).length;
                               const completed = tabData.upcomingPaymentsList.length - active;
@@ -716,8 +716,8 @@ export default function AdminCompanyDetailPage() {
                             <span className="text-xs font-medium text-muted-foreground mr-2">Status:</span>
                             {[
                               { key: "all", label: "All", count: tabData.upcomingPaymentsList.length },
-                              { key: "active", label: "Active", count: tabData.upcomingPaymentsList.filter((d: any) => (d?.remainingMonths ?? 1) > 0 && d?.status !== "paid").length, color: "amber" },
-                              { key: "completed", label: "Completed", count: tabData.upcomingPaymentsList.filter((d: any) => (d?.remainingMonths ?? 1) <= 0 || d?.status === "paid").length, color: "emerald" },
+                              { key: "active", label: "Active", count: tabData.upcomingPaymentsList.filter((d: any) => (d?.remainingMonths ?? 1) > 0 || (d?.dueAmountMinor ?? 0) > 0).length, color: "amber" },
+                              { key: "completed", label: "Completed", count: tabData.upcomingPaymentsList.filter((d: any) => (d?.remainingMonths ?? 1) <= 0 && (d?.dueAmountMinor ?? 0) <= 0).length, color: "emerald" },
                             ].map((filter) => (
                               <button
                                 key={filter.key}
@@ -796,7 +796,7 @@ export default function AdminCompanyDetailPage() {
                               .filter((d: any) => {
                                 // Status filter
                                 if (tabStatus.upcomingPayments && tabStatus.upcomingPayments !== "all") {
-                                  const isCompleted = (d?.remainingMonths ?? 1) <= 0 || d?.status === "paid";
+                                  const isCompleted = (d?.remainingMonths ?? 1) <= 0 && (d?.dueAmountMinor ?? 0) <= 0;
                                   if (tabStatus.upcomingPayments === "completed" && !isCompleted) return false;
                                   if (tabStatus.upcomingPayments === "active" && isCompleted) return false;
                                 }
@@ -821,7 +821,7 @@ export default function AdminCompanyDetailPage() {
                                 const dueAmountMinor = Number(d?.dueAmountMinor ?? d?.amountMinor ?? 0);
                                 const paidMonths = Number(d?.paidMonths ?? 0);
                                 const totalMonths = Number(d?.totalMonths ?? d?.duration ?? 1);
-                                const isCompleted = (d?.remainingMonths ?? 1) <= 0;
+                                const isCompleted = (d?.remainingMonths ?? 1) <= 0 && (d?.dueAmountMinor ?? 0) <= 0;
                                 const progress = totalMonths > 0 ? Math.min(100, Math.round((paidMonths / totalMonths) * 100)) : (d?.status === "paid" ? 100 : 0);
                                 
                                 return (
