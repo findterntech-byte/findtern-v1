@@ -262,8 +262,7 @@ export default function AdminCompanyDetailPage() {
       return matches(hay, tabSearch.hired);
     });
     const employerDuesList = paymentSummary?.internEmployerDues ?? [];
-    const combinedUpcomingList = [...upcomingPaymentsList, ...employerDuesList];
-    return { projectList, proposalList, interviewList, paymentList, upcomingPaymentsList: combinedUpcomingList, hiredList, employerDuesList };
+    return { projectList, proposalList, interviewList, paymentList, upcomingPaymentsList: employerDuesList, hiredList, employerDuesList };
   }, [orders, projects, proposals, interviews, tabSearch, tabStatus, paymentSummary, hiredType]);
 
   const pagination = useMemo(() => {
@@ -686,8 +685,8 @@ export default function AdminCompanyDetailPage() {
                           <div className="flex flex-wrap gap-3">
                             {(() => {
                               const active = tabData.upcomingPaymentsList.filter((d: any) => {
-                                const isCompleted = (d?.remainingMonths ?? 1) <= 0 && (d?.dueAmountMinor ?? 0) <= 0;
-                                return !isCompleted;
+                                const due = Number(d?.dueAmountMinor ?? d?.dueAmount ?? 0);
+                                return due > 0;
                               }).length;
                               const completed = tabData.upcomingPaymentsList.length - active;
                               const totalDue = tabData.upcomingPaymentsList.reduce((sum: number, d: any) => sum + Number(d?.dueAmountMinor ?? d?.amountMinor ?? 0), 0);
@@ -716,8 +715,8 @@ export default function AdminCompanyDetailPage() {
                             <span className="text-xs font-medium text-muted-foreground mr-2">Status:</span>
                             {[
                               { key: "all", label: "All", count: tabData.upcomingPaymentsList.length },
-                              { key: "active", label: "Active", count: tabData.upcomingPaymentsList.filter((d: any) => (d?.remainingMonths ?? 1) > 0 || (d?.dueAmountMinor ?? 0) > 0).length, color: "amber" },
-                              { key: "completed", label: "Completed", count: tabData.upcomingPaymentsList.filter((d: any) => (d?.remainingMonths ?? 1) <= 0 && (d?.dueAmountMinor ?? 0) <= 0).length, color: "emerald" },
+                              { key: "active", label: "Active", count: tabData.upcomingPaymentsList.filter((d: any) => { const due = Number(d?.dueAmountMinor ?? d?.dueAmount ?? 0); return due > 0; }).length, color: "amber" },
+                              { key: "completed", label: "Completed", count: tabData.upcomingPaymentsList.filter((d: any) => { const due = Number(d?.dueAmountMinor ?? d?.dueAmount ?? 0); return due <= 0; }).length, color: "emerald" },
                             ].map((filter) => (
                               <button
                                 key={filter.key}
@@ -796,9 +795,10 @@ export default function AdminCompanyDetailPage() {
                               .filter((d: any) => {
                                 // Status filter
                                 if (tabStatus.upcomingPayments && tabStatus.upcomingPayments !== "all") {
-                                  const isCompleted = (d?.remainingMonths ?? 1) <= 0 && (d?.dueAmountMinor ?? 0) <= 0;
-                                  if (tabStatus.upcomingPayments === "completed" && !isCompleted) return false;
-                                  if (tabStatus.upcomingPayments === "active" && isCompleted) return false;
+                                  const due = Number(d?.dueAmountMinor ?? d?.dueAmount ?? 0);
+                                  const isCompleted = due <= 0;
+                                  if (tabStatus.upcomingPayments === "completed" && due > 0) return false;
+                                  if (tabStatus.upcomingPayments === "active" && due <= 0) return false;
                                 }
                                 // Currency filter
                                 if (tabSearch.upcomingPayments && tabSearch.upcomingPayments !== "all") {
@@ -814,15 +814,15 @@ export default function AdminCompanyDetailPage() {
                                 const startDate = d?.startDate ? formatDate(d.startDate) : d?.dueDate ? formatDate(d.dueDate) : "—";
                                 const duration = d?.duration ?? "—";
                                 const hasFullTime = String(duration).toLowerCase().includes("full-time") || String(duration).toLowerCase().includes("pp") || (d?.offerDetails && String(d.offerDetails).toLowerCase().includes("full"));
-                                const upcomingPaymentDate = d?.upcomingPaymentDate ? formatDate(d.upcomingPaymentDate) : d?.dueDate ? formatDate(d.dueDate) : "—";
                                 const currency = String(d?.currency ?? "INR").toUpperCase();
-                                const upcomingPaymentMinor = Number(d?.monthlyAmountMinor ?? d?.monthlyAmount ?? d?.amountMinor ?? 0);
-                                const totalAmountMinor = Number(d?.totalAmountMinor ?? d?.amountMinor ?? 0);
-                                const dueAmountMinor = Number(d?.dueAmountMinor ?? d?.amountMinor ?? 0);
-                                const paidMonths = Number(d?.paidMonths ?? 0);
+                                const dueAmountMinor = Number(d?.dueAmountMinor ?? d?.dueAmount ?? d?.amountMinor ?? 0);
+                                const isCompleted = dueAmountMinor <= 0;
+                                const upcomingPaymentMinor = isCompleted ? 0 : Number(d?.monthlyAmountMinor ?? d?.monthlyAmount ?? d?.amountMinor ?? 0);
+                                const totalAmountMinor = isCompleted ? 0 : Number(d?.totalAmountMinor ?? d?.amountMinor ?? 0);
+                                const upcomingPaymentDate = isCompleted ? "—" : (d?.upcomingPaymentDate ? formatDate(d.upcomingPaymentDate) : d?.dueDate ? formatDate(d.dueDate) : "—");
+                                const paidMonths = isCompleted ? (d?.totalMonths ?? 0) : Number(d?.paidMonths ?? 0);
                                 const totalMonths = Number(d?.totalMonths ?? d?.duration ?? 1);
-                                const isCompleted = (d?.remainingMonths ?? 1) <= 0 && (d?.dueAmountMinor ?? 0) <= 0;
-                                const progress = totalMonths > 0 ? Math.min(100, Math.round((paidMonths / totalMonths) * 100)) : (d?.status === "paid" ? 100 : 0);
+                                const progress = totalMonths > 0 ? Math.min(100, Math.round((paidMonths / totalMonths) * 100)) : 100;
                                 
                                 return (
                                   <div 

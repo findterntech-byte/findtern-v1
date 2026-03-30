@@ -15503,11 +15503,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         })
         .reduce((acc: number, p: any) => acc + (Number(p?.amountMinor ?? 0) || 0), 0);
 
-      const upcomingPayments = payments
-        .filter((p: any) => {
-          const s = String(p?.status ?? "").trim().toLowerCase();
-          return s === "pending" || s === "created" || (!s && String(p?.orderId ?? "").trim());
-        })
+      const allPayments = payments
         .map((p: any) => {
           const raw = p?.raw ?? {};
           const notes = raw?.notes ?? raw?.order?.notes ?? {};
@@ -15515,24 +15511,31 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           const pid = Array.isArray(proposalIds) && proposalIds.length === 1 ? proposalIds[0] : null;
           const proposal = pid ? (proposals as any[]).find((pr: any) => String(pr?.id ?? "") === pid) : null;
           
+          const status = String(p?.status ?? "").trim().toLowerCase();
+          
           return {
             id: p?.orderId ?? p?.id ?? "",
+            orderId: p?.orderId ?? p?.id ?? "",
             amountMinor: Number(p?.amountMinor ?? 0) || 0,
             currency: String(p?.currency ?? "INR").toUpperCase(),
             dueDate: p?.createdAt ? new Date(p.createdAt).toISOString().slice(0, 10) : null,
+            paidAt: p?.paidAt ? new Date(p.paidAt).toISOString().slice(0, 10) : null,
             candidateName: proposal ? getInternName(proposal) : "Multiple",
             projectName: proposal ? getProjectName(proposal) : "Multiple",
             startDate: proposal ? getStartDate(proposal) : null,
             duration: proposal ? getDuration(proposal) : 0,
-            status: String(p?.status ?? "pending"),
+            status: status,
+            isPaid: status === "paid",
           };
         })
         .filter((p: any) => p.amountMinor > 0);
 
+      const upcomingPayments = allPayments.filter((p: any) => !p.isPaid);
+      const paidPayments = allPayments.filter((p: any) => p.isPaid);
+
       const nextUpcoming = upcomingPayments.length > 0 ? upcomingPayments[0] : null;
       const totalUpcomingMinor = upcomingPayments.reduce((acc: number, p: any) => acc + p.amountMinor, 0);
 
-      const internIds = Array.from(new Set(hiredProposals.map((p: any) => String(p?.internId ?? p?.intern_id ?? "").trim()).filter(Boolean)));
       const internEmployerDues: any[] = [];
 
       for (const proposal of hiredProposals) {
@@ -15606,7 +15609,8 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           upcomingPaymentMinor: totalUpcomingMinor,
           nextUpcomingDate: nextUpcoming?.dueDate ?? null,
         },
-        upcomingPayments,
+        upcomingPayments: allPayments,
+        paidPayments,
         internEmployerDues,
       });
     } catch (error) {
