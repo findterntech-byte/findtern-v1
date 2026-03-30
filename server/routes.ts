@@ -15533,7 +15533,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
       const totalUpcomingMinor = upcomingPayments.reduce((acc: number, p: any) => acc + p.amountMinor, 0);
 
       const internIds = Array.from(new Set(hiredProposals.map((p: any) => String(p?.internId ?? p?.intern_id ?? "").trim()).filter(Boolean)));
-      const internEmployerDues = [];
+      const internEmployerDues: any[] = [];
 
       for (const internId of internIds) {
         try {
@@ -15543,17 +15543,24 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           if (duesRes.ok) {
             const duesData = await duesRes.json();
             const dues = Array.isArray(duesData.employerDues) ? duesData.employerDues : [];
+            const matchingProposal = hiredProposals.find((p: any) => String(p?.internId ?? p?.intern_id ?? "") === internId);
             for (const d of dues) {
               if (String(d?.employerId ?? "") === employerId) {
+                const offer = matchingProposal?.offerDetails ?? matchingProposal?.offer_details ?? {};
                 internEmployerDues.push({
                   ...d,
                   internId,
-                  internName: getInternName(hiredProposals.find((p: any) => String(p?.internId ?? p?.intern_id ?? "") === internId)),
+                  internName: getInternName(matchingProposal),
+                  projectName: getProjectName(matchingProposal),
+                  monthlyAmount: offer?.monthlyAmount ?? offer?.monthly_amount ?? null,
+                  currency: String(offer?.currency ?? "INR").toUpperCase(),
                 });
               }
             }
           }
-        } catch {}
+        } catch (err) {
+          console.error("Error fetching employer dues for intern:", internId, err);
+        }
       }
 
       return res.json({

@@ -420,14 +420,13 @@ export default function AdminCompaniesPage() {
 
   const overview = useMemo(() => {
     const total = rows.length;
-    const active = rows.filter((c) => c.isActive).length;
-    const deactivated = Math.max(0, total - active);
-    const onboardingCompleted = rows.filter((c) => c.isActive && c.onboardingCompleted).length;
-    const onboardingPending = rows.filter((c) => c.isActive && !c.onboardingCompleted).length;
+    const active = rows.filter((c) => c.isActive && c.onboardingCompleted).length;
+    const pending = rows.filter((c) => c.isActive && !c.onboardingCompleted).length;
+    const deactivated = rows.filter((c) => !c.isActive).length;
     const totalRevenue = rows.reduce((sum, c) => sum + c.totalPaidAmountMinor, 0);
     const totalPending = rows.reduce((sum, c) => sum + c.totalRemainingAmountMinor, 0);
 
-    return { total, active, deactivated, onboardingCompleted, onboardingPending, totalRevenue, totalPending };
+    return { total, active, pending, deactivated, onboardingCompleted: active, onboardingPending: pending, totalRevenue, totalPending };
   }, [rows]);
 
   const filtered = useMemo(() => {

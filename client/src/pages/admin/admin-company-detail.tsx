@@ -136,6 +136,7 @@ export default function AdminCompanyDetailPage() {
   });
   const [pageSize, setPageSize] = useState<5 | 10 | 25 | 50>(10);
   const [projectsCreatedDate, setProjectsCreatedDate] = useState<string>("");
+  const [hiredType, setHiredType] = useState<"all" | "fulltime" | "internship">("all");
 
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
@@ -247,10 +248,23 @@ export default function AdminCompanyDetailPage() {
     const interviewList = (interviews ?? []).filter((i: any) => { const s = norm(i?.status ?? "-"); const sf = norm(tabStatus.interviews); if (sf && s !== sf) return false; const hay = `${i?.internName ?? ""} ${i?.projectName ?? ""} ${i?.timezone ?? ""} ${i?.meetingLink ?? ""}`; return matches(hay, tabSearch.interviews); });
     const paymentList = (orders ?? []).filter((o: any) => { const s = norm(o?.status ?? "-"); const sf = norm(tabStatus.payments); if (sf && s !== sf) return false; const hay = `${o?.orderId ?? o?.order_id ?? ""} ${o?.currency ?? ""} ${o?.status ?? ""}`; return matches(hay, tabSearch.payments); });
     const upcomingPaymentsList = (paymentSummary?.upcomingPayments ?? []).filter((o: any) => { const s = norm(o?.status ?? ""); if (s === "paid") return false; const sf = norm(tabStatus.upcomingPayments); if (sf && s !== sf) return false; const hay = `${o?.candidateName ?? o?.internName ?? ""} ${o?.projectName ?? ""} ${o?.currency ?? ""} ${o?.id ?? ""}`; return matches(hay, tabSearch.upcomingPayments); });
-    const hiredList = (proposals ?? []).filter((p: any) => norm(p?.status ?? "") === "hired").filter((p: any) => { const hay = `${p?.internName ?? p?.candidateName ?? ""} ${p?.projectName ?? ""}`; return matches(hay, tabSearch.hired); });
+    const hiredList = (proposals ?? []).filter((p: any) => norm(p?.status ?? "") === "hired").filter((p: any) => {
+      const offer = p?.offerDetails ?? {};
+      const fullTimeOffer = (offer as any)?.fullTimeOffer ?? null;
+      const hasFullTimeOffer = !!fullTimeOffer && typeof fullTimeOffer === "object";
+      const duration = String(offer?.duration ?? "").trim();
+      const isFullTime = hasFullTimeOffer || /full[-\s]?time/i.test(duration);
+      
+      if (hiredType === "fulltime" && !isFullTime) return false;
+      if (hiredType === "internship" && isFullTime) return false;
+      
+      const hay = `${p?.internName ?? p?.candidateName ?? ""} ${p?.projectName ?? ""}`;
+      return matches(hay, tabSearch.hired);
+    });
     const employerDuesList = paymentSummary?.internEmployerDues ?? [];
-    return { projectList, proposalList, interviewList, paymentList, upcomingPaymentsList, hiredList, employerDuesList };
-  }, [orders, projects, proposals, interviews, tabSearch, tabStatus, paymentSummary]);
+    const combinedUpcomingList = [...upcomingPaymentsList, ...employerDuesList];
+    return { projectList, proposalList, interviewList, paymentList, upcomingPaymentsList: combinedUpcomingList, hiredList, employerDuesList };
+  }, [orders, projects, proposals, interviews, tabSearch, tabStatus, paymentSummary, hiredType]);
 
   const pagination = useMemo(() => {
     const getList = (tab: TabKey) => { if (tab === "projects") return tabData.projectList; if (tab === "proposals") return tabData.proposalList; if (tab === "interviews") return tabData.interviewList; if (tab === "payments") return tabData.paymentList; if (tab === "upcomingPayments") return tabData.upcomingPaymentsList; return tabData.hiredList; };
@@ -265,6 +279,8 @@ export default function AdminCompanyDetailPage() {
 
   useEffect(() => { setTabPage((prev) => ({ ...prev, [activeTab]: 1 })); }, [activeTab, pageSize, tabSearch, tabStatus]);
   useEffect(() => { setTabPage((prev) => ({ ...prev, projects: 1 })); }, [projectsCreatedDate]);
+  useEffect(() => { if (activeTab !== "hired") setHiredType("all"); }, [activeTab]);
+  useEffect(() => { if (activeTab === "hired") setTabPage((prev) => ({ ...prev, hired: 1 })); }, [hiredType]);
 
   const formatDate = (raw: string | null) => { if (!raw) return "—"; const d = new Date(raw); if (Number.isNaN(d.getTime())) return String(raw); return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); };
   const formatAmount = (amountMinor: number, currencyCode: string) => { const cur = String(currencyCode || "INR").toUpperCase(); const locale = cur === "INR" ? "en-IN" : "en-US"; const major = Number.isFinite(amountMinor) ? amountMinor / 100 : 0; return new Intl.NumberFormat(locale, { style: "currency", currency: cur, maximumFractionDigits: 0 }).format(major || 0); };
@@ -349,10 +365,7 @@ export default function AdminCompanyDetailPage() {
                   <p className="text-xs text-white/70 font-medium">Active</p>
                   <p className="text-2xl font-bold text-white">{summary.activeInternships}</p>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl px-5 py-3 text-center border border-white/20">
-                  <p className="text-xs text-white/70 font-medium">Hired</p>
-                  <p className="text-2xl font-bold text-white">{summary.hiredResourcesCount}</p>
-                </div>
+               
               </div>
             </div>
           </div>
@@ -377,11 +390,9 @@ export default function AdminCompanyDetailPage() {
         </Card>
 
         {/* Stats Row */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
           <StatCard title="Total Projects" value={projects.length} subtitle={`${summary.activeInternships} active`} icon={<Briefcase className="h-5 w-5" />} />
           <StatCard title="Proposals Sent" value={summary.totalProposals} subtitle={`${Math.round(summary.conversionRate * 100)}% conversion`} icon={<FileCheck className="h-5 w-5" />} variant="success" />
-          <StatCard title="Hired Resources" value={summary.hiredResourcesCount} subtitle="Total hires" icon={<Users className="h-5 w-5" />} variant="success" />
-          <StatCard title="Total Revenue" value={formatAmount(summary.earningsMinor, "INR")} subtitle={summary.lastPaymentAt ? `Last: ${formatDate(summary.lastPaymentAt)}` : "No payments yet"} icon={<DollarSign className="h-5 w-5" />} />
         </div>
 
         {/* Main Tabs */}
@@ -420,6 +431,16 @@ export default function AdminCompanyDetailPage() {
                       <Input className="h-10 pl-10 bg-background" placeholder={`Search ${activeTab}...`} value={tabSearch[activeTab]} onChange={(e) => setTabSearch((prev) => ({ ...prev, [activeTab]: e.target.value }))} />
                     </div>
                     {activeTab === "projects" && <Input type="date" className="h-10 w-full sm:w-[160px] bg-background" value={projectsCreatedDate} onChange={(e) => setProjectsCreatedDate(e.target.value)} />}
+                    {activeTab === "hired" && (
+                      <Select value={hiredType} onValueChange={(v) => setHiredType(v as "all" | "fulltime" | "internship")}>
+                        <SelectTrigger className="h-10 w-full sm:w-[160px] bg-background"><SelectValue placeholder="Hire Type" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Hires</SelectItem>
+                          <SelectItem value="fulltime">Full-time</SelectItem>
+                          <SelectItem value="internship">Internship</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
                     {activeTab !== "hired" && activeTab !== "upcomingPayments" && (
                       <Select value={tabStatus[activeTab] || "__all__"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, [activeTab]: v === "__all__" ? "" : v }))}>
                         <SelectTrigger className="h-10 w-full sm:w-[160px] bg-background"><SelectValue placeholder="Status" /></SelectTrigger>
@@ -596,36 +617,52 @@ export default function AdminCompanyDetailPage() {
                   )}
 
                   {tab === "payments" && (
-                    <div className="rounded-lg border overflow-hidden">
-                      <Table>
-                        <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40"><TableHead>Order ID</TableHead><TableHead>Candidate</TableHead><TableHead>Project</TableHead><TableHead>Status</TableHead><TableHead>Amount</TableHead><TableHead>Currency</TableHead><TableHead>Paid At</TableHead><TableHead>Created</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                          {tabData.paymentList.length === 0 ? <TableRow><TableCell colSpan={9}><EmptyState icon={CreditCard} title="No payments" description="No payment records found for this company." /></TableCell></TableRow> :
-                            tabData.paymentList.map((o: any, idx: number) => {
-                              const orderId = String(o?.orderId ?? o?.order_id ?? "").trim();
-                              const candidateName = String(o?.internName ?? "").trim();
-                              const projectName = String(o?.projectName ?? "").trim();
-                              const status = String(o?.status ?? "").trim().toLowerCase();
-                              const amountMinor = Number(o?.amountMinor ?? o?.amount_minor ?? 0);
-                              const cur = String(o?.currency ?? "INR").toUpperCase();
-                              const paidAtRaw = o?.paidAt ?? o?.paid_at ?? null;
-                              const createdAtRaw = o?.createdAt ?? o?.created_at ?? null;
-                              return (
-                                <TableRow key={String(o?.id ?? orderId ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
-                                  <TableCell className="font-mono text-xs">{orderId || "—"}</TableCell>
-                                  <TableCell className="font-medium">{candidateName || "—"}</TableCell>
-                                  <TableCell>{projectName || "—"}</TableCell>
-                                  <TableCell><StatusBadge status={status} /></TableCell>
-                                  <TableCell className="font-medium">{formatAmount(amountMinor, cur)}</TableCell>
-                                  <TableCell>{cur}</TableCell>
-                                  <TableCell className="text-muted-foreground">{formatDate(paidAtRaw ? String(paidAtRaw) : null)}</TableCell>
-                                  <TableCell className="text-muted-foreground">{formatDate(createdAtRaw ? String(createdAtRaw) : null)}</TableCell>
-                                  <TableCell className="text-right"><Button size="sm" variant="outline" onClick={() => { setSelectedPayment(o); setPaymentDialogOpen(true); }}><Eye className="h-3 w-3 mr-1" /> View</Button></TableCell>
-                                </TableRow>
-                              );
-                            })}
-                        </TableBody>
-                      </Table>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between bg-muted/30 p-4 rounded-lg">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Total Billed</p>
+                          <p className="text-xl font-bold">{formatAmount(summary.totalBilledMinor, "INR")}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">Total Paid</p>
+                          <p className="text-xl font-bold text-emerald-600">{formatAmount(summary.totalPaidMinor, "INR")}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">Remaining</p>
+                          <p className="text-xl font-bold text-amber-600">{formatAmount(summary.remainingMinor, "INR")}</p>
+                        </div>
+                      </div>
+                      <div className="rounded-lg border overflow-hidden">
+                        <Table>
+                          <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40"><TableHead>Order ID</TableHead><TableHead>Candidate</TableHead><TableHead>Project</TableHead><TableHead>Status</TableHead><TableHead>Amount</TableHead><TableHead>Currency</TableHead><TableHead>Paid At</TableHead><TableHead>Created</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                          <TableBody>
+                            {tabData.paymentList.length === 0 ? <TableRow><TableCell colSpan={9}><EmptyState icon={CreditCard} title="No payments" description="No payment records found for this company." /></TableCell></TableRow> :
+                              tabData.paymentList.map((o: any, idx: number) => {
+                                const orderId = String(o?.orderId ?? o?.order_id ?? "").trim();
+                                const candidateName = String(o?.internName ?? "").trim();
+                                const projectName = String(o?.projectName ?? "").trim();
+                                const status = String(o?.status ?? "").trim().toLowerCase();
+                                const amountMinor = Number(o?.amountMinor ?? o?.amount_minor ?? 0);
+                                const cur = String(o?.currency ?? "INR").toUpperCase();
+                                const paidAtRaw = o?.paidAt ?? o?.paid_at ?? null;
+                                const createdAtRaw = o?.createdAt ?? o?.created_at ?? null;
+                                return (
+                                  <TableRow key={String(o?.id ?? orderId ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
+                                    <TableCell className="font-mono text-xs">{orderId || "—"}</TableCell>
+                                    <TableCell className="font-medium">{candidateName || "—"}</TableCell>
+                                    <TableCell>{projectName || "—"}</TableCell>
+                                    <TableCell><StatusBadge status={status} /></TableCell>
+                                    <TableCell className="font-medium">{formatAmount(amountMinor, cur)}</TableCell>
+                                    <TableCell>{cur}</TableCell>
+                                    <TableCell className="text-muted-foreground">{formatDate(paidAtRaw ? String(paidAtRaw) : null)}</TableCell>
+                                    <TableCell className="text-muted-foreground">{formatDate(createdAtRaw ? String(createdAtRaw) : null)}</TableCell>
+                                    <TableCell className="text-right"><Button size="sm" variant="outline" onClick={() => { setSelectedPayment(o); setPaymentDialogOpen(true); }}><Eye className="h-3 w-3 mr-1" /> View</Button></TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </div>
                   )}
 
