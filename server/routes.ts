@@ -15535,32 +15535,61 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
       const internIds = Array.from(new Set(hiredProposals.map((p: any) => String(p?.internId ?? p?.intern_id ?? "").trim()).filter(Boolean)));
       const internEmployerDues: any[] = [];
 
-      for (const internId of internIds) {
-        try {
-          const duesRes = await fetch(`${req.protocol}://${req.get("host")}/api/admin/interns/${internId}/employer-dues`, {
-            headers: { Cookie: req.get("Cookie") || "" },
-          });
-          if (duesRes.ok) {
-            const duesData = await duesRes.json();
-            const dues = Array.isArray(duesData.employerDues) ? duesData.employerDues : [];
-            const matchingProposal = hiredProposals.find((p: any) => String(p?.internId ?? p?.intern_id ?? "") === internId);
-            for (const d of dues) {
-              if (String(d?.employerId ?? "") === employerId) {
-                const offer = matchingProposal?.offerDetails ?? matchingProposal?.offer_details ?? {};
-                internEmployerDues.push({
-                  ...d,
-                  internId,
-                  internName: getInternName(matchingProposal),
-                  projectName: getProjectName(matchingProposal),
-                  monthlyAmount: offer?.monthlyAmount ?? offer?.monthly_amount ?? null,
-                  currency: String(offer?.currency ?? "INR").toUpperCase(),
-                });
-              }
-            }
-          }
-        } catch (err) {
-          console.error("Error fetching employer dues for intern:", internId, err);
-        }
+      for (const proposal of hiredProposals) {
+        const internId = String(proposal?.internId ?? proposal?.intern_id ?? "").trim();
+        if (!internId) continue;
+        
+        const intern = userById.get(internId);
+        const internName = intern ? `${String(intern.firstName ?? "")} ${String(intern.lastName ?? "")}`.trim() : null;
+        
+        const offer = proposal?.offerDetails ?? proposal?.offer_details ?? {};
+        const currency = String(offer?.currency ?? "INR").toUpperCase();
+        const monthlyAmount = Number(offer?.monthlyAmount ?? offer?.monthly_amount ?? 0);
+        const duration = String(offer?.duration ?? "").trim();
+        const months = monthsFromDuration(duration);
+        
+        const startDate = proposal?.startDate ?? proposal?.createdAt ?? null;
+        const startDateStr = startDate ? (() => { const d = new Date(startDate); return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10); })() : null;
+        
+        const proposalPayments = payments.filter((p: any) => {
+          const raw = p?.raw ?? {};
+          const notes = raw?.notes ?? raw?.order?.notes ?? {};
+          const pids = notes?.proposalIds ?? notes?.proposal_ids ?? [];
+          return pids.includes(proposal?.id);
+        });
+        
+        const paidAmountMinor = proposalPayments
+          .filter((p: any) => String(p?.status ?? "").trim().toLowerCase() === "paid")
+          .reduce((sum: number, p: any) => sum + (Number(p?.amountMinor ?? 0) || 0), 0);
+        
+        const totalAmountMinor = monthlyAmount * months;
+        const remainingAmountMinor = Math.max(0, totalAmountMinor - paidAmountMinor);
+        const remainingMonths = Math.max(0, months - Math.floor(paidAmountMinor / (monthlyAmount || 1)));
+        
+        const paymentsForProposal = proposalPayments.length;
+        
+        internEmployerDues.push({
+          id: proposal?.id ?? "",
+          proposalId: proposal?.id ?? "",
+          internId,
+          internName: internName ?? "Unknown",
+          projectName: getProjectName(proposal),
+          currency,
+          monthlyAmount: monthlyAmount,
+          monthlyAmountMinor: monthlyAmount * 100,
+          totalAmount: totalAmountMinor / 100,
+          totalAmountMinor: totalAmountMinor,
+          paidAmount: paidAmountMinor / 100,
+          paidAmountMinor,
+          dueAmount: remainingAmountMinor / 100,
+          dueAmountMinor: remainingAmountMinor,
+          startDate: startDateStr,
+          duration: months,
+          totalMonths: months,
+          paidMonths: Math.floor(paidAmountMinor / (monthlyAmount || 1)),
+          remainingMonths,
+          status: remainingAmountMinor <= 0 ? "completed" : "active",
+        });
       }
 
       return res.json({
