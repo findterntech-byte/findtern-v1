@@ -15544,9 +15544,16 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         
         const offer = proposal?.offerDetails ?? proposal?.offer_details ?? {};
         const currency = String(offer?.currency ?? "INR").toUpperCase();
-        const monthlyAmount = Number(offer?.monthlyAmount ?? offer?.monthly_amount ?? 0);
+        
+        let monthlyAmount = Number(offer?.monthlyAmount ?? offer?.monthly_amount ?? 0);
+        
+        const totalPriceOffer = Number(offer?.totalPrice ?? offer?.total_price ?? 0);
         const duration = String(offer?.duration ?? "").trim();
-        const months = monthsFromDuration(duration);
+        let months = monthsFromDuration(duration);
+        
+        if (totalPriceOffer > 0 && monthlyAmount === 0) {
+          monthlyAmount = totalPriceOffer / months;
+        }
         
         const startDate = proposal?.startDate ?? proposal?.createdAt ?? null;
         const startDateStr = startDate ? (() => { const d = new Date(startDate); return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10); })() : null;
@@ -15562,13 +15569,10 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           .filter((p: any) => String(p?.status ?? "").trim().toLowerCase() === "paid")
           .reduce((sum: number, p: any) => sum + (Number(p?.amountMinor ?? 0) || 0), 0);
         
-        const totalAmountMinor = monthlyAmount * months;
+        const totalAmountMinor = monthlyAmount * months * 100;
         const remainingAmountMinor = Math.max(0, totalAmountMinor - paidAmountMinor);
-        const remainingMonths = Math.max(0, months - Math.floor(paidAmountMinor / (monthlyAmount || 1)));
-        
-        const paymentsForProposal = proposalPayments.length;
-        const paidMonths = monthlyAmount > 0 ? Math.floor(paidAmountMinor / monthlyAmount) : 0;
-        const remainingMonthsCalc = months - paidMonths;
+        const paidMonths = monthlyAmount > 0 ? Math.floor(paidAmountMinor / (monthlyAmount * 100)) : 0;
+        const remainingMonthsCalc = Math.max(0, months - paidMonths);
         
         internEmployerDues.push({
           id: proposal?.id ?? "",
@@ -15579,7 +15583,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           currency,
           monthlyAmount: monthlyAmount,
           monthlyAmountMinor: monthlyAmount * 100,
-          totalAmount: totalAmountMinor / 100,
+          totalAmount: monthlyAmount * months,
           totalAmountMinor: totalAmountMinor,
           paidAmount: paidAmountMinor / 100,
           paidAmountMinor,
