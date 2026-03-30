@@ -194,6 +194,9 @@ export default function AdminCompanyDetailPage() {
     void load();
   }, [companyId]);
 
+  const convertToInrIfUsd = (amountMajor: number, currencyCode: string) => { const cur = String(currencyCode || "INR").toUpperCase(); if (cur !== "USD") return amountMajor; const rate = DEFAULT_USD_TO_INR_RATE; const safeRate = Number.isFinite(rate) && rate > 0 ? rate : 100; return Math.round((Number.isFinite(amountMajor) ? amountMajor : 0) * safeRate); };
+  const convertMinorToInrIfUsd = (amountMinor: number, currencyCode: string) => { const cur = String(currencyCode || "INR").toUpperCase(); if (cur !== "USD") return amountMinor; const major = Number.isFinite(amountMinor) ? amountMinor / 100 : 0; const inrMajor = convertToInrIfUsd(major, cur); return Math.round(inrMajor * 100); };
+
   const summary = useMemo(() => {
     const e = employer ?? ({} as any);
     const createdAtRaw = e.createdAt ?? null;
@@ -203,7 +206,14 @@ export default function AdminCompanyDetailPage() {
     const activeInternships = (projects ?? []).reduce((acc, p: any) => { const s = String(p?.status ?? "active").trim().toLowerCase(); return acc + (s === "active" ? 1 : 0); }, 0);
     const hiredResourcesCount = (() => { const ids = new Set((proposals ?? []).filter((p: any) => String(p?.status ?? "").trim().toLowerCase() === "hired").map((p: any) => String(p?.internId ?? p?.intern_id ?? "").trim()).filter(Boolean)); return ids.size; })();
     const lastPaymentAt = (() => { let best: Date | null = null; for (const row of orders ?? []) { const raw = row?.paidAt ?? row?.createdAt ?? null; if (!raw) continue; const dt = new Date(raw); if (Number.isNaN(dt.getTime())) continue; if (!best || dt.getTime() > best.getTime()) best = dt; } return best ? best.toISOString() : null; })();
-    const earningsMinor = (orders ?? []).reduce((acc, o: any) => { const s = String(o?.status ?? "").trim().toLowerCase(); if (s !== "paid") return acc; const minor = Number(o?.amountMinor ?? o?.amount_minor ?? o?.amount ?? 0); return acc + (Number.isFinite(minor) ? minor : 0); }, 0);
+    const earningsMinor = (orders ?? []).reduce((acc, o: any) => { 
+      const s = String(o?.status ?? "").trim().toLowerCase(); 
+      if (s !== "paid") return acc; 
+      const minor = Number(o?.amountMinor ?? o?.amount_minor ?? o?.amount ?? 0);
+      const currency = String(o?.currency ?? "INR").toUpperCase();
+      const minorInr = currency === "USD" ? convertMinorToInrIfUsd(minor, currency) : minor;
+      return acc + (Number.isFinite(minorInr) ? minorInr : 0); 
+    }, 0);
     const totalProposals = Array.isArray(proposals) ? proposals.length : 0;
     const conversionRate = totalProposals > 0 ? hiredResourcesCount / totalProposals : 0;
     
@@ -286,8 +296,6 @@ export default function AdminCompanyDetailPage() {
   const formatMajorMoney = (amountMajor: number, currencyCode: string) => { const cur = String(currencyCode || "INR").toUpperCase(); const locale = cur === "INR" ? "en-IN" : "en-US"; const major = Number.isFinite(amountMajor) ? amountMajor : 0; return new Intl.NumberFormat(locale, { style: "currency", currency: cur, maximumFractionDigits: 0 }).format(major || 0); };
   const displayProposalStatus = (raw: unknown) => { const s = String(raw ?? "-").trim().toLowerCase(); if (s === "expired") return "withdrawn"; return s || "-"; };
   const toDisplayUrl = (raw: string) => { const v = String(raw ?? "").trim(); if (!v) return ""; if (v.startsWith("/")) return v; if (/^https?:\/\//i.test(v)) return v; return `https://${v}`; };
-  const convertToInrIfUsd = (amountMajor: number, currencyCode: string) => { const cur = String(currencyCode || "INR").toUpperCase(); if (cur !== "USD") return amountMajor; const rate = DEFAULT_USD_TO_INR_RATE; const safeRate = Number.isFinite(rate) && rate > 0 ? rate : 100; return Math.round((Number.isFinite(amountMajor) ? amountMajor : 0) * safeRate); };
-  const convertMinorToInrIfUsd = (amountMinor: number, currencyCode: string) => { const cur = String(currencyCode || "INR").toUpperCase(); if (cur !== "USD") return amountMinor; const major = Number.isFinite(amountMinor) ? amountMinor / 100 : 0; const inrMajor = convertToInrIfUsd(major, cur); return Math.round(inrMajor * 100); };
   const monthsFromDuration = (duration: unknown) => { switch (String(duration ?? "").trim().toLowerCase()) { case "2m": return 2; case "3m": return 3; case "6m": return 6; default: return 1; } };
 
   if (loading) {
@@ -619,16 +627,12 @@ export default function AdminCompanyDetailPage() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between bg-muted/30 p-4 rounded-lg">
                         <div>
-                          <p className="text-sm text-muted-foreground">Total Billed</p>
-                          <p className="text-xl font-bold">{formatAmount(summary.totalBilledMinor, "INR")}</p>
+                          <p className="text-sm text-muted-foreground">Total Earnings</p>
+                          <p className="text-xl font-bold">{formatAmount(summary.earningsMinor, "INR")}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Total Paid</p>
-                          <p className="text-xl font-bold text-emerald-600">{formatAmount(summary.totalPaidMinor, "INR")}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Remaining</p>
-                          <p className="text-xl font-bold text-amber-600">{formatAmount(summary.remainingMinor, "INR")}</p>
+                          <p className="text-sm text-muted-foreground">Last Payment</p>
+                          <p className="text-xl font-bold">{summary.lastPaymentAt ? formatDate(summary.lastPaymentAt) : "—"}</p>
                         </div>
                       </div>
                       <div className="rounded-lg border overflow-hidden">
