@@ -413,7 +413,7 @@ export default function AdminCompanyDetailPage() {
                         "ml-2 px-2 py-0.5 text-xs font-medium rounded-full",
                         activeTab === tab ? "bg-[#0E6049] text-white" : "bg-muted text-muted-foreground"
                       )}>
-                        {tab === "projects" ? tabData.projectList.length : tab === "proposals" ? tabData.proposalList.length : tab === "interviews" ? tabData.interviewList.length : tab === "payments" ? tabData.paymentList.length : tab === "upcomingPayments" ? tabData.employerDuesList.filter((d: any) => (d?.remainingMonths ?? 1) > 0).length : tabData.hiredList.length}
+                        {tab === "projects" ? tabData.projectList.length : tab === "proposals" ? tabData.proposalList.length : tab === "interviews" ? tabData.interviewList.length : tab === "payments" ? tabData.paymentList.length : tab === "upcomingPayments" ? tabData.upcomingPaymentsList.length : tabData.hiredList.length}
                       </span>
                     )}
                   </TabsTrigger>
@@ -685,12 +685,12 @@ export default function AdminCompanyDetailPage() {
                           {/* Stats Summary */}
                           <div className="flex flex-wrap gap-3">
                             {(() => {
-                              const active = tabData.employerDuesList.filter((d: any) => {
-                                const isCompleted = (d?.remainingMonths ?? 1) <= 0;
+                              const active = tabData.upcomingPaymentsList.filter((d: any) => {
+                                const isCompleted = (d?.remainingMonths ?? 1) <= 0 || d?.status === "paid";
                                 return !isCompleted;
                               }).length;
-                              const completed = tabData.employerDuesList.length - active;
-                              const totalDue = tabData.employerDuesList.reduce((sum: number, d: any) => sum + Number(d?.dueAmountMinor ?? 0), 0);
+                              const completed = tabData.upcomingPaymentsList.length - active;
+                              const totalDue = tabData.upcomingPaymentsList.reduce((sum: number, d: any) => sum + Number(d?.dueAmountMinor ?? d?.amountMinor ?? 0), 0);
                               return (
                                 <>
                                   <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
@@ -715,9 +715,9 @@ export default function AdminCompanyDetailPage() {
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs font-medium text-muted-foreground mr-2">Status:</span>
                             {[
-                              { key: "all", label: "All", count: tabData.employerDuesList.length },
-                              { key: "active", label: "Active", count: tabData.employerDuesList.filter((d: any) => (d?.remainingMonths ?? 1) > 0).length, color: "amber" },
-                              { key: "completed", label: "Completed", count: tabData.employerDuesList.filter((d: any) => (d?.remainingMonths ?? 1) <= 0).length, color: "emerald" },
+                              { key: "all", label: "All", count: tabData.upcomingPaymentsList.length },
+                              { key: "active", label: "Active", count: tabData.upcomingPaymentsList.filter((d: any) => (d?.remainingMonths ?? 1) > 0 && d?.status !== "paid").length, color: "amber" },
+                              { key: "completed", label: "Completed", count: tabData.upcomingPaymentsList.filter((d: any) => (d?.remainingMonths ?? 1) <= 0 || d?.status === "paid").length, color: "emerald" },
                             ].map((filter) => (
                               <button
                                 key={filter.key}
@@ -750,9 +750,9 @@ export default function AdminCompanyDetailPage() {
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs font-medium text-muted-foreground mr-2">Currency:</span>
                             {[
-                              { key: "all", label: "All", count: tabData.employerDuesList.length },
-                              { key: "INR", label: "₹ INR", count: tabData.employerDuesList.filter((d: any) => String(d?.currency ?? "INR").toUpperCase() === "INR").length, color: "blue" },
-                              { key: "USD", label: "$ USD", count: tabData.employerDuesList.filter((d: any) => String(d?.currency ?? "INR").toUpperCase() === "USD").length, color: "blue" },
+                              { key: "all", label: "All", count: tabData.upcomingPaymentsList.length },
+                              { key: "INR", label: "₹ INR", count: tabData.upcomingPaymentsList.filter((d: any) => String(d?.currency ?? "INR").toUpperCase() === "INR").length, color: "blue" },
+                              { key: "USD", label: "$ USD", count: tabData.upcomingPaymentsList.filter((d: any) => String(d?.currency ?? "INR").toUpperCase() === "USD").length, color: "blue" },
                             ].map((filter) => (
                               <button
                                 key={`currency-${filter.key}`}
@@ -782,21 +782,21 @@ export default function AdminCompanyDetailPage() {
                           </div>
                         </div>
 
-                        {tabData.employerDuesList.length === 0 ? (
+                        {tabData.upcomingPaymentsList.length === 0 ? (
                           <div className="flex flex-col items-center justify-center py-16 text-center">
                             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 mb-4">
                               <CheckCircle2 className="h-8 w-8 text-emerald-600" />
                             </div>
-                            <h3 className="text-lg font-semibold text-foreground">No payment records</h3>
-                            <p className="text-sm text-muted-foreground mt-1">No hired candidates to track payments for.</p>
+                            <h3 className="text-lg font-semibold text-foreground">No upcoming payments</h3>
+                            <p className="text-sm text-muted-foreground mt-1">No pending payments to track.</p>
                           </div>
                         ) : (
                           <div className="space-y-4">
-                            {tabData.employerDuesList
+                            {tabData.upcomingPaymentsList
                               .filter((d: any) => {
                                 // Status filter
                                 if (tabStatus.upcomingPayments && tabStatus.upcomingPayments !== "all") {
-                                  const isCompleted = (d?.remainingMonths ?? 1) <= 0;
+                                  const isCompleted = (d?.remainingMonths ?? 1) <= 0 || d?.status === "paid";
                                   if (tabStatus.upcomingPayments === "completed" && !isCompleted) return false;
                                   if (tabStatus.upcomingPayments === "active" && isCompleted) return false;
                                 }
@@ -808,20 +808,21 @@ export default function AdminCompanyDetailPage() {
                                 return true;
                               })
                               .map((d: any, idx: number) => {
-                                const candidateName = d?.internName ?? "—";
+                                const isEmployerDue = d?.remainingMonths !== undefined;
+                                const candidateName = d?.internName ?? d?.candidateName ?? "—";
                                 const projectName = d?.projectName ?? "—";
-                                const startDate = d?.startDate ? formatDate(d.startDate) : "—";
+                                const startDate = d?.startDate ? formatDate(d.startDate) : d?.dueDate ? formatDate(d.dueDate) : "—";
                                 const duration = d?.duration ?? "—";
-                                const hasFullTime = String(duration).toLowerCase().includes("full-time") || String(duration).toLowerCase().includes("pp");
-                                const upcomingPaymentDate = d?.upcomingPaymentDate ? formatDate(d.upcomingPaymentDate) : "—";
+                                const hasFullTime = String(duration).toLowerCase().includes("full-time") || String(duration).toLowerCase().includes("pp") || (d?.offerDetails && String(d.offerDetails).toLowerCase().includes("full"));
+                                const upcomingPaymentDate = d?.upcomingPaymentDate ? formatDate(d.upcomingPaymentDate) : d?.dueDate ? formatDate(d.dueDate) : "—";
                                 const currency = String(d?.currency ?? "INR").toUpperCase();
-                                const upcomingPaymentMinor = Number(d?.monthlyAmountMinor ?? d?.monthlyAmount ?? 0);
-                                const totalAmountMinor = Number(d?.totalAmountMinor ?? 0);
-                                const dueAmountMinor = Number(d?.dueAmountMinor ?? 0);
+                                const upcomingPaymentMinor = Number(d?.monthlyAmountMinor ?? d?.monthlyAmount ?? d?.amountMinor ?? 0);
+                                const totalAmountMinor = Number(d?.totalAmountMinor ?? d?.amountMinor ?? 0);
+                                const dueAmountMinor = Number(d?.dueAmountMinor ?? d?.amountMinor ?? 0);
                                 const paidMonths = Number(d?.paidMonths ?? 0);
-                                const totalMonths = Number(d?.totalMonths ?? 1);
+                                const totalMonths = Number(d?.totalMonths ?? d?.duration ?? 1);
                                 const isCompleted = (d?.remainingMonths ?? 1) <= 0;
-                                const progress = totalMonths > 0 ? Math.min(100, Math.round((paidMonths / totalMonths) * 100)) : 0;
+                                const progress = totalMonths > 0 ? Math.min(100, Math.round((paidMonths / totalMonths) * 100)) : (d?.status === "paid" ? 100 : 0);
                                 
                                 return (
                                   <div 
