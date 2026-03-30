@@ -36,6 +36,7 @@ import {
   Sparkles,
   Users,
   Receipt,
+  ShoppingCart,
   ChevronDown,
   Shield,
   User,
@@ -103,6 +104,7 @@ const companyItems: NavItem[] = [
 const reportsItems: NavItem[] = [
   { label: "Reports", icon: Newspaper, href: "/admin/reports", required: "reports:read" },
   { label: "Transactions", icon: Receipt, href: "/admin/transactions", required: "transactions:read" },
+  { label: "Orders", icon: ShoppingCart, href: "/admin/orders", required: "transactions:read" },
 ];
 
 const cmsItems: NavItem[] = [
@@ -144,7 +146,7 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
 
   const isInternRoute = location.startsWith("/admin/interns");
   const isCompanyRoute = location.startsWith("/admin/companies") || location.startsWith("/admin/projects");
-  const isReportsRoute = location.startsWith("/admin/reports") || location.startsWith("/admin/transactions");
+  const isReportsRoute = location.startsWith("/admin/reports") || location.startsWith("/admin/transactions") || location.startsWith("/admin/orders");
   const isCmsRoute = location.startsWith("/admin/website");
   const [internOpen, setInternOpen] = React.useState<boolean>(isInternRoute);
   const [companyOpen, setCompanyOpen] = React.useState<boolean>(isCompanyRoute);
