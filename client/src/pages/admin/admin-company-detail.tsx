@@ -95,14 +95,41 @@ function StatCard({ title, value, subtitle, icon, className, variant = "default"
 
 function StatusBadge({ status }: { status: string }) {
   const s = status.toLowerCase();
-  if (s === "active" || s === "completed" || s === "paid" || s === "accepted" || s === "hired") {
+  if (s === "active") {
     return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 font-medium">Active</Badge>;
   }
-  if (s === "pending" || s === "sent" || s === "scheduled" || s === "created") {
+  if (s === "paid") {
+    return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 font-medium">Paid</Badge>;
+  }
+  if (s === "completed") {
+    return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 font-medium">Completed</Badge>;
+  }
+  if (s === "accepted") {
+    return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 font-medium">Accepted</Badge>;
+  }
+  if (s === "hired") {
+    return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 font-medium">Hired</Badge>;
+  }
+  if (s === "sent") {
+    return <Badge className="bg-amber-100 text-amber-700 border-amber-200 font-medium">Sent</Badge>;
+  }
+  if (s === "pending" || s === "scheduled" || s === "created") {
     return <Badge className="bg-amber-100 text-amber-700 border-amber-200 font-medium">Pending</Badge>;
   }
-  if (s === "rejected" || s === "failed" || s === "expired" || s === "withdrawn" || s === "cancelled") {
-    return <Badge className="bg-red-100 text-red-700 border-red-200 font-medium">Inactive</Badge>;
+  if (s === "rejected") {
+    return <Badge className="bg-red-100 text-red-700 border-red-200 font-medium">Rejected</Badge>;
+  }
+  if (s === "failed") {
+    return <Badge className="bg-red-100 text-red-700 border-red-200 font-medium">Failed</Badge>;
+  }
+  if (s === "expired") {
+    return <Badge className="bg-red-100 text-red-700 border-red-200 font-medium">Expired</Badge>;
+  }
+  if (s === "withdrawn") {
+    return <Badge className="bg-red-100 text-red-700 border-red-200 font-medium">Withdrawn</Badge>;
+  }
+  if (s === "cancelled") {
+    return <Badge className="bg-red-100 text-red-700 border-red-200 font-medium">Cancelled</Badge>;
   }
   return <Badge variant="outline" className="font-medium">{status}</Badge>;
 }
@@ -140,6 +167,7 @@ export default function AdminCompanyDetailPage() {
   });
   const [pageSize, setPageSize] = useState<5 | 10 | 25 | 50>(10);
   const [projectsCreatedDate, setProjectsCreatedDate] = useState<string>("");
+  const [projectFullTimeFilter, setProjectFullTimeFilter] = useState<"all" | "yes" | "no">("all");
   const [hiredType, setHiredType] = useState<"all" | "fulltime" | "internship">("all");
 
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -161,7 +189,7 @@ export default function AdminCompanyDetailPage() {
   const [paymentSummary, setPaymentSummary] = useState<any>(null);
   const [internUsers, setInternUsers] = useState<Record<string, any>>({});
 
-  const displayProposalStatus = (raw: unknown) => { const s = String(raw ?? "-").trim().toLowerCase(); if (s === "expired") return "withdrawn"; return s || "-"; };
+  const displayProposalStatus = (raw: unknown) => { const s = String(raw ?? "-").trim().toLowerCase(); if (s === "expired") return "expired"; return s || "-"; };
 
   const interviewStatusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -278,8 +306,8 @@ export default function AdminCompanyDetailPage() {
     const tokens = (q: string) => norm(q).split(/\s+/).filter(Boolean);
     const matches = (haystack: string, q: string) => { const t = tokens(q); if (t.length === 0) return true; const h = norm(haystack); return t.every((x) => h.includes(x)); };
     const toDateKey = (raw: unknown) => { if (!raw) return ""; const d = new Date(String(raw)); if (Number.isNaN(d.getTime())) return ""; return d.toISOString().slice(0, 10); };
-    const projectList = (projects ?? []).filter((p: any) => { const s = norm(p?.status ?? "-"); const sf = norm(tabStatus.projects); if (sf && s !== sf) return false; const ck = toDateKey(p?.createdAt ?? p?.created_at ?? null); const cfk = String(projectsCreatedDate ?? "").trim(); if (cfk && ck !== cfk) return false; const skills = Array.isArray(p?.skills) ? p.skills.join(" ") : ""; const hay = `${p?.projectName ?? p?.title ?? ""} ${skills} ${p?.city ?? ""} ${p?.timezone ?? ""} ${p?.locationType ?? p?.location_type ?? ""}`; return matches(hay, tabSearch.projects); });
-    const proposalList = (proposals ?? []).filter((p: any) => { const s = norm(p?.status ?? "-"); const sf = norm(tabStatus.proposals); if (sf) { if (sf === "withdrawn") { if (s !== "expired" && s !== "withdrawn") return false; } else if (s !== sf) return false; } const hay = `${p?.internName ?? p?.candidateName ?? ""} ${p?.projectName ?? ""} ${p?.currency ?? ""}`; return matches(hay, tabSearch.proposals); });
+    const projectList = (projects ?? []).filter((p: any) => { const s = norm(p?.status ?? "-"); const sf = norm(tabStatus.projects); if (sf && s !== sf) return false; const ck = toDateKey(p?.createdAt ?? p?.created_at ?? null); const cfk = String(projectsCreatedDate ?? "").trim(); if (cfk && ck !== cfk) return false; const fullTimeOffer = Boolean(p?.fullTimeOffer ?? p?.full_time_offer ?? false); if (projectFullTimeFilter === "yes" && !fullTimeOffer) return false; if (projectFullTimeFilter === "no" && fullTimeOffer) return false; const skills = Array.isArray(p?.skills) ? p.skills.join(" ") : ""; const hay = `${p?.projectName ?? p?.title ?? ""} ${skills} ${p?.city ?? ""} ${p?.timezone ?? ""} ${p?.locationType ?? p?.location_type ?? ""}`; return matches(hay, tabSearch.projects); });
+    const proposalList = (proposals ?? []).filter((p: any) => { const s = norm(p?.status ?? "-"); const sf = norm(tabStatus.proposals); if (sf) { if (sf === "withdrawn") { if (s !== "withdrawn") return false; } else if (s !== sf) return false; } const hay = `${p?.internName ?? p?.candidateName ?? ""} ${p?.projectName ?? ""} ${p?.currency ?? ""}`; return matches(hay, tabSearch.proposals); });
     const interviewList = (interviews ?? []).filter((i: any) => { 
       const s = norm(i?.status ?? "-"); 
       const sf = norm(tabStatus.interviews); 
@@ -294,7 +322,7 @@ export default function AdminCompanyDetailPage() {
       const s = norm(o?.status ?? "-"); 
       const sf = norm(tabStatus.payments); 
       if (sf && s !== sf) return false; 
-      const currencyFilter = tabSearchCurrency.payments;
+      const currencyFilter = norm(tabSearchCurrency.payments);
       const currency = norm(o?.currency ?? "INR");
       if (currencyFilter && currency !== currencyFilter) return false;
       const candidateName = String(o?.internName ?? o?.candidateName ?? "").toLowerCase();
@@ -337,7 +365,7 @@ export default function AdminCompanyDetailPage() {
     });
     const employerDuesList = paymentSummary?.internEmployerDues ?? [];
     return { projectList, proposalList, interviewList, paymentList, upcomingPaymentsList, hiredList, employerDuesList };
-  }, [orders, projects, proposals, interviews, tabSearch, tabStatus, tabSearchCurrency, paymentSummary, hiredType, internUsers]);
+  }, [orders, projects, proposals, interviews, tabSearch, tabStatus, tabSearchCurrency, paymentSummary, hiredType, internUsers, projectFullTimeFilter]);
 
   const pagination = useMemo(() => {
     const getList = (tab: TabKey) => { if (tab === "projects") return tabData.projectList; if (tab === "proposals") return tabData.proposalList; if (tab === "interviews") return tabData.interviewList; if (tab === "payments") return tabData.paymentList; if (tab === "upcomingPayments") return tabData.upcomingPaymentsList; return tabData.hiredList; };
@@ -533,14 +561,24 @@ export default function AdminCompanyDetailPage() {
                       </Select>
                     )}
                     {activeTab === "projects" && (
-                      <Select value={tabStatus[activeTab] || "__all__"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, [activeTab]: v === "__all__" ? "" : v }))}>
-                        <SelectTrigger className="h-10 w-full sm:w-[160px] bg-background"><SelectValue placeholder="Status" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__all__">All Status</SelectItem>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="inactive">Inactive</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <>
+                        <Select value={tabStatus[activeTab] || "__all__"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, [activeTab]: v === "__all__" ? "" : v }))}>
+                          <SelectTrigger className="h-10 w-full sm:w-[160px] bg-background"><SelectValue placeholder="Status" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all__">All Status</SelectItem>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="inactive">Inactive</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select value={projectFullTimeFilter} onValueChange={(v) => setProjectFullTimeFilter(v as "all" | "yes" | "no")}>
+                          <SelectTrigger className="h-10 w-full sm:w-[160px] bg-background"><SelectValue placeholder="Full-time" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All</SelectItem>
+                            <SelectItem value="yes">Full-time: Yes</SelectItem>
+                            <SelectItem value="no">Full-time: No</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </>
                     )}
                     {activeTab === "proposals" && (
                       <div className="flex gap-2">
@@ -684,7 +722,7 @@ export default function AdminCompanyDetailPage() {
                                   <TableCell>{projectState}</TableCell>
                                   <TableCell className="capitalize">{String(p?.locationType ?? p?.location_type ?? "—")}</TableCell>
                                   <TableCell className="text-center">
-                                    <input type="checkbox" checked={fullTimePossible} readOnly disabled className="h-4 w-4" />
+                                    {fullTimePossible ? <CheckCircle2 className="h-5 w-5 text-emerald-500 mx-auto" /> : <span className="text-muted-foreground">—</span>}
                                   </TableCell>
                                   <TableCell><StatusBadge status={status} /></TableCell>
                                   <TableCell className="text-muted-foreground">{createdAt}</TableCell>
@@ -736,9 +774,12 @@ export default function AdminCompanyDetailPage() {
                                   <TableCell><Badge variant="outline">{proposalType}</Badge></TableCell>
                                   <TableCell><StatusBadge status={displayProposalStatus(p?.status)} /></TableCell>
                                   <TableCell className="font-medium text-emerald-600">
-                                    {displayAmount > 0 
-                                      ? formatMajorMoney(displayAmount, currency)
-                                      : "—"}
+                                    {displayAmount > 0 ? (
+                                      <div className="flex flex-col items-start gap-0.5">
+                                        <span>{formatMajorMoney(displayAmount, currency)}</span>
+                                        <span className="text-xs text-muted-foreground">{hasFullTimeOffer ? "Annual CTC" : "Monthly stipend"}</span>
+                                      </div>
+                                    ) : "—"}
                                   </TableCell>
                                   <TableCell>{hasFullTimeOffer ? "Full-time" : duration || "—"}</TableCell>
                                   <TableCell className="text-muted-foreground">{createdAt}</TableCell>
@@ -759,9 +800,9 @@ export default function AdminCompanyDetailPage() {
                   {tab === "interviews" && (
                     <div className="rounded-lg border overflow-hidden">
                       <Table>
-                        <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40"><TableHead>Candidate</TableHead><TableHead>Project</TableHead><TableHead>Status</TableHead><TableHead>Timezone</TableHead><TableHead>Meeting Link</TableHead><TableHead>Created</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40"><TableHead className="w-12">No.</TableHead><TableHead>Candidate</TableHead><TableHead>Project</TableHead><TableHead>Meeting Status</TableHead><TableHead>Slots Sent</TableHead><TableHead>Meeting Timing</TableHead><TableHead>Timezone</TableHead><TableHead>Meeting Link</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                         <TableBody>
-                          {tabData.interviewList.length === 0 ? <TableRow><TableCell colSpan={7}><EmptyState icon={Clock} title="No interviews" description="No interviews scheduled for this company." /></TableCell></TableRow> :
+                          {tabData.interviewList.length === 0 ? <TableRow><TableCell colSpan={9}><EmptyState icon={Clock} title="No interviews" description="No interviews scheduled for this company." /></TableCell></TableRow> :
                             tabData.interviewList.map((i: any, idx: number) => {
                               const createdAtRaw = i?.createdAt ?? i?.created_at ?? null;
                               const createdAt = createdAtRaw ? (() => { const d = new Date(createdAtRaw); return Number.isNaN(d.getTime()) ? String(createdAtRaw) : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); })() : "—";
@@ -770,14 +811,30 @@ export default function AdminCompanyDetailPage() {
                               const notes = String(i?.notes ?? "");
                               const feedbackLine = notes.split("\n").map((l: string) => l.trim()).find((l: string) => l.toLowerCase().startsWith("feedback_text:"));
                               const feedbackText = String(feedbackLine ? feedbackLine.slice("feedback_text:".length).trim() : "");
+                              const slots = Array.isArray(i?.slots) ? i.slots : [];
+                              const slotTimings = slots.map((s: any) => {
+                                const raw = s?.startTime ?? s?.scheduledTime ?? null;
+                                if (!raw) return null;
+                                const d = new Date(raw);
+                                if (Number.isNaN(d.getTime())) return null;
+                                return d.toLocaleString("en-IN", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+                              }).filter(Boolean);
                               return (
                                 <TableRow key={String(i?.id ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
+                                  <TableCell className="font-medium text-muted-foreground">{idx + 1}</TableCell>
                                   <TableCell className="font-medium">{String(i?.internName ?? "—")}</TableCell>
                                   <TableCell>{String(i?.projectName ?? "—")}</TableCell>
                                   <TableCell><StatusBadge status={String(i?.status ?? "—")} /></TableCell>
+                                  <TableCell className="text-center font-semibold">{slots.length > 0 ? slots.length : "—"}</TableCell>
+                                  <TableCell className="max-w-[200px] text-xs text-muted-foreground">
+                                    {slotTimings.length > 0 ? (
+                                      <div className="space-y-1">
+                                        {slotTimings.map((slotTime: string | null, idx: number) => slotTime ? <div key={idx}>{idx + 1}. {slotTime}</div> : null)}
+                                      </div>
+                                    ) : "Not Scheduled"}
+                                  </TableCell>
                                   <TableCell className="text-muted-foreground">{String(i?.timezone ?? "—")}</TableCell>
-                                  <TableCell className="max-w-[200px] truncate">{href ? <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{link}</a> : link || "—"}</TableCell>
-                                  <TableCell className="text-muted-foreground">{createdAt}</TableCell>
+                                  <TableCell className="max-w-[150px] truncate">{href ? <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{link}</a> : link || "—"}</TableCell>
                                   <TableCell className="text-right"><Button size="sm" variant="outline" disabled={!feedbackText} onClick={() => { setSelectedInterviewFeedback(feedbackText); setFeedbackDialogOpen(true); }}><Eye className="h-3 w-3 mr-1" /> Feedback</Button></TableCell>
                                 </TableRow>
                               );
@@ -1143,13 +1200,19 @@ export default function AdminCompanyDetailPage() {
                                 ? annualCtcDisplay 
                                 : (findternScore > 0 && findternScore < 6 && paidAmountMinor > 0 ? (currency === "USD" ? 50 : 5000) : monthly);
                               const displayCurrency = currency;
+                              const amountLabel = hasFullTimeOffer ? "Annual CTC" : "Monthly stipend";
                               return (
                                 <TableRow key={String(p?.id ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
                                   <TableCell className="font-medium">{String(p?.internName ?? "—")}</TableCell>
                                   <TableCell>{String(p?.projectName ?? "—")}</TableCell>
                                   <TableCell>{hasFullTimeOffer ? <Badge className="bg-emerald-100 text-emerald-700">Full-time</Badge> : <Badge variant="outline">Internship</Badge>}</TableCell>
                                   <TableCell className="font-medium text-emerald-600">
-                                    {displayAmount > 0 ? formatMajorMoney(displayAmount, displayCurrency) : "—"}
+                                    {displayAmount > 0 ? (
+                                      <div className="flex flex-col items-start gap-0.5">
+                                        <span>{formatMajorMoney(displayAmount, displayCurrency)}</span>
+                                        <span className="text-xs text-muted-foreground">{amountLabel}</span>
+                                      </div>
+                                    ) : "—"}
                                   </TableCell>
                                   <TableCell className="font-medium">{total ? formatMajorMoney(total, displayCurrency) : "—"}</TableCell>
                                   <TableCell className="text-right"><Button size="sm" variant="outline" disabled={!internId} onClick={() => { if (!internId) return; setLocation(`/admin/interns/${encodeURIComponent(internId)}`); }}><Eye className="h-3 w-3 mr-1" /> Profile</Button></TableCell>
