@@ -17135,10 +17135,32 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         const placeholderLast = body.userId ? String(body.userId) : "Anonymous";
         const queryType = body.userType === "employer" ? "hiring" : "intern";
 
+        let firstName = placeholderFirst;
+        let lastName = placeholderLast;
+        let email = placeholderEmail;
+
+        if (body.userId) {
+          if (body.userType === "employer") {
+            const employer = await storage.getEmployer(body.userId);
+            if (employer) {
+              firstName = String(employer.companyName || employer.name || placeholderFirst).trim() || placeholderFirst;
+              lastName = "";
+              email = String(employer.companyEmail || employer.email || placeholderEmail).trim() || placeholderEmail;
+            }
+          } else {
+            const user = await storage.getUser(body.userId);
+            if (user) {
+              firstName = String(user.firstName || placeholderFirst).trim() || placeholderFirst;
+              lastName = String(user.lastName || "").trim();
+              email = String(user.email || placeholderEmail).trim() || placeholderEmail;
+            }
+          }
+        }
+
         const contact = await storage.createContactMessage({
-          firstName: placeholderFirst,
-          lastName: placeholderLast,
-          email: placeholderEmail,
+          firstName,
+          lastName,
+          email,
           queryType,
           subject: `Support ${body.kind}`,
           message: msgParts.join("\n"),

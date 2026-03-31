@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+                                                                                                                  import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "@/pages/admin/admin-layout";
 import { Card } from "@/components/ui/card";
@@ -153,6 +153,11 @@ const getFileLabelFromUrl = (u: string) => {
   return last || "Attachment";
 };
 
+const isUuidV4 = (value?: string | null) => {
+  if (!value) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value).trim());
+};
+
 export default function AdminContactMessagesPage() {
   const qc = useQueryClient();
   const [viewOpen, setViewOpen] = useState(false);
@@ -197,12 +202,23 @@ export default function AdminContactMessagesPage() {
     if (!allUsersData?.users) return {};
     const map: Record<string, UserInfo> = {};
     allUsersData.users.forEach((u) => {
-      if (userIds.includes(u.id)) {
-        map[u.id] = u;
+      const uid = String((u as any).id ?? "").trim();
+      if (uid && userIds.includes(uid)) {
+        map[uid] = u;
       }
     });
     return map;
   }, [allUsersData, userIds]);
+
+  const usersEmailMap = useMemo(() => {
+    if (!allUsersData?.users) return {};
+    const map: Record<string, UserInfo> = {};
+    allUsersData.users.forEach((u) => {
+      const e = String(u.email ?? "").trim().toLowerCase();
+      if (e) map[e] = u;
+    });
+    return map;
+  }, [allUsersData]);
 
 const employersMap = useMemo(() => {
     if (!allEmployersData?.employers) return { map: {}, emailMap: {} };
@@ -262,9 +278,40 @@ const employersMap = useMemo(() => {
           userInfo = employersMap.map[userId];
         }
       }
-      
-      if (!userInfo && msgEmail && employersMap.emailMap?.[msgEmail]) {
-        userInfo = employersMap.emailMap[msgEmail];
+
+      if (!userInfo && msgEmail) {
+        if (usersEmailMap[msgEmail]) {
+          userInfo = usersEmailMap[msgEmail];
+        } else if (employersMap.emailMap?.[msgEmail]) {
+          userInfo = employersMap.emailMap[msgEmail];
+        }
+      }
+
+      if (!userInfo && userId) {
+        const fallbackUser = (allUsersData?.users ?? []).find((u) => String((u as any).id ?? "").trim() === String(userId).trim());
+        if (fallbackUser) {
+          userInfo = fallbackUser;
+        }
+      }
+
+      if (!userInfo && isUuidV4(m.lastName)) {
+        const uid = String(m.lastName).trim();
+        const fallbackUser = (allUsersData?.users ?? []).find((u) => String((u as any).id ?? "").trim() === uid);
+        if (fallbackUser) {
+          userInfo = fallbackUser;
+        } else if (usersMap?.[uid]) {
+          userInfo = usersMap[uid];
+        } else if (employersMap.map?.[uid]) {
+          userInfo = employersMap.map[uid];
+        }
+      }
+
+      if (!userInfo && m.email) {
+        // fallback to query by first name/email from form entries in a user list
+        const lowerEmail = String(m.email).trim().toLowerCase();
+        if (usersEmailMap[lowerEmail]) {
+          userInfo = usersEmailMap[lowerEmail];
+        }
       }
 
       return {
@@ -397,9 +444,9 @@ const employersMap = useMemo(() => {
       const roleVal = filter.replace("role:", "").toLowerCase();
       if (!msgQt.includes("support") && !msgQt.includes("report")) {
         if (roleVal === "intern") {
-          return msgRole && msgRole.includes("intern") && !msgRole.includes("partner");
+          return Boolean(msgRole && msgRole.includes("intern") && !msgRole.includes("partner"));
         } else if (roleVal === "employer") {
-          return msgRole && msgRole.includes("employer");
+          return Boolean(msgRole && msgRole.includes("employer"));
         } else if (msgRole === roleVal) {
           return true;
         }
@@ -778,7 +825,7 @@ const employersMap = useMemo(() => {
                       <div className="flex flex-col items-center gap-2 text-muted-foreground">
                         <FilterX className="h-10 w-10 opacity-20" />
                         <p className="font-medium">No messages match your criteria.</p>
-                        <Button variant="link" className="text-emerald-600 h-auto p-0" onClick={() => setSearch("")}>Clear Search</Button>
+                        <Button variant="ghost" className="text-emerald-600 h-auto p-0" onClick={() => setSearch("")}>Clear Search</Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -818,20 +865,60 @@ const employersMap = useMemo(() => {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="font-bold text-slate-900 flex items-center gap-1.5 group-hover:text-emerald-700 transition-colors">
-                              {x.userInfo ? `${x.userInfo.firstName} ${x.userInfo.lastName}` : `${m.firstName} ${m.lastName}`}
-                              {meta.role === 'employer' && <Badge variant="outline" className="text-[9px] h-4 bg-blue-50 text-blue-700 border-blue-100">Employer</Badge>}
-                              {meta.role === 'intern' && <Badge variant="outline" className="text-[9px] h-4 bg-emerald-50 text-emerald-700 border-emerald-100">Intern</Badge>}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                              <Mail className="h-3 w-3" />
-                              {x.userInfo?.email || m.email}
-                            </span>
-                            {!x.userInfo && x.userId && (
-                              <span className="text-[9px] text-slate-400 font-mono mt-0.5">
-                                ID: {x.userId}
-                              </span>
-                            )}
+                            {(() => {
+                              const isGenericFirstName = ["Intern", "Employer"].includes(String(m.firstName ?? "").trim());
+                              const uuidLikeLastName = isUuidV4(String(m.lastName ?? ""));
+                              
+                              let resolutionUserInfo = x.userInfo;
+                              
+                              // If we have placeholder firstname + UUID lastname, try hard to resolve
+                              if (!resolutionUserInfo && isGenericFirstName && uuidLikeLastName) {
+                                const uuid = String(m.lastName).trim();
+                                // Try from direct user list at render time
+                                const directUser = (allUsersData?.users ?? []).find((u) => String((u as any).id ?? "").trim() === uuid);
+                                if (directUser) {
+                                  resolutionUserInfo = directUser;
+                                } else {
+                                  // Try from employers
+                                  const directEmployer = (allEmployersData?.employers ?? []).find((e: any) => String(e.id ?? "").trim() === uuid);
+                                  if (directEmployer) {
+                                    resolutionUserInfo = {
+                                      firstName: String(directEmployer.companyName || directEmployer.name || "").trim(),
+                                      lastName: "",
+                                      email: String(directEmployer.companyEmail || directEmployer.email || "").trim(),
+                                    } as any;
+                                  }
+                                }
+                              }
+
+                              const displayName = resolutionUserInfo
+                                ? `${resolutionUserInfo.firstName} ${resolutionUserInfo.lastName || ""}`.trim()
+                                : [String(m.firstName ?? "").trim(), !isUuidV4(String(m.lastName ?? "")) ? String(m.lastName ?? "").trim() : ""]
+                                    .filter(Boolean)
+                                    .join(" ")
+                                    .trim() || "Unknown";
+                              const displayEmail = resolutionUserInfo?.email || m.email || "—";
+                              const showId = !resolutionUserInfo && x.userId;
+
+                              return (
+                                <>
+                                  <span className="font-bold text-slate-900 flex items-center gap-1.5 group-hover:text-emerald-700 transition-colors">
+                                  {displayName}
+                                  {meta.role === 'employer' && <Badge variant="outline" className="text-[9px] h-4 bg-blue-50 text-blue-700 border-blue-100">Employer</Badge>}
+                                  {meta.role === 'intern' && <Badge variant="outline" className="text-[9px] h-4 bg-emerald-50 text-emerald-700 border-emerald-100">Intern</Badge>}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                                  <Mail className="h-3 w-3" />
+                                  {displayEmail}
+                                </span>
+                                {showId && (
+                                  <span className="text-[9px] text-slate-400 font-mono mt-0.5">
+                                    ID: {x.userId}
+                                  </span>
+                                )}
+                              </>
+                            );
+                          })()}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -970,26 +1057,64 @@ const employersMap = useMemo(() => {
                   {selected.subject || "(No Subject)"}
                 </DialogTitle>
                 <DialogDescription className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-slate-500">
-                  <span className="flex items-center gap-1.5 font-semibold text-slate-700">
-                    <User className="h-4 w-4 text-emerald-600" />
-                    {selected.userInfo ? `${selected.userInfo.firstName} ${selected.userInfo.lastName}` : `${selected.firstName} ${selected.lastName}`}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Mail className="h-4 w-4" />
-                    {selected.userInfo?.email || selected.email}
-                  </span>
-                  {(selected.userInfo?.phoneNumber || selected.phone) && (
-                    <span className="flex items-center gap-1.5">
-                      <Phone className="h-4 w-4" />
-                      {selected.userInfo?.phoneNumber || selected.phone}
-                    </span>
-                  )}
-                  {selected.userInfo?.countryCode && (
-                    <span className="flex items-center gap-1.5">
-                      <Globe className="h-4 w-4" />
-                      {selected.userInfo.countryCode}
-                    </span>
-                  )}
+                  {(() => {
+                    const isGenericFirstName = ["Intern", "Employer"].includes(String(selected.firstName ?? "").trim());
+                    const uuidLikeLastName = isUuidV4(String(selected.lastName ?? ""));
+                    
+                    let modalUserInfo = selected.userInfo;
+                    
+                    // If placeholder pattern detected, try to resolve
+                    if (!modalUserInfo && isGenericFirstName && uuidLikeLastName) {
+                      const uuid = String(selected.lastName).trim();
+                      const directUser = (allUsersData?.users ?? []).find((u) => String((u as any).id ?? "").trim() === uuid);
+                      if (directUser) {
+                        modalUserInfo = directUser;
+                      } else {
+                        const directEmployer = (allEmployersData?.employers ?? []).find((e: any) => String(e.id ?? "").trim() === uuid);
+                        if (directEmployer) {
+                          modalUserInfo = {
+                            firstName: String(directEmployer.companyName || directEmployer.name || "").trim(),
+                            lastName: "",
+                            email: String(directEmployer.companyEmail || directEmployer.email || "").trim(),
+                            phoneNumber: directEmployer.phoneNumber || directEmployer.phone,
+                            countryCode: directEmployer.countryCode,
+                          } as any;
+                        }
+                      }
+                    }
+
+                    const displayName = modalUserInfo
+                      ? `${modalUserInfo.firstName} ${modalUserInfo.lastName || ""}`.trim()
+                      : `${selected.firstName} ${selected.lastName}`.trim();
+                    const displayEmail = modalUserInfo?.email || selected.email;
+                    const displayPhone = modalUserInfo?.phoneNumber || selected.phone;
+                    const displayCountry = modalUserInfo?.countryCode;
+
+                    return (
+                      <>
+                        <span className="flex items-center gap-1.5 font-semibold text-slate-700">
+                          <User className="h-4 w-4 text-emerald-600" />
+                          {displayName}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <Mail className="h-4 w-4" />
+                          {displayEmail}
+                        </span>
+                        {displayPhone && (
+                          <span className="flex items-center gap-1.5">
+                            <Phone className="h-4 w-4" />
+                            {displayPhone}
+                          </span>
+                        )}
+                        {displayCountry && (
+                          <span className="flex items-center gap-1.5">
+                            <Globe className="h-4 w-4" />
+                            {displayCountry}
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
                 </DialogDescription>
               </DialogHeader>
 
