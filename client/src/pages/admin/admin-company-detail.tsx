@@ -6,19 +6,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import {
   Building2, FileText, ExternalLink, TrendingUp, Users, Search, Calendar, MapPin, Globe, Mail, Phone, Briefcase,
   CheckCircle2, Clock, AlertCircle, X, ChevronRight, DollarSign, ArrowUpRight, ArrowDownRight, Loader2,
-  CreditCard, User, FileCheck, MoreHorizontal, Eye, ArrowLeft, ArrowRight, AlertTriangle
+  CreditCard, User, FileCheck, MoreHorizontal, Eye, ArrowLeft, ArrowRight, AlertTriangle,
+  ArrowDown, ArrowUp, Filter, EyeOff, Columns, MoreVertical, FileVideo, MessageSquare
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { DEFAULT_USD_TO_INR_RATE } from "@/lib/currency";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 
 type LoadedEmployer = {
   id: string;
@@ -110,11 +120,11 @@ function StatusBadge({ status }: { status: string }) {
   if (s === "hired") {
     return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 font-medium">Hired</Badge>;
   }
-  if (s === "sent") {
-    return <Badge className="bg-amber-100 text-amber-700 border-amber-200 font-medium">Sent</Badge>;
+  if (s === "sent" || s === "pending" || s === "created") {
+    return <Badge className="bg-purple-100 text-purple-700 border-purple-200 font-medium">Sent</Badge>;
   }
-  if (s === "pending" || s === "scheduled" || s === "created") {
-    return <Badge className="bg-amber-100 text-amber-700 border-amber-200 font-medium">Pending</Badge>;
+  if (s === "scheduled") {
+    return <Badge className="bg-blue-100 text-blue-700 border-blue-200 font-medium">Scheduled</Badge>;
   }
   if (s === "rejected") {
     return <Badge className="bg-red-100 text-red-700 border-red-200 font-medium">Rejected</Badge>;
@@ -124,6 +134,9 @@ function StatusBadge({ status }: { status: string }) {
   }
   if (s === "expired") {
     return <Badge className="bg-red-100 text-red-700 border-red-200 font-medium">Expired</Badge>;
+  }
+  if (s === "missed") {
+    return <Badge className="bg-red-100 text-red-700 border-red-200 font-medium">Missed</Badge>;
   }
   if (s === "withdrawn") {
     return <Badge className="bg-red-100 text-red-700 border-red-200 font-medium">Withdrawn</Badge>;
@@ -156,6 +169,7 @@ export default function AdminCompanyDetailPage() {
   const [tabSearch, setTabSearch] = useState<Record<TabKey, string>>({
     profile: "", projects: "", proposals: "", interviews: "", payments: "", upcomingPayments: "", hired: "",
   });
+  const [interviewTimezoneFilter, setInterviewTimezoneFilter] = useState<string>("");
   const [tabSearchCurrency, setTabSearchCurrency] = useState<Record<TabKey, string>>({
     profile: "", projects: "", proposals: "", interviews: "", payments: "", upcomingPayments: "", hired: "",
   });
@@ -168,6 +182,7 @@ export default function AdminCompanyDetailPage() {
   const [pageSize, setPageSize] = useState<5 | 10 | 25 | 50>(10);
   const [projectsCreatedDate, setProjectsCreatedDate] = useState<string>("");
   const [projectFullTimeFilter, setProjectFullTimeFilter] = useState<"all" | "yes" | "no">("all");
+  const [projectTimezoneFilter, setProjectTimezoneFilter] = useState<string>("");
   const [hiredType, setHiredType] = useState<"all" | "fulltime" | "internship">("all");
 
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -176,6 +191,8 @@ export default function AdminCompanyDetailPage() {
   const [selectedProposal, setSelectedProposal] = useState<any | null>(null);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [selectedInterviewFeedback, setSelectedInterviewFeedback] = useState<string>("");
+  const [interviewDialogOpen, setInterviewDialogOpen] = useState(false);
+  const [selectedInterview, setSelectedInterview] = useState<any | null>(null);
   const [markingReceivedId, setMarkingReceivedId] = useState<string>("");
   const [logoError, setLogoError] = useState(false);
 
@@ -189,16 +206,39 @@ export default function AdminCompanyDetailPage() {
   const [paymentSummary, setPaymentSummary] = useState<any>(null);
   const [internUsers, setInternUsers] = useState<Record<string, any>>({});
 
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+  const [openFilterFor, setOpenFilterFor] = useState<string | null>(null);
+  const [filterDraft, setFilterDraft] = useState("");
+
   const displayProposalStatus = (raw: unknown) => { const s = String(raw ?? "-").trim().toLowerCase(); if (s === "expired") return "expired"; return s || "-"; };
 
   const interviewStatusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     interviews.forEach((i: any) => {
-      const status = String(i?.status ?? "").toLowerCase();
+      const rawStatus = String(i?.status ?? "").toLowerCase();
+      const status = (rawStatus === "pending" || rawStatus === "created") ? "sent" : rawStatus;
       counts[status] = (counts[status] || 0) + 1;
     });
     return counts;
   }, [interviews]);
+
+  const availableTimezones = useMemo(() => {
+    const timezones = new Set<string>();
+    interviews.forEach((i: any) => {
+      const tz = String(i?.timezone ?? "").trim();
+      if (tz) timezones.add(tz);
+    });
+    return Array.from(timezones).sort();
+  }, [interviews]);
+
+  const availableProjectTimezones = useMemo(() => {
+    const timezones = new Set<string>();
+    projects.forEach((p: any) => {
+      const tz = String(p?.timezone ?? "").trim();
+      if (tz) timezones.add(tz);
+    });
+    return Array.from(timezones).sort();
+  }, [projects]);
 
   const proposalStatusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -306,12 +346,48 @@ export default function AdminCompanyDetailPage() {
     const tokens = (q: string) => norm(q).split(/\s+/).filter(Boolean);
     const matches = (haystack: string, q: string) => { const t = tokens(q); if (t.length === 0) return true; const h = norm(haystack); return t.every((x) => h.includes(x)); };
     const toDateKey = (raw: unknown) => { if (!raw) return ""; const d = new Date(String(raw)); if (Number.isNaN(d.getTime())) return ""; return d.toISOString().slice(0, 10); };
-    const projectList = (projects ?? []).filter((p: any) => { const s = norm(p?.status ?? "-"); const sf = norm(tabStatus.projects); if (sf && s !== sf) return false; const ck = toDateKey(p?.createdAt ?? p?.created_at ?? null); const cfk = String(projectsCreatedDate ?? "").trim(); if (cfk && ck !== cfk) return false; const fullTimeOffer = Boolean(p?.fullTimeOffer ?? p?.full_time_offer ?? false); if (projectFullTimeFilter === "yes" && !fullTimeOffer) return false; if (projectFullTimeFilter === "no" && fullTimeOffer) return false; const skills = Array.isArray(p?.skills) ? p.skills.join(" ") : ""; const hay = `${p?.projectName ?? p?.title ?? ""} ${skills} ${p?.city ?? ""} ${p?.timezone ?? ""} ${p?.locationType ?? p?.location_type ?? ""}`; return matches(hay, tabSearch.projects); });
-    const proposalList = (proposals ?? []).filter((p: any) => { const s = norm(p?.status ?? "-"); const sf = norm(tabStatus.proposals); if (sf) { if (sf === "withdrawn") { if (s !== "withdrawn") return false; } else if (s !== sf) return false; } const hay = `${p?.internName ?? p?.candidateName ?? ""} ${p?.projectName ?? ""} ${p?.currency ?? ""}`; return matches(hay, tabSearch.proposals); });
+    const projectList = (projects ?? []).filter((p: any) => { 
+      const s = norm(p?.status ?? "-"); 
+      const sf = norm(tabStatus.projects); 
+      if (sf && s !== sf) return false; 
+      const cfProjectName = columnFilters["projects_projectName"];
+      if (cfProjectName && !norm(p?.projectName ?? p?.title ?? "").includes(norm(cfProjectName))) return false;
+      const cfSkills = columnFilters["projects_skills"];
+      if (cfSkills) { const skills = Array.isArray(p?.skills) ? p.skills.join(" ") : ""; if (!norm(skills).includes(norm(cfSkills))) return false; }
+      const cfCity = columnFilters["projects_city"];
+      if (cfCity && !norm(p?.city ?? "").includes(norm(cfCity))) return false;
+      const cfState = columnFilters["projects_state"];
+      if (cfState && !norm(p?.state ?? "").includes(norm(cfState))) return false;
+      const cfStatus = columnFilters["projects_status"];
+      if (cfStatus && s !== norm(cfStatus)) return false;
+      const cfTimezone = columnFilters["projects_timezone"];
+      if (cfTimezone && !norm(p?.timezone ?? "").includes(norm(cfTimezone))) return false;
+      const tzFilter = norm(projectTimezoneFilter);
+      if (tzFilter && !norm(p?.timezone ?? "").includes(tzFilter)) return false;
+      const ck = toDateKey(p?.createdAt ?? p?.created_at ?? null); const cfk = String(projectsCreatedDate ?? "").trim(); if (cfk && ck !== cfk) return false; const fullTimeOffer = Boolean(p?.fullTimeOffer ?? p?.full_time_offer ?? false); if (projectFullTimeFilter === "yes" && !fullTimeOffer) return false; if (projectFullTimeFilter === "no" && fullTimeOffer) return false; const skills = Array.isArray(p?.skills) ? p.skills.join(" ") : ""; const hay = `${p?.projectName ?? p?.title ?? ""} ${skills} ${p?.city ?? ""} ${p?.timezone ?? ""} ${p?.locationType ?? p?.location_type ?? ""}`; return matches(hay, tabSearch.projects); 
+    });
+    const proposalList = (proposals ?? []).filter((p: any) => { 
+      const s = norm(p?.status ?? "-"); 
+      const sf = norm(tabStatus.proposals); 
+      if (sf) { if (sf === "withdrawn") { if (s !== "withdrawn") return false; } else if (s !== sf) return false; } 
+      const cfInternName = columnFilters["proposals_internName"];
+      if (cfInternName && !norm(p?.internName ?? p?.candidateName ?? "").includes(norm(cfInternName))) return false;
+      const cfStatus = columnFilters["proposals_status"];
+      if (cfStatus && s !== norm(cfStatus)) return false;
+      const hay = `${p?.internName ?? p?.candidateName ?? ""} ${p?.projectName ?? ""} ${p?.currency ?? ""}`; return matches(hay, tabSearch.proposals); 
+    });
     const interviewList = (interviews ?? []).filter((i: any) => { 
       const s = norm(i?.status ?? "-"); 
       const sf = norm(tabStatus.interviews); 
       if (sf && s !== sf) return false; 
+      const cfInternName = columnFilters["interviews_internName"];
+      if (cfInternName && !norm(i?.internName ?? "").includes(norm(cfInternName))) return false;
+      const cfStatus = columnFilters["interviews_status"];
+      if (cfStatus && s !== norm(cfStatus)) return false;
+      const cfMeetingLink = columnFilters["interviews_meetingLink"];
+      if (cfMeetingLink && !norm(i?.meetingLink ?? "").includes(norm(cfMeetingLink))) return false;
+      const tzFilter = norm(interviewTimezoneFilter);
+      if (tzFilter && !norm(i?.timezone ?? "").includes(tzFilter)) return false;
       const candidateName = String(i?.internName ?? "").toLowerCase();
       const projectName = String(i?.projectName ?? "").toLowerCase();
       const searchTerm = norm(tabSearch.interviews);
@@ -322,6 +398,14 @@ export default function AdminCompanyDetailPage() {
       const s = norm(o?.status ?? "-"); 
       const sf = norm(tabStatus.payments); 
       if (sf && s !== sf) return false; 
+      const cfOrderId = columnFilters["payments_orderId"];
+      if (cfOrderId && !norm(o?.orderId ?? "").includes(norm(cfOrderId))) return false;
+      const cfInternName = columnFilters["payments_internName"];
+      if (cfInternName && !norm(o?.internName ?? o?.candidateName ?? "").includes(norm(cfInternName))) return false;
+      const cfStatus = columnFilters["payments_status"];
+      if (cfStatus && s !== norm(cfStatus)) return false;
+      const cfCurrency = columnFilters["payments_currency"];
+      if (cfCurrency && norm(o?.currency ?? "INR") !== norm(cfCurrency)) return false;
       const currencyFilter = norm(tabSearchCurrency.payments);
       const currency = norm(o?.currency ?? "INR");
       if (currencyFilter && currency !== currencyFilter) return false;
@@ -350,6 +434,9 @@ export default function AdminCompanyDetailPage() {
       if (hiredType === "fulltime" && !isFullTime) return false;
       if (hiredType === "internship" && isFullTime) return false;
       
+      const cfInternName = columnFilters["hired_internName"];
+      if (cfInternName && !norm(p?.internName ?? p?.candidateName ?? "").includes(norm(cfInternName))) return false;
+      
       const hay = `${p?.internName ?? p?.candidateName ?? ""} ${p?.projectName ?? ""}`;
       return matches(hay, tabSearch.hired);
     }).map((p: any) => {
@@ -365,7 +452,7 @@ export default function AdminCompanyDetailPage() {
     });
     const employerDuesList = paymentSummary?.internEmployerDues ?? [];
     return { projectList, proposalList, interviewList, paymentList, upcomingPaymentsList, hiredList, employerDuesList };
-  }, [orders, projects, proposals, interviews, tabSearch, tabStatus, tabSearchCurrency, paymentSummary, hiredType, internUsers, projectFullTimeFilter]);
+  }, [orders, projects, proposals, interviews, tabSearch, tabStatus, tabSearchCurrency, paymentSummary, hiredType, internUsers, projectFullTimeFilter, projectTimezoneFilter, columnFilters]);
 
   const pagination = useMemo(() => {
     const getList = (tab: TabKey) => { if (tab === "projects") return tabData.projectList; if (tab === "proposals") return tabData.proposalList; if (tab === "interviews") return tabData.interviewList; if (tab === "payments") return tabData.paymentList; if (tab === "upcomingPayments") return tabData.upcomingPaymentsList; return tabData.hiredList; };
@@ -378,7 +465,7 @@ export default function AdminCompanyDetailPage() {
     return { total, totalPages, safePage, startIndex, endIndex, list, pageList: list.slice(startIndex, endIndex) };
   }, [activeTab, pageSize, tabData, tabPage]);
 
-  useEffect(() => { setTabPage((prev) => ({ ...prev, [activeTab]: 1 })); }, [activeTab, pageSize, tabSearch, tabStatus]);
+  useEffect(() => { setTabPage((prev) => ({ ...prev, [activeTab]: 1 })); }, [activeTab, pageSize, tabSearch, tabStatus, columnFilters]);
   useEffect(() => { setTabPage((prev) => ({ ...prev, projects: 1 })); }, [projectsCreatedDate]);
   useEffect(() => { if (activeTab !== "hired") setHiredType("all"); }, [activeTab]);
   useEffect(() => { if (activeTab === "hired") setTabPage((prev) => ({ ...prev, hired: 1 })); }, [hiredType]);
@@ -409,6 +496,92 @@ export default function AdminCompanyDetailPage() {
   const formatMajorMoney = (amountMajor: number, currencyCode: string) => { const cur = String(currencyCode || "INR").toUpperCase(); const locale = cur === "INR" ? "en-IN" : "en-US"; const major = Number.isFinite(amountMajor) ? amountMajor : 0; return new Intl.NumberFormat(locale, { style: "currency", currency: cur, maximumFractionDigits: 0 }).format(major || 0); };
   const toDisplayUrl = (raw: string) => { const v = String(raw ?? "").trim(); if (!v) return ""; if (v.startsWith("/")) return v; if (/^https?:\/\//i.test(v)) return v; return `https://${v}`; };
   const monthsFromDuration = (duration: unknown) => { switch (String(duration ?? "").trim().toLowerCase()) { case "2m": return 2; case "3m": return 3; case "6m": return 6; default: return 1; } };
+
+  const projectColumns = [
+    { key: "projectName", label: "Project", filterKey: "projectName" },
+    { key: "skills", label: "Skills", filterKey: "skills" },
+    { key: "scopeOfWork", label: "Scope" },
+    { key: "city", label: "City", filterKey: "city" },
+    { key: "state", label: "State", filterKey: "state" },
+    { key: "locationType", label: "Location" },
+    { key: "timezone", label: "Timezone" },
+    { key: "fullTimeOffer", label: "Full-time" },
+    { key: "status", label: "Status", filterKey: "status" },
+    { key: "createdAt", label: "Created" },
+  ];
+
+  const proposalColumns = [
+    { key: "internName", label: "Candidate", filterKey: "internName" },
+    { key: "projectName", label: "Project" },
+    { key: "type", label: "Type" },
+    { key: "status", label: "Status", filterKey: "status" },
+    { key: "monthly", label: "Monthly" },
+    { key: "duration", label: "Duration" },
+    { key: "createdAt", label: "Created" },
+  ];
+
+  const interviewColumns = [
+    { key: "internName", label: "Candidate", filterKey: "internName" },
+    { key: "projectName", label: "Project" },
+    { key: "status", label: "Status", filterKey: "status" },
+    { key: "timezone", label: "Timezone", filterKey: "timezone" },
+    { key: "meetingLink", label: "Meeting Link" },
+  ];
+
+  const paymentColumns = [
+    { key: "orderId", label: "Order ID", filterKey: "orderId" },
+    { key: "internName", label: "Candidate", filterKey: "internName" },
+    { key: "projectName", label: "Project" },
+    { key: "status", label: "Status", filterKey: "status" },
+    { key: "currency", label: "Currency", filterKey: "currency" },
+  ];
+
+  const hiredColumns = [
+    { key: "internName", label: "Candidate", filterKey: "internName" },
+    { key: "projectName", label: "Project" },
+    { key: "type", label: "Type" },
+  ];
+
+  const getColumns = (tab: string) => {
+    switch (tab) {
+      case "projects": return projectColumns;
+      case "proposals": return proposalColumns;
+      case "interviews": return interviewColumns;
+      case "payments": return paymentColumns;
+      case "hired": return hiredColumns;
+      default: return [];
+    }
+  };
+
+  const ColumnHeader = ({ col, tab }: { col: any; tab: string }) => {
+    const isFiltered = Boolean(String(columnFilters[`${tab}_${col.key}`] ?? "").trim());
+    const openFilter = () => {
+      if (!col.filterKey) return;
+      setOpenFilterFor(`${tab}_${col.key}`);
+      setFilterDraft(String(columnFilters[`${tab}_${col.key}`] ?? ""));
+    };
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className={cn("flex items-center gap-1.5 transition-colors", isFiltered && "text-primary")}>
+            <span className="truncate">{col.label}</span>
+            {isFiltered && <span className="h-2 w-2 rounded-full bg-primary" />}
+            <MoreVertical className="h-4 w-4 opacity-50" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-52">
+          <DropdownMenuLabel className="text-xs">{col.label}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuItem disabled={!col.filterKey} onClick={openFilter}>
+              <Filter className="h-4 w-4" /> {isFiltered ? "Edit Filter" : "Add Filter"}
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
 
   if (loading) {
     return (
@@ -563,7 +736,7 @@ export default function AdminCompanyDetailPage() {
                     {activeTab === "projects" && (
                       <>
                         <Select value={tabStatus[activeTab] || "__all__"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, [activeTab]: v === "__all__" ? "" : v }))}>
-                          <SelectTrigger className="h-10 w-full sm:w-[160px] bg-background"><SelectValue placeholder="Status" /></SelectTrigger>
+                          <SelectTrigger className="h-10 w-full sm:w-[140px] bg-background"><SelectValue placeholder="Status" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__all__">All Status</SelectItem>
                             <SelectItem value="active">Active</SelectItem>
@@ -571,11 +744,20 @@ export default function AdminCompanyDetailPage() {
                           </SelectContent>
                         </Select>
                         <Select value={projectFullTimeFilter} onValueChange={(v) => setProjectFullTimeFilter(v as "all" | "yes" | "no")}>
-                          <SelectTrigger className="h-10 w-full sm:w-[160px] bg-background"><SelectValue placeholder="Full-time" /></SelectTrigger>
+                          <SelectTrigger className="h-10 w-full sm:w-[140px] bg-background"><SelectValue placeholder="Full-time" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="all">All</SelectItem>
                             <SelectItem value="yes">Full-time: Yes</SelectItem>
                             <SelectItem value="no">Full-time: No</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select value={projectTimezoneFilter || "__all__"} onValueChange={(v) => setProjectTimezoneFilter(v === "__all__" ? "" : v)}>
+                          <SelectTrigger className="h-10 w-full sm:w-[160px] bg-background"><SelectValue placeholder="Timezone" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all__">All Timezones</SelectItem>
+                            {availableProjectTimezones.map(tz => (
+                              <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </>
@@ -599,18 +781,45 @@ export default function AdminCompanyDetailPage() {
                       </div>
                     )}
                     {activeTab === "interviews" && (
-                      <Select value={tabStatus.interviews || "all"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, interviews: v === "all" ? "" : v }))}>
-                  <SelectTrigger className="w-[150px] h-8 text-xs bg-white">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status ({interviews.length})</SelectItem>
-                    <SelectItem value="pending">Pending ({interviewStatusCounts["pending"] || 0})</SelectItem>
-                    <SelectItem value="scheduled">Scheduled ({interviewStatusCounts["scheduled"] || 0})</SelectItem>
-                    <SelectItem value="completed">Completed ({interviewStatusCounts["completed"] || 0})</SelectItem>
-                    <SelectItem value="expired">Expired ({interviewStatusCounts["expired"] || 0})</SelectItem>
-                  </SelectContent>
-                </Select>
+                      <>
+                        <Select value={tabStatus.interviews || "all"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, interviews: v === "all" ? "" : v }))}>
+                          <SelectTrigger className="w-[150px] h-8 text-xs bg-white">
+                            <SelectValue placeholder="Status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Status ({interviews.length})</SelectItem>
+                            <SelectItem value="sent">Sent ({interviewStatusCounts["sent"] || 0})</SelectItem>
+                            <SelectItem value="scheduled">Scheduled ({interviewStatusCounts["scheduled"] || 0})</SelectItem>
+                            <SelectItem value="completed">Completed ({interviewStatusCounts["completed"] || 0})</SelectItem>
+                            <SelectItem value="expired">Expired ({interviewStatusCounts["expired"] || 0})</SelectItem>
+                            <SelectItem value="missed">Missed ({interviewStatusCounts["missed"] || 0})</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select value={interviewTimezoneFilter || "__all__"} onValueChange={(v) => setInterviewTimezoneFilter(v === "__all__" ? "" : v)}>
+                          <SelectTrigger className="w-[160px] h-8 text-xs bg-white border-slate-200">
+                            <SelectValue placeholder="Filter by Timezone" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[300px]">
+                            <SelectItem value="__all__">
+                              <div className="flex items-center justify-between w-full">
+                                <span>All Timezones</span>
+                                <span className="ml-2 text-xs bg-slate-100 px-1.5 py-0.5 rounded-full">{interviews.length}</span>
+                              </div>
+                            </SelectItem>
+                            {availableTimezones.map(tz => {
+                              const count = interviews.filter((i: any) => String(i?.timezone ?? "").trim() === tz).length;
+                              return (
+                                <SelectItem key={tz} value={tz}>
+                                  <div className="flex items-center justify-between w-full">
+                                    <span>{tz}</span>
+                                    <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">{count}</span>
+                                  </div>
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </>
                     )}
                     {activeTab === "payments" && (
                       <>
@@ -701,9 +910,20 @@ export default function AdminCompanyDetailPage() {
                   {tab === "projects" && (
                     <div className="rounded-lg border overflow-hidden">
                       <Table>
-                        <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40"><TableHead>Project</TableHead><TableHead>Skills</TableHead><TableHead>Scope</TableHead><TableHead>City</TableHead><TableHead>State</TableHead><TableHead>Location</TableHead><TableHead>Full-time possible</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
+                          <TableHead><ColumnHeader col={projectColumns[0]} tab="projects" /></TableHead>
+                          <TableHead><ColumnHeader col={projectColumns[1]} tab="projects" /></TableHead>
+                          <TableHead><ColumnHeader col={projectColumns[2]} tab="projects" /></TableHead>
+                          <TableHead><ColumnHeader col={projectColumns[3]} tab="projects" /></TableHead>
+                          <TableHead><ColumnHeader col={projectColumns[4]} tab="projects" /></TableHead>
+                          <TableHead><ColumnHeader col={projectColumns[5]} tab="projects" /></TableHead>
+                          <TableHead><ColumnHeader col={projectColumns[6]} tab="projects" /></TableHead>
+                          <TableHead><ColumnHeader col={projectColumns[7]} tab="projects" /></TableHead>
+                          <TableHead><ColumnHeader col={projectColumns[8]} tab="projects" /></TableHead>
+                          <TableHead><ColumnHeader col={projectColumns[9]} tab="projects" /></TableHead>
+                        </TableRow></TableHeader>
                         <TableBody>
-                          {tabData.projectList.length === 0 ? <TableRow><TableCell colSpan={9}><EmptyState icon={Briefcase} title="No projects" description="This company hasn't created any projects yet." /></TableCell></TableRow> :
+                          {tabData.projectList.length === 0 ? <TableRow><TableCell colSpan={10}><EmptyState icon={Briefcase} title="No projects" description="This company hasn't created any projects yet." /></TableCell></TableRow> :
                             tabData.projectList.map((p: any, idx: number) => {
                               const createdAtRaw = p?.createdAt ?? p?.created_at ?? null;
                               const createdAt = createdAtRaw ? (() => { const d = new Date(createdAtRaw); return Number.isNaN(d.getTime()) ? String(createdAtRaw) : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); })() : "—";
@@ -713,6 +933,7 @@ export default function AdminCompanyDetailPage() {
                               const projectState = rawState && rawState !== "active" && rawState !== "inactive" && rawState !== "draft" ? String(p?.state ?? "—") : "—";
                               const status = String(p?.status ?? "—") || "—";
                               const fullTimePossible = Boolean((p?.fullTimeOffer ?? p?.full_time_offer ?? p?.full_time_offer ?? false));
+                              const projectTimezone = String(p?.timezone ?? "—") || "—";
                               return (
                                 <TableRow key={String(p?.id ?? p?.projectName ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
                                   <TableCell className="font-medium">{String(p?.projectName ?? p?.title ?? "—")}</TableCell>
@@ -721,6 +942,7 @@ export default function AdminCompanyDetailPage() {
                                   <TableCell>{projectCity}</TableCell>
                                   <TableCell>{projectState}</TableCell>
                                   <TableCell className="capitalize">{String(p?.locationType ?? p?.location_type ?? "—")}</TableCell>
+                                  <TableCell className="text-muted-foreground">{projectTimezone}</TableCell>
                                   <TableCell className="text-center">
                                     {fullTimePossible ? <CheckCircle2 className="h-5 w-5 text-emerald-500 mx-auto" /> : <span className="text-muted-foreground">—</span>}
                                   </TableCell>
@@ -737,7 +959,16 @@ export default function AdminCompanyDetailPage() {
                   {tab === "proposals" && (
                     <div className="rounded-lg border overflow-hidden">
                       <Table>
-                        <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40"><TableHead>Candidate</TableHead><TableHead>Project</TableHead><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Monthly</TableHead><TableHead>Duration</TableHead><TableHead>Created</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
+                          <TableHead><ColumnHeader col={proposalColumns[0]} tab="proposals" /></TableHead>
+                          <TableHead><ColumnHeader col={proposalColumns[1]} tab="proposals" /></TableHead>
+                          <TableHead><ColumnHeader col={proposalColumns[2]} tab="proposals" /></TableHead>
+                          <TableHead><ColumnHeader col={proposalColumns[3]} tab="proposals" /></TableHead>
+                          <TableHead><ColumnHeader col={proposalColumns[4]} tab="proposals" /></TableHead>
+                          <TableHead><ColumnHeader col={proposalColumns[5]} tab="proposals" /></TableHead>
+                          <TableHead><ColumnHeader col={proposalColumns[6]} tab="proposals" /></TableHead>
+                          <TableHead className="text-right">Action</TableHead>
+                        </TableRow></TableHeader>
                         <TableBody>
                           {tabData.proposalList.length === 0 ? <TableRow><TableCell colSpan={8}><EmptyState icon={FileCheck} title="No proposals" description="No proposals found for this company." /></TableCell></TableRow> :
                             tabData.proposalList.map((p: any, idx: number) => {
@@ -798,49 +1029,103 @@ export default function AdminCompanyDetailPage() {
                   )}
 
                   {tab === "interviews" && (
-                    <div className="rounded-lg border overflow-hidden">
-                      <Table>
-                        <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40"><TableHead className="w-12">No.</TableHead><TableHead>Candidate</TableHead><TableHead>Project</TableHead><TableHead>Meeting Status</TableHead><TableHead>Slots Sent</TableHead><TableHead>Meeting Timing</TableHead><TableHead>Timezone</TableHead><TableHead>Meeting Link</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                          {tabData.interviewList.length === 0 ? <TableRow><TableCell colSpan={9}><EmptyState icon={Clock} title="No interviews" description="No interviews scheduled for this company." /></TableCell></TableRow> :
-                            tabData.interviewList.map((i: any, idx: number) => {
-                              const createdAtRaw = i?.createdAt ?? i?.created_at ?? null;
-                              const createdAt = createdAtRaw ? (() => { const d = new Date(createdAtRaw); return Number.isNaN(d.getTime()) ? String(createdAtRaw) : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); })() : "—";
-                              const link = String(i?.meetingLink ?? "").trim();
-                              const href = link ? toDisplayUrl(link) : "";
-                              const notes = String(i?.notes ?? "");
-                              const feedbackLine = notes.split("\n").map((l: string) => l.trim()).find((l: string) => l.toLowerCase().startsWith("feedback_text:"));
-                              const feedbackText = String(feedbackLine ? feedbackLine.slice("feedback_text:".length).trim() : "");
-                              const slots = Array.isArray(i?.slots) ? i.slots : [];
-                              const slotTimings = slots.map((s: any) => {
-                                const raw = s?.startTime ?? s?.scheduledTime ?? null;
-                                if (!raw) return null;
-                                const d = new Date(raw);
-                                if (Number.isNaN(d.getTime())) return null;
-                                return d.toLocaleString("en-IN", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
-                              }).filter(Boolean);
-                              return (
-                                <TableRow key={String(i?.id ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
-                                  <TableCell className="font-medium text-muted-foreground">{idx + 1}</TableCell>
-                                  <TableCell className="font-medium">{String(i?.internName ?? "—")}</TableCell>
-                                  <TableCell>{String(i?.projectName ?? "—")}</TableCell>
-                                  <TableCell><StatusBadge status={String(i?.status ?? "—")} /></TableCell>
-                                  <TableCell className="text-center font-semibold">{slots.length > 0 ? slots.length : "—"}</TableCell>
-                                  <TableCell className="max-w-[200px] text-xs text-muted-foreground">
-                                    {slotTimings.length > 0 ? (
-                                      <div className="space-y-1">
-                                        {slotTimings.map((slotTime: string | null, idx: number) => slotTime ? <div key={idx}>{idx + 1}. {slotTime}</div> : null)}
+                    <div className="space-y-4">
+                      {tabData.interviewList.length === 0 ? (
+                        <EmptyState icon={Clock} title="No interviews" description="No interviews scheduled for this company." />
+                      ) : (
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                          {tabData.interviewList.map((i: any, idx: number) => {
+                            const slot1 = i?.slot1 ?? i?.slot_1 ?? null;
+                            const slot2 = i?.slot2 ?? i?.slot_2 ?? null;
+                            const slot3 = i?.slot3 ?? i?.slot_3 ?? null;
+                            const selectedSlot = Number(i?.selectedSlot ?? i?.selected_slot ?? 0);
+                            const selectedSlotTime = selectedSlot === 1 ? slot1 : selectedSlot === 2 ? slot2 : selectedSlot === 3 ? slot3 : null;
+                            const slots = [slot1, slot2, slot3].filter(Boolean);
+                            const rawStatus = String(i?.status ?? "").toLowerCase();
+                            const displayStatus = (rawStatus === "pending" || rawStatus === "created") ? "sent" : rawStatus;
+                            
+                            return (
+                              <Card key={String(i?.id ?? idx)} className="overflow-hidden hover:shadow-lg transition-all duration-300 border-l-4">
+                                <div className={cn(
+                                  "p-4 border-b",
+                                  displayStatus === "sent" ? "border-l-purple-500 bg-purple-50/50" :
+                                  displayStatus === "scheduled" ? "border-l-blue-500 bg-blue-50/50" :
+                                  displayStatus === "completed" ? "border-l-emerald-500 bg-emerald-50/50" :
+                                  displayStatus === "expired" ? "border-l-red-500 bg-red-50/50" :
+                                  "border-l-amber-500 bg-amber-50/50"
+                                )}>
+                                  <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-sm">
+                                        {String(i?.internName ?? "?").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                                       </div>
-                                    ) : "Not Scheduled"}
-                                  </TableCell>
-                                  <TableCell className="text-muted-foreground">{String(i?.timezone ?? "—")}</TableCell>
-                                  <TableCell className="max-w-[150px] truncate">{href ? <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{link}</a> : link || "—"}</TableCell>
-                                  <TableCell className="text-right"><Button size="sm" variant="outline" disabled={!feedbackText} onClick={() => { setSelectedInterviewFeedback(feedbackText); setFeedbackDialogOpen(true); }}><Eye className="h-3 w-3 mr-1" /> Feedback</Button></TableCell>
-                                </TableRow>
-                              );
-                            })}
-                        </TableBody>
-                      </Table>
+                                      <div>
+                                        <h4 className="font-semibold text-sm">{i?.internName ?? "Unknown"}</h4>
+                                        <p className="text-xs text-muted-foreground">{i?.projectName ?? "General Interview"}</p>
+                                      </div>
+                                    </div>
+                                    <StatusBadge status={displayStatus} />
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div className="bg-white/60 rounded-lg p-2">
+                                      <p className="text-muted-foreground mb-1">Slots Sent</p>
+                                      <p className="font-semibold">{slots.length > 0 ? slots.length : "—"}</p>
+                                    </div>
+                                    <div className="bg-white/60 rounded-lg p-2">
+                                      <p className="text-muted-foreground mb-1">Selected</p>
+                                      <p className={cn("font-semibold", selectedSlotTime ? "text-emerald-600" : "text-muted-foreground")}>
+                                        {selectedSlotTime ? `Slot ${selectedSlot}` : "Pending"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  
+                                  {selectedSlotTime && (
+                                    <div className="mt-2 bg-emerald-100 rounded-lg p-2 flex items-center gap-2">
+                                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                      <span className="text-xs font-medium text-emerald-700">
+                                        Confirmed: {(() => { const d = new Date(selectedSlotTime); return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); })()}
+                                      </span>
+                                    </div>
+                                  )}
+                                  
+                                  <div className="mt-2 flex items-center justify-between">
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                      <Globe className="h-3 w-3" />
+                                      {i?.timezone ?? "—"}
+                                    </div>
+                                      <div className="flex gap-1">
+                                      {(() => {
+                                        const fb = i?.feedbackText ?? i?.feedback_text ?? "";
+                                        const notes = String(i?.notes ?? "");
+                                        const hasFeedbackText = fb.trim() || notes.toLowerCase().includes("feedback_text:");
+                                        const hasFeedbackLink = i?.feedbackLink ?? i?.feedback_link;
+                                        return (
+                                          <>
+                                            {(hasFeedbackText || hasFeedbackLink) && (
+                                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { 
+                                                const notesFb = notes.split("\n").find((l: string) => l.toLowerCase().startsWith("feedback_text:")); 
+                                                const fbText = fb.trim() || (notesFb ? notesFb.slice("feedback_text:".length).trim() : "");
+                                                setSelectedInterviewFeedback(fbText); 
+                                                setFeedbackDialogOpen(true); 
+                                              }}>
+                                                <FileText className="h-3 w-3 mr-1" /> Feedback
+                                              </Button>
+                                            )}
+                                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setSelectedInterview(i); setInterviewDialogOpen(true); }}>
+                                              <Eye className="h-3 w-3 mr-1" /> View
+                                            </Button>
+                                          </>
+                                        );
+                                      })()}
+                                    </div>
+                                  </div>
+                                </div>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -858,7 +1143,17 @@ export default function AdminCompanyDetailPage() {
                       </div>
                       <div className="rounded-lg border overflow-hidden">
                         <Table>
-                          <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40"><TableHead>Order ID</TableHead><TableHead>Candidate</TableHead><TableHead>Project</TableHead><TableHead>Status</TableHead><TableHead>Amount</TableHead><TableHead>Currency</TableHead><TableHead>Paid At</TableHead><TableHead>Created</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                          <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
+                            <TableHead><ColumnHeader col={paymentColumns[0]} tab="payments" /></TableHead>
+                            <TableHead><ColumnHeader col={paymentColumns[1]} tab="payments" /></TableHead>
+                            <TableHead>Project</TableHead>
+                            <TableHead><ColumnHeader col={paymentColumns[3]} tab="payments" /></TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead><ColumnHeader col={paymentColumns[4]} tab="payments" /></TableHead>
+                            <TableHead>Paid At</TableHead>
+                            <TableHead>Created</TableHead>
+                            <TableHead className="text-right">Action</TableHead>
+                          </TableRow></TableHeader>
                           <TableBody>
                             {tabData.paymentList.length === 0 ? <TableRow><TableCell colSpan={9}><EmptyState icon={CreditCard} title="No payments" description="No payment records found for this company." /></TableCell></TableRow> :
                               tabData.paymentList.map((o: any, idx: number) => {
@@ -1181,7 +1476,14 @@ export default function AdminCompanyDetailPage() {
                   {tab === "hired" && (
                     <div className="rounded-lg border overflow-hidden">
                       <Table>
-                        <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40"><TableHead>Candidate</TableHead><TableHead>Project</TableHead><TableHead>Type</TableHead><TableHead>Monthly</TableHead><TableHead>Total</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
+                          <TableHead><ColumnHeader col={hiredColumns[0]} tab="hired" /></TableHead>
+                          <TableHead><ColumnHeader col={hiredColumns[1]} tab="hired" /></TableHead>
+                          <TableHead><ColumnHeader col={hiredColumns[2]} tab="hired" /></TableHead>
+                          <TableHead>Monthly</TableHead>
+                          <TableHead>Total</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
+                        </TableRow></TableHeader>
                         <TableBody>
                           {tabData.hiredList.length === 0 ? <TableRow><TableCell colSpan={6}><EmptyState icon={Users} title="No hires" description="No resources have been hired yet." /></TableCell></TableRow> :
                             tabData.hiredList.map((p: any, idx: number) => {
@@ -1334,6 +1636,150 @@ export default function AdminCompanyDetailPage() {
           </DialogContent>
         </Dialog>
 
+        {/* Interview Detail Dialog */}
+        <Dialog open={interviewDialogOpen} onOpenChange={(open) => { setInterviewDialogOpen(open); if (!open) setSelectedInterview(null); }}>
+          <DialogContent className="max-w-[700px] p-0 overflow-hidden">
+            {selectedInterview && (() => {
+              const slot1 = selectedInterview?.slot1 ?? selectedInterview?.slot_1 ?? null;
+              const slot2 = selectedInterview?.slot2 ?? selectedInterview?.slot_2 ?? null;
+              const slot3 = selectedInterview?.slot3 ?? selectedInterview?.slot_3 ?? null;
+              const selectedSlot = Number(selectedInterview?.selectedSlot ?? selectedInterview?.selected_slot ?? 0);
+              const slots = [slot1, slot2, slot3].filter(Boolean);
+              const rawStatus = String(selectedInterview?.status ?? "").toLowerCase();
+              const displayStatus = (rawStatus === "pending" || rawStatus === "created") ? "sent" : rawStatus;
+              const internName = selectedInterview?.internName ?? "Unknown";
+              const projectName = selectedInterview?.projectName ?? "General Interview";
+              const timezone = selectedInterview?.timezone ?? "—";
+              const createdAt = selectedInterview?.createdAt ?? selectedInterview?.created_at ?? null;
+              const feedbackText = selectedInterview?.feedbackText ?? selectedInterview?.feedback_text ?? "";
+              const notes = String(selectedInterview?.notes ?? "");
+              const meetingLink = selectedInterview?.meetingLink ?? selectedInterview?.meet_link ?? null;
+              const recordingLink = selectedInterview?.recordingLink ?? selectedInterview?.recording_link ?? null;
+              const feedbackLink = selectedInterview?.feedbackLink ?? selectedInterview?.feedback_link ?? null;
+
+              return (
+                <>
+                  <div className={cn(
+                    "p-6 border-b",
+                    displayStatus === "sent" ? "bg-purple-50" :
+                    displayStatus === "scheduled" ? "bg-blue-50" :
+                    displayStatus === "completed" ? "bg-emerald-50" :
+                    displayStatus === "expired" ? "bg-red-50" :
+                    "bg-amber-50"
+                  )}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="h-14 w-14 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-lg">
+                          {String(internName).split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <h2 className="text-xl font-semibold">{internName}</h2>
+                          <p className="text-muted-foreground">{projectName}</p>
+                        </div>
+                      </div>
+                      <StatusBadge status={displayStatus} />
+                    </div>
+                  </div>
+                  <ScrollArea className="max-h-[60vh]">
+                    <div className="p-6 space-y-6">
+                      {/* Time Info */}
+                      <Card className="p-4">
+                        <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><Calendar className="h-4 w-4" /> Interview Schedule</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Timezone</p>
+                            <p className="font-medium">{timezone}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Created</p>
+                            <p className="font-medium">{createdAt ? new Date(createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</p>
+                          </div>
+                        </div>
+                      </Card>
+
+                      {/* Slots */}
+                      <Card className="p-4">
+                        <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><Clock className="h-4 w-4" /> Available Slots</h3>
+                        <div className="space-y-2">
+                          {slots.length === 0 ? <p className="text-muted-foreground text-sm">No slots provided</p> : 
+                            [slot1, slot2, slot3].map((slot, idx) => {
+                              if (!slot) return null;
+                              const slotNum = idx + 1;
+                              const isSelected = selectedSlot === slotNum;
+                              const d = new Date(slot);
+                              return (
+                                <div key={idx} className={cn(
+                                  "flex items-center justify-between p-3 rounded-lg border",
+                                  isSelected ? "bg-emerald-50 border-emerald-200" : "bg-muted/30"
+                                )}>
+                                  <div className="flex items-center gap-3">
+                                    {isSelected && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+                                    <div>
+                                      <p className={cn("font-medium", isSelected && "text-emerald-700")}>
+                                        Slot {slotNum} {isSelected && "(Selected)"}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        {Number.isNaN(d.getTime()) ? "Invalid date" : d.toLocaleString("en-IN", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          }
+                        </div>
+                      </Card>
+
+                      {/* Links */}
+                      {(meetingLink || recordingLink || feedbackLink) && (
+                        <Card className="p-4">
+                          <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><ExternalLink className="h-4 w-4" /> Meeting & Resources</h3>
+                          <div className="space-y-2">
+                            {meetingLink && (
+                              <a href={meetingLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
+                                <ExternalLink className="h-4 w-4" /> Join Meeting
+                              </a>
+                            )}
+                            {recordingLink && (
+                              <a href={recordingLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-purple-600 hover:underline">
+                                <FileVideo className="h-4 w-4" /> View Recording
+                              </a>
+                            )}
+                            {feedbackLink && (
+                              <a href={feedbackLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-amber-600 hover:underline">
+                                <FileText className="h-4 w-4" /> View Feedback
+                              </a>
+                            )}
+                          </div>
+                        </Card>
+                      )}
+
+                      {/* Feedback Text */}
+                      {feedbackText && (
+                        <Card className="p-4">
+                          <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Feedback</h3>
+                          <p className="text-sm whitespace-pre-wrap">{feedbackText}</p>
+                        </Card>
+                      )}
+
+                      {/* Notes */}
+                      {notes && (
+                        <Card className="p-4">
+                          <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><FileText className="h-4 w-4" /> Notes</h3>
+                          <pre className="text-sm whitespace-pre-wrap break-words">{notes}</pre>
+                        </Card>
+                      )}
+                    </div>
+                  </ScrollArea>
+                  <DialogFooter className="p-4 border-t">
+                    <Button variant="outline" onClick={() => setInterviewDialogOpen(false)}>Close</Button>
+                  </DialogFooter>
+                </>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
+
         {/* Payment Dialog */}
         <Dialog open={paymentDialogOpen} onOpenChange={(open) => { setPaymentDialogOpen(open); if (!open) setSelectedPayment(null); }}>
           <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
@@ -1409,6 +1855,36 @@ export default function AdminCompanyDetailPage() {
                 );
               })()}
             </ScrollArea>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={openFilterFor !== null} onOpenChange={(open) => { if (!open) { setOpenFilterFor(null); setFilterDraft(""); } }}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Filter: {openFilterFor ? openFilterFor.split("_").pop() : ""}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Input
+                  placeholder={`Enter value to filter...`}
+                  value={filterDraft}
+                  onChange={(e) => setFilterDraft(e.target.value)}
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === "Enter") { setColumnFilters((prev) => ({ ...prev, [openFilterFor!]: filterDraft })); setOpenFilterFor(null); setFilterDraft(""); } }}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => { if (!openFilterFor) return; setColumnFilters((prev) => { const next = { ...prev }; delete next[openFilterFor]; return next; }); setOpenFilterFor(null); setFilterDraft(""); }}>
+                  Clear
+                </Button>
+                <Button className="flex-1" onClick={() => { if (!openFilterFor) return; setColumnFilters((prev) => ({ ...prev, [openFilterFor]: filterDraft })); setOpenFilterFor(null); setFilterDraft(""); }}>
+                  Apply Filter
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

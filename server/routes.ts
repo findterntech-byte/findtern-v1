@@ -937,6 +937,20 @@ function serializeInterview(i: any) {
 
   const effectiveStatus = (() => {
     if (hasFeedback) return "completed";
+    
+    const slot1 = i?.slot1 ? new Date(i.slot1) : null;
+    const slot2 = i?.slot2 ? new Date(i.slot2) : null;
+    const slot3 = i?.slot3 ? new Date(i.slot3) : null;
+    const slots = [slot1, slot2, slot3].filter(Boolean);
+    const latestSlot = slots.length > 0 ? new Date(Math.max(...slots.map(d => d.getTime()))) : null;
+    
+    if (rawStatusLower === "pending" || rawStatusLower === "created") {
+      if (latestSlot && nowMs > latestSlot.getTime()) {
+        return "expired";
+      }
+      return i?.status ?? null;
+    }
+    
     if (rawStatusLower !== "scheduled") return i?.status ?? null;
 
     if (!Number.isFinite(selectedSlotIndex) || (selectedSlotIndex !== 1 && selectedSlotIndex !== 2 && selectedSlotIndex !== 3)) {
@@ -7239,28 +7253,24 @@ export async function registerRoutes(
         return !excludedEmployerIds.has(employerId);
       });
 
-      const internUsersById = new Map<string, any>();
-      for (const u of users as any[]) {
-        if (String(u?.role ?? "").toLowerCase() === "intern") {
-          const { password, ...safeUser } = u;
-          internUsersById.set(String(u.id), safeUser);
+      const processedInterviews = (filteredInterviews as any[]).map((i: any) => {
+        const status = String(i?.status ?? "").trim().toLowerCase();
+        if (status === "sent" || status === "pending" || status === "scheduled") {
+          const now = new Date();
+          const slot1 = i?.slot1 ? new Date(i.slot1) : null;
+          const slot2 = i?.slot2 ? new Date(i.slot2) : null;
+          const slot3 = i?.slot3 ? new Date(i.slot3) : null;
+          const latestSlot = [slot1, slot2, slot3].filter(Boolean).sort((a, b) => b!.getTime() - a!.getTime())[0];
+          if (latestSlot && now > latestSlot) {
+            return { ...i, status: "expired" };
+          }
         }
-      }
-
-      const employersById = new Map<string, any>();
-      for (const e of employers as any[]) {
-        const { password, ...safeEmployer } = e;
-        employersById.set(String(e.id), safeEmployer);
-      }
-
-      const projectsById = new Map<string, any>();
-      for (const p of projects as any[]) {
-        projectsById.set(String(p.id), p);
-      }
+        return i;
+      });
 
       return res.json({
         proposals: filteredProposals,
-        interviews: filteredInterviews,
+        interviews: processedInterviews,
         interns: Array.from(internUsersById.values()),
         employers: Array.from(employersById.values()),
         projects: Array.from(projectsById.values()),

@@ -249,12 +249,12 @@ export default function AdminProposalTrackerPage() {
         return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 flex items-center gap-1 w-fit"><CheckCircle2 className="h-3 w-3" />{status}</Badge>;
       case "scheduled":
         return <Badge className="bg-blue-100 text-blue-700 border-blue-200 flex items-center gap-1 w-fit"><Calendar className="h-3 w-3" />{status}</Badge>;
+      case "sent":
+        return <Badge className="bg-purple-100 text-purple-700 border-purple-200 flex items-center gap-1 w-fit"><Send className="h-3 w-3" />{status}</Badge>;
       case "rejected":
-    
       case "expired":
       case "withdrawn":
         return <Badge className="bg-rose-100 text-rose-700 border-rose-200 flex items-center gap-1 w-fit"><XCircle className="h-3 w-3" />{status}</Badge>;
-      case "sent":
       case "pending":
         return <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1 w-fit"><Clock className="h-3 w-3" />{status}</Badge>;
       default:
@@ -450,14 +450,14 @@ export default function AdminProposalTrackerPage() {
               <div className="grid grid-cols-2 gap-3 p-4">
                 <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-sm hover:from-white/15 hover:to-white/10 transition-all duration-300 group/card">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 bg-amber-500/20 rounded-lg">
-                      <Clock className="h-4 w-4 text-amber-400" />
+                    <div className="p-2 bg-purple-500/20 rounded-lg">
+                      <Send className="h-4 w-4 text-purple-400" />
                     </div>
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Pending</span>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Sent</span>
                   </div>
-                  <p className="text-2xl font-bold text-amber-400">{interviewStatusCounts["pending"] || 0}</p>
+                  <p className="text-2xl font-bold text-purple-400">{interviewStatusCounts["sent"] || 0}</p>
                   <div className="mt-2 h-1 bg-slate-700 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full" style={{ width: `${interviews.length > 0 ? ((interviewStatusCounts["pending"] || 0) / interviews.length * 100) : 0}%` }}></div>
+                    <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full" style={{ width: `${interviews.length > 0 ? ((interviewStatusCounts["sent"] || 0) / interviews.length * 100) : 0}%` }}></div>
                   </div>
                 </div>
                 
@@ -489,7 +489,8 @@ export default function AdminProposalTrackerPage() {
                   </div>
                 </div>
                 
-            
+             
+        
                 
                 <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-sm hover:from-white/15 hover:to-white/10 transition-all duration-300 group/card">
                   <div className="flex items-center gap-3 mb-3">
@@ -870,6 +871,7 @@ export default function AdminProposalTrackerPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Status ({interviews.length})</SelectItem>
+                    <SelectItem value="sent">Sent ({interviewStatusCounts["sent"] || 0})</SelectItem>
                     <SelectItem value="pending">Pending ({interviewStatusCounts["pending"] || 0})</SelectItem>
                     <SelectItem value="scheduled">Scheduled ({interviewStatusCounts["scheduled"] || 0})</SelectItem>
                     <SelectItem value="completed">Completed ({interviewStatusCounts["completed"] || 0})</SelectItem>
