@@ -7521,13 +7521,20 @@ export async function registerRoutes(
           const paid = Boolean(extra?.payment?.isPaid);
           const paymentStatus = paid ? "Paid" : "Unpaid";
 
+          const hired = latestHiredProposalByInternId.get(internId) ?? null;
+          const accepted = latestAcceptedProposalByInternId.get(internId) ?? null;
+          const latestProposal = latestProposalByInternId.get(internId) ?? null;
+
           const onboardingStatus = (() => {
             const explicit = (extra as any)?.onboardingStatus;
             if (typeof explicit === "string" && explicit.trim()) return explicit.trim();
             const explicitBool = (extra as any)?.isOnboarded;
             if (typeof explicitBool === "boolean") return explicitBool ? "Onboarded" : "Not onboarded";
             const isPaid = Boolean(extra?.payment?.isPaid);
-            return isPaid ? "Onboarded" : "Not onboarded";
+            if (!isPaid) return "Not onboarded";
+            const proposalStatus = latestProposal ? String((latestProposal as any)?.status ?? "").trim().toLowerCase() : "";
+            const isReadyForOnboarding = proposalStatus === "accepted" || proposalStatus === "hired";
+            return isReadyForOnboarding ? "Onboarded" : "Not onboarded";
           })();
 
           const payoutAgg = payoutAggByInternId.get(internId) ?? {
@@ -7538,10 +7545,6 @@ export async function registerRoutes(
             upcomingAmountMinor: 0,
             upcomingCreatedAt: null,
           };
-
-          const hired = latestHiredProposalByInternId.get(internId) ?? null;
-          const accepted = latestAcceptedProposalByInternId.get(internId) ?? null;
-          const latestProposal = latestProposalByInternId.get(internId) ?? null;
 
           const offerSource = hired ?? accepted;
           const offerDetails = offerSource ? ((offerSource as any)?.offerDetails ?? (offerSource as any)?.offer_details ?? {}) : {};
@@ -7674,7 +7677,7 @@ export async function registerRoutes(
           const internshipStatus = hired
             ? projectStatus === "completed"
               ? "Completed"
-              : "Ongoing"
+              : "Onboarding"
             : "-";
 
           const offerStatus = (() => {
@@ -8579,6 +8582,22 @@ export async function registerRoutes(
         proposalStatusCounts[status] = (proposalStatusCounts[status] || 0) + 1;
       }
 
+      const pickNewer = (a: any, b: any) => {
+        const aRaw = a?.updatedAt ?? a?.updated_at ?? a?.createdAt ?? a?.created_at ?? null;
+        const bRaw = b?.updatedAt ?? b?.updated_at ?? b?.createdAt ?? b?.created_at ?? null;
+        const aT = aRaw ? new Date(aRaw).getTime() : 0;
+        const bT = bRaw ? new Date(bRaw).getTime() : 0;
+        return bT >= aT ? b : a;
+      };
+
+      const latestProposalByInternId = new Map<string, any>();
+      for (const p of proposals as any[]) {
+        const internId = String(p?.internId ?? p?.intern_id ?? "").trim();
+        if (!internId) continue;
+        const existing = latestProposalByInternId.get(internId);
+        latestProposalByInternId.set(internId, existing ? pickNewer(existing, p) : p);
+      }
+
       const nowMs = Date.now();
       const getInterviewEffectiveStatus = (interview: any) => {
         const rawStatus = String(interview?.status ?? "sent").trim().toLowerCase();
@@ -8713,14 +8732,17 @@ export async function registerRoutes(
         if (!onboardingByUserId.has(id)) onboardingByUserId.set(id, o);
       }
 
-      const deriveOnboardingStatus = (o: any) => {
+      const deriveOnboardingStatus = (o: any, proposalStatus: string = "") => {
         const extra = (o as any)?.extraData ?? (o as any)?.extra_data ?? {};
         const explicit = (extra as any)?.onboardingStatus;
         if (typeof explicit === "string" && explicit.trim()) return explicit.trim();
         const explicitBool = (extra as any)?.isOnboarded;
         if (typeof explicitBool === "boolean") return explicitBool ? "Onboarded" : "Not onboarded";
         const isPaid = Boolean(extra?.payment?.isPaid);
-        return isPaid ? "Onboarded" : "Not onboarded";
+        if (!isPaid) return "Not onboarded";
+        const normalizedProposalStatus = proposalStatus.trim().toLowerCase();
+        const isReadyForOnboarding = normalizedProposalStatus === "accepted" || normalizedProposalStatus === "hired";
+        return isReadyForOnboarding ? "Onboarded" : "Not onboarded";
       };
 
       const deriveLiveStatus = (o: any) => {
@@ -8740,7 +8762,9 @@ export async function registerRoutes(
         const isProfileComplete = id ? onboardingCompleteUserIds.has(id) : false;
 
         const onboardRow = id ? onboardingByUserId.get(id) : null;
-        const onboardStatus = onboardRow ? deriveOnboardingStatus(onboardRow) : "Not onboarded";
+        const latestProposal = id ? latestProposalByInternId.get(id) : null;
+        const proposalStatus = latestProposal ? String((latestProposal as any)?.status ?? "").trim() : "";
+        const onboardStatus = onboardRow ? deriveOnboardingStatus(onboardRow, proposalStatus) : "Not onboarded";
         const liveStatus = onboardRow ? deriveLiveStatus(onboardRow) : "Live";
 
         if (internProfile !== "all") {
@@ -8784,7 +8808,9 @@ export async function registerRoutes(
             })()
           : "-";
 
-        const onboardingStatus = onboardRow ? deriveOnboardingStatus(onboardRow) : "Not onboarded";
+        const latestProposal = id ? latestProposalByInternId.get(id) : null;
+        const proposalStatus = latestProposal ? String((latestProposal as any)?.status ?? "").trim() : "";
+        const onboardingStatus = onboardRow ? deriveOnboardingStatus(onboardRow, proposalStatus) : "Not onboarded";
         const liveStatus = onboardRow ? deriveLiveStatus(onboardRow) : "Live";
 
         return {
@@ -8891,13 +8917,6 @@ export async function registerRoutes(
       }
       const interviewedCount = interviewedInternIds.size;
 
-      const pickNewer = (a: any, b: any) => {
-        const aRaw = a?.updatedAt ?? a?.updated_at ?? a?.createdAt ?? a?.created_at ?? null;
-        const bRaw = b?.updatedAt ?? b?.updated_at ?? b?.createdAt ?? b?.created_at ?? null;
-        const aT = aRaw ? new Date(aRaw).getTime() : 0;
-        const bT = bRaw ? new Date(bRaw).getTime() : 0;
-        return bT >= aT ? b : a;
-      };
 
       const latestAiInterviewByInternId = new Map<string, any>();
       for (const i of interviews as any[]) {
@@ -12584,7 +12603,10 @@ export async function registerRoutes(
         };
       });
 
-      return res.json({ proposals: enriched });
+      return res.json({ 
+        proposals: enriched,
+        internUsers: internById,
+      });
     } catch (error) {
       console.error("List employer proposals error:", error);
       return res
@@ -14972,10 +14994,39 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
               await storage.updateInternOnboarding(internId, {
                 extraData: {
                   ...prevExtra,
-                  onboardingStatus: "Onboarded",
-                  isOnboarded: true,
+                  onboardingStatus: "Onboarding",
+                  isOnboarded: false,
                 },
               } as any);
+
+              const rows = await storage.getProposalsByIds(updatedProposalIds);
+              const hiredProposal = (rows as any[]).find(
+                (p) => String((p as any)?.internId ?? "").trim() === internId && String((p as any)?.status ?? "").toLowerCase() === "hired"
+              );
+              if (!hiredProposal) return;
+
+              const offerDetails = (hiredProposal as any)?.offerDetails ?? {};
+              const monthlyAmount = Number((offerDetails as any)?.monthlyAmount ?? (offerDetails as any)?.monthly_amount ?? 0);
+              const currency = String((hiredProposal as any)?.currency ?? "INR").toUpperCase();
+              const internMonthlyMinor = Math.round(monthlyAmount * 100 * 0.5);
+
+              if (internMonthlyMinor > 0) {
+                const existingPayouts = await storage.listInternPayoutsByInternId(internId, { limit: 1 }).catch(() => []);
+                const hasExisting = (Array.isArray(existingPayouts) ? existingPayouts : []).length > 0;
+                if (!hasExisting) {
+                  await storage.createInternPayout({
+                    internId,
+                    amountMinor: internMonthlyMinor,
+                    currency: currency === "USD" ? "USD" : "INR",
+                    status: "pending",
+                    method: "bank",
+                    notes: String((offerDetails as any)?.roleTitle ?? "Internship payout").trim() || "Internship payout",
+                    source: "initial_hire",
+                    proposalId: String((hiredProposal as any)?.id ?? "").trim() || null,
+                    employerId: employerId || null,
+                  } as any);
+                }
+              }
             } catch {
               return;
             }
@@ -15566,6 +15617,11 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         const intern = userById.get(internId);
         const internName = intern ? `${String(intern.firstName ?? "")} ${String(intern.lastName ?? "")}`.trim() : null;
         
+        const internExtra = (intern as any)?.extraData ?? {};
+        const findternScoreRaw = internExtra?.findternScore;
+        const findternScore = Number(findternScoreRaw ?? 0);
+        const safeFindternScore = Number.isFinite(findternScore) ? findternScore : 0;
+        
         const offer = proposal?.offerDetails ?? proposal?.offer_details ?? {};
         const currency = String(offer?.currency ?? "INR").toUpperCase();
         
@@ -15619,6 +15675,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           paidMonths,
           remainingMonths: remainingMonthsCalc,
           status: remainingAmountMinor <= 0 ? "completed" : "active",
+          findternScore: safeFindternScore,
         });
       }
 

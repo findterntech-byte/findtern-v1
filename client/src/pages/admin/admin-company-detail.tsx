@@ -129,6 +129,9 @@ export default function AdminCompanyDetailPage() {
   const [tabSearch, setTabSearch] = useState<Record<TabKey, string>>({
     profile: "", projects: "", proposals: "", interviews: "", payments: "", upcomingPayments: "", hired: "",
   });
+  const [tabSearchCurrency, setTabSearchCurrency] = useState<Record<TabKey, string>>({
+    profile: "", projects: "", proposals: "", interviews: "", payments: "", upcomingPayments: "", hired: "",
+  });
   const [tabStatus, setTabStatus] = useState<Record<TabKey, string>>({
     profile: "", projects: "", proposals: "", interviews: "", payments: "", upcomingPayments: "", hired: "",
   });
@@ -156,6 +159,27 @@ export default function AdminCompanyDetailPage() {
   const [interviews, setInterviews] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [paymentSummary, setPaymentSummary] = useState<any>(null);
+  const [internUsers, setInternUsers] = useState<Record<string, any>>({});
+
+  const displayProposalStatus = (raw: unknown) => { const s = String(raw ?? "-").trim().toLowerCase(); if (s === "expired") return "withdrawn"; return s || "-"; };
+
+  const interviewStatusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    interviews.forEach((i: any) => {
+      const status = String(i?.status ?? "").toLowerCase();
+      counts[status] = (counts[status] || 0) + 1;
+    });
+    return counts;
+  }, [interviews]);
+
+  const proposalStatusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    proposals.forEach((p: any) => {
+      const status = displayProposalStatus(p?.status ?? "");
+      counts[status] = (counts[status] || 0) + 1;
+    });
+    return counts;
+  }, [proposals]);
 
   useEffect(() => {
     const load = async () => {
@@ -176,7 +200,7 @@ export default function AdminCompanyDetailPage() {
         setEmployer((employerJson?.employer ?? null) as any);
         if (projectsRes) { const j = await projectsRes.json().catch(() => null); setProjects(Array.isArray(j?.projects) ? j.projects : []); }
         else setProjects([]);
-        if (proposalsRes) { const j = await proposalsRes.json().catch(() => null); setProposals(Array.isArray(j?.proposals) ? j.proposals : []); }
+        if (proposalsRes) { const j = await proposalsRes.json().catch(() => null); setProposals(Array.isArray(j?.proposals) ? j.proposals : []); setInternUsers((j?.internUsers ?? {}) as any); }
         else setProposals([]);
         if (interviewsRes) { const j = await interviewsRes.json().catch(() => null); setInterviews(Array.isArray(j?.interviews) ? j.interviews : []); }
         else setInterviews([]);
@@ -255,10 +279,39 @@ export default function AdminCompanyDetailPage() {
     const matches = (haystack: string, q: string) => { const t = tokens(q); if (t.length === 0) return true; const h = norm(haystack); return t.every((x) => h.includes(x)); };
     const toDateKey = (raw: unknown) => { if (!raw) return ""; const d = new Date(String(raw)); if (Number.isNaN(d.getTime())) return ""; return d.toISOString().slice(0, 10); };
     const projectList = (projects ?? []).filter((p: any) => { const s = norm(p?.status ?? "-"); const sf = norm(tabStatus.projects); if (sf && s !== sf) return false; const ck = toDateKey(p?.createdAt ?? p?.created_at ?? null); const cfk = String(projectsCreatedDate ?? "").trim(); if (cfk && ck !== cfk) return false; const skills = Array.isArray(p?.skills) ? p.skills.join(" ") : ""; const hay = `${p?.projectName ?? p?.title ?? ""} ${skills} ${p?.city ?? ""} ${p?.timezone ?? ""} ${p?.locationType ?? p?.location_type ?? ""}`; return matches(hay, tabSearch.projects); });
-    const proposalList = (proposals ?? []).filter((p: any) => { const s = norm(p?.status ?? "-"); const sf = norm(tabStatus.proposals); if (sf) { if (sf === "expired") { if (s !== "expired" && s !== "withdrawn") return false; } else if (s !== sf) return false; } const hay = `${p?.internName ?? p?.candidateName ?? ""} ${p?.projectName ?? ""} ${p?.currency ?? ""}`; return matches(hay, tabSearch.proposals); });
-    const interviewList = (interviews ?? []).filter((i: any) => { const s = norm(i?.status ?? "-"); const sf = norm(tabStatus.interviews); if (sf && s !== sf) return false; const hay = `${i?.internName ?? ""} ${i?.projectName ?? ""} ${i?.timezone ?? ""} ${i?.meetingLink ?? ""}`; return matches(hay, tabSearch.interviews); });
-    const paymentList = (orders ?? []).filter((o: any) => { const s = norm(o?.status ?? "-"); const sf = norm(tabStatus.payments); if (sf && s !== sf) return false; const hay = `${o?.orderId ?? o?.order_id ?? ""} ${o?.currency ?? ""} ${o?.status ?? ""}`; return matches(hay, tabSearch.payments); });
-    const upcomingPaymentsList = (paymentSummary?.upcomingPayments ?? []).filter((o: any) => { const s = norm(o?.status ?? ""); if (s === "paid") return false; const sf = norm(tabStatus.upcomingPayments); if (sf && s !== sf) return false; const hay = `${o?.candidateName ?? o?.internName ?? ""} ${o?.projectName ?? ""} ${o?.currency ?? ""} ${o?.id ?? ""}`; return matches(hay, tabSearch.upcomingPayments); });
+    const proposalList = (proposals ?? []).filter((p: any) => { const s = norm(p?.status ?? "-"); const sf = norm(tabStatus.proposals); if (sf) { if (sf === "withdrawn") { if (s !== "expired" && s !== "withdrawn") return false; } else if (s !== sf) return false; } const hay = `${p?.internName ?? p?.candidateName ?? ""} ${p?.projectName ?? ""} ${p?.currency ?? ""}`; return matches(hay, tabSearch.proposals); });
+    const interviewList = (interviews ?? []).filter((i: any) => { 
+      const s = norm(i?.status ?? "-"); 
+      const sf = norm(tabStatus.interviews); 
+      if (sf && s !== sf) return false; 
+      const candidateName = String(i?.internName ?? "").toLowerCase();
+      const projectName = String(i?.projectName ?? "").toLowerCase();
+      const searchTerm = norm(tabSearch.interviews);
+      if (searchTerm && !candidateName.includes(searchTerm) && !projectName.includes(searchTerm) && !String(i?.meetingLink ?? "").toLowerCase().includes(searchTerm)) return false;
+      return true; 
+    });
+    const paymentList = (orders ?? []).filter((o: any) => { 
+      const s = norm(o?.status ?? "-"); 
+      const sf = norm(tabStatus.payments); 
+      if (sf && s !== sf) return false; 
+      const currencyFilter = tabSearchCurrency.payments;
+      const currency = norm(o?.currency ?? "INR");
+      if (currencyFilter && currency !== currencyFilter) return false;
+      const candidateName = String(o?.internName ?? o?.candidateName ?? "").toLowerCase();
+      const projectName = String(o?.projectName ?? "").toLowerCase();
+      const searchTerm = norm(tabSearch.payments);
+      if (searchTerm && !candidateName.includes(searchTerm) && !projectName.includes(searchTerm) && !String(o?.orderId ?? "").toLowerCase().includes(searchTerm)) return false;
+      return true; 
+    });
+    const upcomingPaymentsList = (paymentSummary?.internEmployerDues ?? []).filter((o: any) => { 
+      const s = norm(o?.status ?? ""); 
+      const sf = norm(tabStatus.upcomingPayments); 
+      if (sf === "completed" && s !== "completed") return false; 
+      if (sf === "active" && s !== "active") return false; 
+      if (sf && sf !== "completed" && sf !== "active" && s !== sf) return false; 
+      const hay = `${o?.internName ?? ""} ${o?.projectName ?? ""} ${o?.currency ?? ""} ${o?.id ?? ""}`; 
+      return matches(hay, tabSearch.upcomingPayments); 
+    });
     const hiredList = (proposals ?? []).filter((p: any) => norm(p?.status ?? "") === "hired").filter((p: any) => {
       const offer = p?.offerDetails ?? {};
       const fullTimeOffer = (offer as any)?.fullTimeOffer ?? null;
@@ -271,10 +324,20 @@ export default function AdminCompanyDetailPage() {
       
       const hay = `${p?.internName ?? p?.candidateName ?? ""} ${p?.projectName ?? ""}`;
       return matches(hay, tabSearch.hired);
+    }).map((p: any) => {
+      const internId = String(p?.internId ?? p?.intern_id ?? "").trim();
+      const internUser = internUsers[internId];
+      const internExtra = internUser?.extraData ?? {};
+      const internUserFromDues = (paymentSummary?.internEmployerDues ?? []).find((d: any) => d?.internId === internId);
+      return { 
+        ...p, 
+        findternScore: internExtra?.findternScore ?? internUserFromDues?.findternScore ?? 0, 
+        paidAmountMinor: internUserFromDues?.paidAmountMinor ?? 0 
+      };
     });
     const employerDuesList = paymentSummary?.internEmployerDues ?? [];
-    return { projectList, proposalList, interviewList, paymentList, upcomingPaymentsList: employerDuesList, hiredList, employerDuesList };
-  }, [orders, projects, proposals, interviews, tabSearch, tabStatus, paymentSummary, hiredType]);
+    return { projectList, proposalList, interviewList, paymentList, upcomingPaymentsList, hiredList, employerDuesList };
+  }, [orders, projects, proposals, interviews, tabSearch, tabStatus, tabSearchCurrency, paymentSummary, hiredType, internUsers]);
 
   const pagination = useMemo(() => {
     const getList = (tab: TabKey) => { if (tab === "projects") return tabData.projectList; if (tab === "proposals") return tabData.proposalList; if (tab === "interviews") return tabData.interviewList; if (tab === "payments") return tabData.paymentList; if (tab === "upcomingPayments") return tabData.upcomingPaymentsList; return tabData.hiredList; };
@@ -292,10 +355,30 @@ export default function AdminCompanyDetailPage() {
   useEffect(() => { if (activeTab !== "hired") setHiredType("all"); }, [activeTab]);
   useEffect(() => { if (activeTab === "hired") setTabPage((prev) => ({ ...prev, hired: 1 })); }, [hiredType]);
 
+  const parseDate = (raw: unknown) => {
+    if (!raw) return null;
+    const d = new Date(String(raw));
+    if (Number.isNaN(d.getTime())) return null;
+    return d;
+  };
+
+  const addMonths = (date: Date, months: number) => {
+    const result = new Date(date.getTime());
+    result.setMonth(result.getMonth() + months);
+    return result;
+  };
+
+  const computeScheduledNextPayment = (d: any) => {
+    const start = parseDate(d?.startDate ?? d?.start_date ?? null);
+    if (!start) return null;
+    const paidMonths = Number.isFinite(Number(d?.paidMonths ?? d?.paid_months ?? 0)) ? Number(d?.paidMonths ?? d?.paid_months ?? 0) : 0;
+    const next = addMonths(start, paidMonths + 1);
+    return next;
+  };
+
   const formatDate = (raw: string | null) => { if (!raw) return "—"; const d = new Date(raw); if (Number.isNaN(d.getTime())) return String(raw); return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); };
   const formatAmount = (amountMinor: number, currencyCode: string) => { const cur = String(currencyCode || "INR").toUpperCase(); const locale = cur === "INR" ? "en-IN" : "en-US"; const major = Number.isFinite(amountMinor) ? amountMinor / 100 : 0; return new Intl.NumberFormat(locale, { style: "currency", currency: cur, maximumFractionDigits: 0 }).format(major || 0); };
   const formatMajorMoney = (amountMajor: number, currencyCode: string) => { const cur = String(currencyCode || "INR").toUpperCase(); const locale = cur === "INR" ? "en-IN" : "en-US"; const major = Number.isFinite(amountMajor) ? amountMajor : 0; return new Intl.NumberFormat(locale, { style: "currency", currency: cur, maximumFractionDigits: 0 }).format(major || 0); };
-  const displayProposalStatus = (raw: unknown) => { const s = String(raw ?? "-").trim().toLowerCase(); if (s === "expired") return "withdrawn"; return s || "-"; };
   const toDisplayUrl = (raw: string) => { const v = String(raw ?? "").trim(); if (!v) return ""; if (v.startsWith("/")) return v; if (/^https?:\/\//i.test(v)) return v; return `https://${v}`; };
   const monthsFromDuration = (duration: unknown) => { switch (String(duration ?? "").trim().toLowerCase()) { case "2m": return 2; case "3m": return 3; case "6m": return 6; default: return 1; } };
 
@@ -449,15 +532,76 @@ export default function AdminCompanyDetailPage() {
                         </SelectContent>
                       </Select>
                     )}
-                    {activeTab !== "hired" && activeTab !== "upcomingPayments" && (
+                    {activeTab === "projects" && (
                       <Select value={tabStatus[activeTab] || "__all__"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, [activeTab]: v === "__all__" ? "" : v }))}>
                         <SelectTrigger className="h-10 w-full sm:w-[160px] bg-background"><SelectValue placeholder="Status" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__all__">All Status</SelectItem>
-                          {activeTab === "projects" && [<SelectItem key="active" value="active">Active</SelectItem>, <SelectItem key="inactive" value="inactive">Inactive</SelectItem>, <SelectItem key="draft" value="draft">Draft</SelectItem>]}
-                          {activeTab === "proposals" && [<SelectItem key="sent" value="sent">Sent</SelectItem>, <SelectItem key="accepted" value="accepted">Accepted</SelectItem>, <SelectItem key="rejected" value="rejected">Rejected</SelectItem>, <SelectItem key="hired" value="hired">Hired</SelectItem>, <SelectItem key="expired" value="expired">Withdrawn</SelectItem>]}
-                          {activeTab === "interviews" && [<SelectItem key="scheduled" value="scheduled">Scheduled</SelectItem>, <SelectItem key="completed" value="completed">Completed</SelectItem>, <SelectItem key="cancelled" value="cancelled">Cancelled</SelectItem>]}
-                          {activeTab === "payments" && [<SelectItem key="paid" value="paid">Paid</SelectItem>, <SelectItem key="pending" value="pending">Pending</SelectItem>, <SelectItem key="created" value="created">Created</SelectItem>, <SelectItem key="failed" value="failed">Failed</SelectItem>]}
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {activeTab === "proposals" && (
+                      <div className="flex gap-2">
+                        <Select value={tabStatus.proposals || "all"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, proposals: v === "all" ? "" : v }))}>
+                          <SelectTrigger className="w-[150px] h-8 text-xs bg-white">
+                            <SelectValue placeholder="Status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Status ({proposals.length})</SelectItem>
+                            <SelectItem value="sent">Sent ({proposalStatusCounts["sent"] || 0})</SelectItem>
+                            <SelectItem value="accepted">Accepted ({proposalStatusCounts["accepted"] || 0})</SelectItem>
+                            <SelectItem value="rejected">Rejected ({proposalStatusCounts["rejected"] || 0})</SelectItem>
+                            <SelectItem value="withdrawn">Withdrawn ({proposalStatusCounts["withdrawn"] || 0})</SelectItem>
+                            <SelectItem value="hired">Hired ({proposalStatusCounts["hired"] || 0})</SelectItem>
+                            <SelectItem value="expired">Expired ({proposalStatusCounts["expired"] || 0})</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    {activeTab === "interviews" && (
+                      <Select value={tabStatus.interviews || "all"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, interviews: v === "all" ? "" : v }))}>
+                  <SelectTrigger className="w-[150px] h-8 text-xs bg-white">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status ({interviews.length})</SelectItem>
+                    <SelectItem value="pending">Pending ({interviewStatusCounts["pending"] || 0})</SelectItem>
+                    <SelectItem value="scheduled">Scheduled ({interviewStatusCounts["scheduled"] || 0})</SelectItem>
+                    <SelectItem value="completed">Completed ({interviewStatusCounts["completed"] || 0})</SelectItem>
+                    <SelectItem value="expired">Expired ({interviewStatusCounts["expired"] || 0})</SelectItem>
+                  </SelectContent>
+                </Select>
+                    )}
+                    {activeTab === "payments" && (
+                      <>
+                        <Select value={tabStatus[activeTab] || "__all__"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, [activeTab]: v === "__all__" ? "" : v }))}>
+                          <SelectTrigger className="h-10 w-full sm:w-[140px] bg-background"><SelectValue placeholder="Status" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all__">All Status</SelectItem>
+                            <SelectItem value="paid">Paid</SelectItem>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="failed">Failed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select value={tabSearchCurrency.payments || "__all__"} onValueChange={(v) => setTabSearchCurrency((prev) => ({ ...prev, payments: v === "__all__" ? "" : v }))}>
+                          <SelectTrigger className="h-10 w-full sm:w-[120px] bg-background"><SelectValue placeholder="Currency" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all__">All Currency</SelectItem>
+                            <SelectItem value="INR">INR</SelectItem>
+                            <SelectItem value="USD">USD</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </>
+                    )}
+                    {activeTab === "upcomingPayments" && (
+                      <Select value={tabStatus[activeTab] || "__all__"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, [activeTab]: v === "__all__" ? "" : v }))}>
+                        <SelectTrigger className="h-10 w-full sm:w-[160px] bg-background"><SelectValue placeholder="Status" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">All Status</SelectItem>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
                         </SelectContent>
                       </Select>
                     )}
@@ -519,7 +663,7 @@ export default function AdminCompanyDetailPage() {
                   {tab === "projects" && (
                     <div className="rounded-lg border overflow-hidden">
                       <Table>
-                        <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40"><TableHead>Project</TableHead><TableHead>Skills</TableHead><TableHead>Scope</TableHead><TableHead>City</TableHead><TableHead>State</TableHead><TableHead>Location</TableHead><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40"><TableHead>Project</TableHead><TableHead>Skills</TableHead><TableHead>Scope</TableHead><TableHead>City</TableHead><TableHead>State</TableHead><TableHead>Location</TableHead><TableHead>Full-time possible</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead></TableRow></TableHeader>
                         <TableBody>
                           {tabData.projectList.length === 0 ? <TableRow><TableCell colSpan={9}><EmptyState icon={Briefcase} title="No projects" description="This company hasn't created any projects yet." /></TableCell></TableRow> :
                             tabData.projectList.map((p: any, idx: number) => {
@@ -530,6 +674,7 @@ export default function AdminCompanyDetailPage() {
                               const rawState = String(p?.state ?? "").trim().toLowerCase();
                               const projectState = rawState && rawState !== "active" && rawState !== "inactive" && rawState !== "draft" ? String(p?.state ?? "—") : "—";
                               const status = String(p?.status ?? "—") || "—";
+                              const fullTimePossible = Boolean((p?.fullTimeOffer ?? p?.full_time_offer ?? p?.full_time_offer ?? false));
                               return (
                                 <TableRow key={String(p?.id ?? p?.projectName ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
                                   <TableCell className="font-medium">{String(p?.projectName ?? p?.title ?? "—")}</TableCell>
@@ -538,7 +683,9 @@ export default function AdminCompanyDetailPage() {
                                   <TableCell>{projectCity}</TableCell>
                                   <TableCell>{projectState}</TableCell>
                                   <TableCell className="capitalize">{String(p?.locationType ?? p?.location_type ?? "—")}</TableCell>
-                                  <TableCell>{p?.fullTimeOffer ?? p?.full_time_offer ? "Full-time" : "Internship"}</TableCell>
+                                  <TableCell className="text-center">
+                                    <input type="checkbox" checked={fullTimePossible} readOnly disabled className="h-4 w-4" />
+                                  </TableCell>
                                   <TableCell><StatusBadge status={status} /></TableCell>
                                   <TableCell className="text-muted-foreground">{createdAt}</TableCell>
                                 </TableRow>
@@ -566,19 +713,33 @@ export default function AdminCompanyDetailPage() {
                               const totalRaw = Number(offer?.totalPrice ?? offer?.total_price ?? 0);
                               const derivedTotal = Number.isFinite(monthly) ? Number(monthly) * months : 0;
                               const total = Number.isFinite(totalRaw) && totalRaw > 0 ? totalRaw : derivedTotal;
+                              const annualCtc = Number((fullTimeOffer as any)?.annualCtc ?? 0);
                               const monthlyInr = currency === "USD" ? convertToInrIfUsd(monthly, currency) : monthly;
+                              const annualCtcInr = currency === "USD" ? convertToInrIfUsd(annualCtc, currency) : annualCtc;
                               const proposalType = hasFullTimeOffer ? "PPO" : "Internship";
                               const createdAtRaw = p?.createdAt ?? p?.created_at ?? null;
                               const createdAt = createdAtRaw ? (() => { const d = new Date(createdAtRaw); return Number.isNaN(d.getTime()) ? String(createdAtRaw) : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); })() : "—";
                               const internId = String(p?.internId ?? p?.intern_id ?? p?.intern?.id ?? "").trim();
                               const proposalId = String(p?.id ?? "").trim();
+                              const internUser = internUsers[internId];
+                              const internExtra = internUser?.extraData ?? {};
+                              const findternScore = Number(internExtra?.findternScore ?? 0);
+                              const internFromDues = (paymentSummary?.internEmployerDues ?? []).find((d: any) => d?.internId === internId);
+                              const paidAmountMinor = Number(internFromDues?.paidAmountMinor ?? 0);
+                              const displayAmount = hasFullTimeOffer && annualCtc > 0 
+                                ? annualCtc 
+                                : (findternScore > 0 && findternScore < 6 && paidAmountMinor > 0 ? 5000 : monthly);
                               return (
                                 <TableRow key={String(p?.id ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
                                   <TableCell className="font-medium">{String(p?.internName ?? p?.candidateName ?? "—")}</TableCell>
                                   <TableCell>{String(p?.projectName ?? "—")}</TableCell>
                                   <TableCell><Badge variant="outline">{proposalType}</Badge></TableCell>
                                   <TableCell><StatusBadge status={displayProposalStatus(p?.status)} /></TableCell>
-                                  <TableCell className="font-medium text-emerald-600">{monthly ? formatMajorMoney(monthlyInr, currency === "USD" ? "INR" : currency) : "—"}</TableCell>
+                                  <TableCell className="font-medium text-emerald-600">
+                                    {displayAmount > 0 
+                                      ? formatMajorMoney(displayAmount, currency)
+                                      : "—"}
+                                  </TableCell>
                                   <TableCell>{hasFullTimeOffer ? "Full-time" : duration || "—"}</TableCell>
                                   <TableCell className="text-muted-foreground">{createdAt}</TableCell>
                                   <TableCell className="text-right">
@@ -807,11 +968,6 @@ export default function AdminCompanyDetailPage() {
                                   if (tabStatus.upcomingPayments === "completed" && due > 0) return false;
                                   if (tabStatus.upcomingPayments === "active" && due <= 0) return false;
                                 }
-                                // Currency filter
-                                if (tabSearch.upcomingPayments && tabSearch.upcomingPayments !== "all") {
-                                  const currency = String(d?.currency ?? "INR").toUpperCase();
-                                  if (currency !== tabSearch.upcomingPayments) return false;
-                                }
                                 return true;
                               })
                               .map((d: any, idx: number) => {
@@ -826,7 +982,15 @@ export default function AdminCompanyDetailPage() {
                                 const isCompleted = dueAmountMinor <= 0;
                                 const upcomingPaymentMinor = isCompleted ? 0 : Number(d?.monthlyAmountMinor ?? d?.monthlyAmount ?? d?.amountMinor ?? 0);
                                 const totalAmountMinor = isCompleted ? 0 : Number(d?.totalAmountMinor ?? d?.amountMinor ?? 0);
-                                const upcomingPaymentDate = isCompleted ? "—" : (d?.upcomingPaymentDate ? formatDate(d.upcomingPaymentDate) : d?.dueDate ? formatDate(d.dueDate) : "—");
+                                const upcomingPaymentDate = isCompleted
+                                  ? "—"
+                                  : (d?.nextPaymentAt ? formatDate(d.nextPaymentAt)
+                                    : d?.next_payment_at ? formatDate(d.next_payment_at)
+                                    : d?.upcomingPaymentDate ? formatDate(d.upcomingPaymentDate)
+                                    : d?.upcoming_payment_date ? formatDate(d.upcoming_payment_date)
+                                    : d?.dueDate ? formatDate(d.dueDate)
+                                    : d?.due_date ? formatDate(d.due_date)
+                                    : (computeScheduledNextPayment(d) ? formatDate(computeScheduledNextPayment(d)!.toISOString()) : "—"));
                                 const paidMonths = isCompleted ? (d?.totalMonths ?? 0) : Number(d?.paidMonths ?? 0);
                                 const totalMonths = Number(d?.totalMonths ?? d?.duration ?? 1);
                                 const progress = totalMonths > 0 ? Math.min(100, Math.round((paidMonths / totalMonths) * 100)) : 100;
@@ -926,7 +1090,14 @@ export default function AdminCompanyDetailPage() {
                                           "text-sm font-bold",
                                           isCompleted ? "text-emerald-600" : dueAmountMinor > 0 ? "text-red-600" : "text-emerald-600"
                                         )}>
-                                          {formatAmount(dueAmountMinor, currency)}
+                                          {(() => {
+                                            const findternScore = Number(d?.findternScore ?? 0);
+                                            const paidAmountMinor = Number(d?.paidAmountMinor ?? d?.paidAmount ?? 0);
+                                            if (findternScore > 0 && findternScore < 6 && paidAmountMinor > 0) {
+                                              return formatAmount(currency === "USD" ? 500000 : 500000, currency);
+                                            }
+                                            return formatAmount(dueAmountMinor, currency);
+                                          })()}
                                         </span>
                                       </div>
                                       {!isCompleted && dueAmountMinor > 0 && (
@@ -962,14 +1133,25 @@ export default function AdminCompanyDetailPage() {
                               const hasFullTimeOffer = !!fullTimeOffer && typeof fullTimeOffer === "object";
                               const monthly = typeof offer?.monthlyAmount === "number" ? offer.monthlyAmount : 0;
                               const total = typeof offer?.totalPrice === "number" ? offer.totalPrice : 0;
+                              const currency = String(p?.currency ?? offer?.currency ?? "INR").toUpperCase();
+                              const annualCtc = Number((fullTimeOffer as any)?.annualCtc ?? 0);
+                              const annualCtcDisplay = currency === "USD" ? convertToInrIfUsd(annualCtc, currency) : annualCtc;
                               const internId = String(p?.internId ?? p?.intern_id ?? p?.intern?.id ?? "").trim();
+                              const findternScore = Number(p?.findternScore ?? 0);
+                              const paidAmountMinor = Number(p?.paidAmountMinor ?? 0);
+                              const displayAmount = hasFullTimeOffer && annualCtc > 0 
+                                ? annualCtcDisplay 
+                                : (findternScore > 0 && findternScore < 6 && paidAmountMinor > 0 ? (currency === "USD" ? 50 : 5000) : monthly);
+                              const displayCurrency = currency;
                               return (
                                 <TableRow key={String(p?.id ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
                                   <TableCell className="font-medium">{String(p?.internName ?? "—")}</TableCell>
                                   <TableCell>{String(p?.projectName ?? "—")}</TableCell>
                                   <TableCell>{hasFullTimeOffer ? <Badge className="bg-emerald-100 text-emerald-700">Full-time</Badge> : <Badge variant="outline">Internship</Badge>}</TableCell>
-                                  <TableCell className="font-medium text-emerald-600">{monthly ? formatMajorMoney(monthly, "INR") : "—"}</TableCell>
-                                  <TableCell className="font-medium">{total ? formatMajorMoney(total, "INR") : "—"}</TableCell>
+                                  <TableCell className="font-medium text-emerald-600">
+                                    {displayAmount > 0 ? formatMajorMoney(displayAmount, displayCurrency) : "—"}
+                                  </TableCell>
+                                  <TableCell className="font-medium">{total ? formatMajorMoney(total, displayCurrency) : "—"}</TableCell>
                                   <TableCell className="text-right"><Button size="sm" variant="outline" disabled={!internId} onClick={() => { if (!internId) return; setLocation(`/admin/interns/${encodeURIComponent(internId)}`); }}><Eye className="h-3 w-3 mr-1" /> Profile</Button></TableCell>
                                 </TableRow>
                               );

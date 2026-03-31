@@ -298,6 +298,10 @@ export default function AdminCompaniesPage() {
 
           const phone = [String(e?.countryCode ?? ""), String(e?.phoneNumber ?? "")].filter(Boolean).join(" ") || "-";
 
+          const totalPaidAmountMinor = Number(e?.totalPaidAmountMinor ?? 0) || 0;
+          const totalRemainingAmountMinor = Number(e?.totalRemainingAmountMinor ?? 0) || 0;
+          const computedTotalBilledAmountMinor = totalPaidAmountMinor + totalRemainingAmountMinor;
+
           return {
             id: String(e?.id ?? ""),
             companyName: String(e?.companyName ?? e?.name ?? "Company"),
@@ -312,9 +316,9 @@ export default function AdminCompaniesPage() {
             upcomingPaymentAt,
             upcomingPaymentAmountMinor,
             upcomingPaymentCurrency,
-            totalBilledAmountMinor: Number(e?.totalBilledAmountMinor ?? 0) || 0,
-            totalPaidAmountMinor: Number(e?.totalPaidAmountMinor ?? 0) || 0,
-            totalRemainingAmountMinor: Number(e?.totalRemainingAmountMinor ?? 0) || 0,
+            totalBilledAmountMinor: computedTotalBilledAmountMinor,
+            totalPaidAmountMinor,
+            totalRemainingAmountMinor,
             proposalsTotal: Number(e?.proposalsTotal ?? 0) || 0,
             proposalsSent: Number(e?.proposalsSent ?? 0) || 0,
             proposalsAccepted: Number(e?.proposalsAccepted ?? 0) || 0,
