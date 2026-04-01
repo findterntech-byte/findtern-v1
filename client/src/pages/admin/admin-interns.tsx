@@ -94,7 +94,7 @@ type Intern = {
   onboardingStatus?: "Onboarded" | "Not onboarded";
   pendingInterviewCount?: number;
   totalInterviewCount?: number;
-  interviewSentCount?: number;
+  // interviewSentCount?: number;
   interviewScheduledCount?: number;
   interviewCompletedCount?: number;
   interviewExpiredCount?: number;
@@ -226,7 +226,7 @@ export default function AdminInternsPage() {
     | "findternScore"
     | "onboardingStatus"
     | "profileStatus"
-    | "interviewSent"
+    // | "interviewSent"
     | "interviewScheduled"
     | "interviewCompleted"
     | "interviewExpired"
@@ -245,7 +245,7 @@ export default function AdminInternsPage() {
     | "ifsc"
     | "bankName"
     | "upi"
-    | "approval"
+    // | "approval"
     | "status"
     | "actions";
 
@@ -258,7 +258,7 @@ export default function AdminInternsPage() {
         { key: "phone" as const, label: "Phone", sortKey: "phone" as const, filterKey: "phone" as const },
         { key: "createdAt" as const, label: "Created On", sortKey: "createdAt" as const },
         { key: "interview" as const, label: "Proposal vs Interview" },
-        { key: "interviewSent" as const, label: "Sent" },
+        // { key: "interviewSent" as const, label: "Sent" },
         { key: "interviewScheduled" as const, label: "Scheduled" },
         { key: "interviewCompleted" as const, label: "Completed" },
         { key: "interviewExpired" as const, label: "Expired" },
@@ -280,7 +280,7 @@ export default function AdminInternsPage() {
         { key: "ifsc" as const, label: "IFSC" },
         { key: "bankName" as const, label: "Bank Name" },
         { key: "upi" as const, label: "UPI" },
-        { key: "approval" as const, label: "Approval" },
+        // { key: "approval" as const, label: "Approval" },
         { key: "status" as const, label: "Status" },
         { key: "actions" as const, label: "Actions" },
       ] as const,
@@ -418,7 +418,7 @@ export default function AdminInternsPage() {
           const onboardingStatus = String((item as any)?.onboardingStatus ?? "").trim();
           const pendingInterviewCountRaw = Number((item as any)?.pendingInterviewCount ?? 0);
           const totalInterviewCountRaw = Number((item as any)?.totalInterviewCount ?? 0);
-          const interviewSentCountRaw = Number((item as any)?.interviewSentCount ?? 0);
+          // const interviewSentCountRaw = Number((item as any)?.interviewSentCount ?? 0);
           const interviewScheduledCountRaw = Number((item as any)?.interviewScheduledCount ?? 0);
           const interviewCompletedCountRaw = Number((item as any)?.interviewCompletedCount ?? 0);
           const interviewExpiredCountRaw = Number((item as any)?.interviewExpiredCount ?? 0);
@@ -517,7 +517,7 @@ export default function AdminInternsPage() {
             onboardingStatus: onboardingStatus.toLowerCase() === "onboarded" ? "Onboarded" : "Not onboarded",
             pendingInterviewCount: Number.isFinite(pendingInterviewCountRaw) ? Math.max(0, Math.floor(pendingInterviewCountRaw)) : 0,
             totalInterviewCount: Number.isFinite(totalInterviewCountRaw) ? Math.max(0, Math.floor(totalInterviewCountRaw)) : 0,
-            interviewSentCount: Number.isFinite(interviewSentCountRaw) ? Math.max(0, Math.floor(interviewSentCountRaw)) : 0,
+            // interviewSentCount: Number.isFinite(interviewSentCountRaw) ? Math.max(0, Math.floor(interviewSentCountRaw)) : 0,
             interviewScheduledCount: Number.isFinite(interviewScheduledCountRaw) ? Math.max(0, Math.floor(interviewScheduledCountRaw)) : 0,
             interviewCompletedCount: Number.isFinite(interviewCompletedCountRaw) ? Math.max(0, Math.floor(interviewCompletedCountRaw)) : 0,
             interviewExpiredCount: Number.isFinite(interviewExpiredCountRaw) ? Math.max(0, Math.floor(interviewExpiredCountRaw)) : 0,
@@ -608,7 +608,7 @@ export default function AdminInternsPage() {
         if (c.key === "phone") row[c.label] = intern.phone;
         if (c.key === "createdAt") row[c.label] = intern.createdAt;
         if (c.key === "interview") row[c.label] = intern.interview;
-        if (c.key === "interviewSent") row[c.label] = intern.interviewSentCount ?? 0;
+        // if (c.key === "interviewSent") row[c.label] = intern.interviewSentCount ?? 0;
         if (c.key === "interviewScheduled") row[c.label] = intern.interviewScheduledCount ?? 0;
         if (c.key === "interviewCompleted") row[c.label] = intern.interviewCompletedCount ?? 0;
         if (c.key === "findternScore") row[c.label] = typeof intern.findternScore === "number" ? intern.findternScore : "-";
@@ -638,7 +638,7 @@ export default function AdminInternsPage() {
         if (c.key === "ifsc") row[c.label] = intern.bankDetails?.ifscCode ?? "-";
         if (c.key === "bankName") row[c.label] = intern.bankDetails?.bankName ?? "-";
         if (c.key === "upi") row[c.label] = intern.bankDetails?.upiId ?? "-";
-        if (c.key === "approval") row[c.label] = intern.approvalStatus;
+        // if (c.key === "approval") row[c.label] = intern.approvalStatus;
         if (c.key === "status") row[c.label] = intern.status;
       }
       return row;
@@ -1847,7 +1847,7 @@ export default function AdminInternsPage() {
                       </TableCell>
                     )}
 
-                    {columnVisibility.interviewSent && (
+                    {/* {columnVisibility.interviewSent && (
                       <TableCell className="py-4 text-center">
                         {Number(intern.interviewSentCount ?? 0) > 0 ? (
                           <Badge className="bg-blue-50/50 text-blue-700 border-blue-200/50 font-bold" variant="outline">
@@ -1857,7 +1857,7 @@ export default function AdminInternsPage() {
                           <span className="text-muted-foreground/40">-</span>
                         )}
                       </TableCell>
-                    )}
+                    )} */}
 
                     {columnVisibility.interviewScheduled && (
                       <TableCell className="py-4 text-center">
@@ -1910,7 +1910,7 @@ export default function AdminInternsPage() {
                     {columnVisibility.totalInterview && (
                       <TableCell className="py-4 text-center">
                         {(() => {
-                          const total = (intern.interviewSentCount ?? 0) + 
+                          const total =  
                                        (intern.interviewScheduledCount ?? 0) + 
                                        (intern.interviewCompletedCount ?? 0) + 
                                        (intern.interviewExpiredCount ?? 0) +
