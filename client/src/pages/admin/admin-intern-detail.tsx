@@ -151,6 +151,7 @@ type EmployerDueRow = {
   internTotalAmountMinor?: number;
   internDueAmountMinor?: number;
   proposalStatus?: string;
+  internshipStatus?: string;
 };
 
 export default function AdminInternDetailPage() {
@@ -451,6 +452,7 @@ export default function AdminInternDetailPage() {
           internTotalAmountMinor: Number(r?.internTotalAmountMinor ?? r?.intern_total_amount_minor ?? 0) || 0,
           internDueAmountMinor: Number(r?.internDueAmountMinor ?? r?.intern_due_amount_minor ?? 0) || 0,
           proposalStatus: String(r?.proposalStatus ?? "").toLowerCase() || "",
+          internshipStatus: String(r?.internshipStatus ?? "").toLowerCase() || "",
         }));
 
         if (items.length === 0) {
@@ -2084,6 +2086,7 @@ export default function AdminInternDetailPage() {
                           <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[140px]">Intern payout (50%)</th>
                           <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[120px]">Intern due</th>
                           <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[100px]">Status</th>
+                          <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[130px]">Internship Status</th>
                           <th className="h-12 px-4 align-middle font-medium text-muted-foreground sticky right-0 z-40 bg-white border-l shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] text-right min-w-[120px]">Action</th>
                         </tr>
                       </thead>
@@ -2092,7 +2095,7 @@ export default function AdminInternDetailPage() {
                           if (loadingEmployerDues && employerDues.length === 0) {
                             return (
                               <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                <td colSpan={12} className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-sm text-muted-foreground text-center">
+                                <td colSpan={13} className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-sm text-muted-foreground text-center">
                                   Loading employer dues...
                                 </td>
                               </tr>
@@ -2102,7 +2105,7 @@ export default function AdminInternDetailPage() {
                           if (employerDues.length === 0) {
                             return (
                               <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                <td colSpan={12} className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-sm text-muted-foreground text-center">
+                                <td colSpan={13} className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-sm text-muted-foreground text-center">
                                   No dues found.
                                 </td>
                               </tr>
@@ -2205,6 +2208,26 @@ export default function AdminInternDetailPage() {
                                       })()}
                                     >
                                       {String(r.proposalStatus ?? "-").charAt(0).toUpperCase() + String(r.proposalStatus ?? "-").slice(1)}
+                                    </Badge>
+                                  </td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[130px]">
+                                    <Badge
+                                      variant="outline"
+                                      className={(() => {
+                                        const st = String(r.internshipStatus ?? "").toLowerCase();
+                                        switch (st) {
+                                          case "onboarding":
+                                            return "border-blue-400 bg-blue-50 text-blue-700";
+                                          case "completed":
+                                            return "border-emerald-500 bg-emerald-50 text-emerald-700";
+                                          case "not hired yet":
+                                            return "border-slate-300 bg-slate-50 text-slate-600";
+                                          default:
+                                            return "border-slate-300 bg-slate-50 text-slate-700";
+                                        }
+                                      })()}
+                                    >
+                                      {String(r.internshipStatus ?? "-").charAt(0).toUpperCase() + String(r.internshipStatus ?? "-").slice(1)}
                                     </Badge>
                                   </td>
                                   <td className="p-4 align-middle sticky right-0 z-10 bg-inherit border-l shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] text-right min-w-[120px]">

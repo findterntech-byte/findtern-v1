@@ -16485,6 +16485,14 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
             "",
         ).trim() || null;
 
+        const projectStatus = String(proj?.status ?? "").trim().toLowerCase();
+        const internshipStatus = (() => {
+          if (hired) {
+            return projectStatus === "completed" ? "Completed" : "Ongoing";
+          }
+          return "-";
+        })();
+
         return {
           proposalId,
           employerId,
@@ -16507,6 +16515,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           internTotalAmountMinor,
           internDueAmountMinor,
           proposalStatus: norm(p?.status ?? ""),
+          internshipStatus,
         };
       });
 

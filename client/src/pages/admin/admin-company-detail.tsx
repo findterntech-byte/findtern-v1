@@ -995,9 +995,16 @@ export default function AdminCompanyDetailPage() {
                               const findternScore = Number(internExtra?.findternScore ?? 0);
                               const internFromDues = (paymentSummary?.internEmployerDues ?? []).find((d: any) => d?.internId === internId);
                               const paidAmountMinor = Number(internFromDues?.paidAmountMinor ?? 0);
+                              const monthlyHours = 160;
+                              const monthlyFromHourly = monthly > 0 ? monthly : (() => {
+                                if (!Number.isFinite(findternScore) || findternScore === 0) return 0;
+                                if (findternScore < 6) return currency === "USD" ? 50 : 5000;
+                                if (findternScore < 8) return currency === "USD" ? 1 * monthlyHours : 100 * monthlyHours;
+                                return currency === "USD" ? 2 * monthlyHours : 200 * monthlyHours;
+                              })();
                               const displayAmount = hasFullTimeOffer && annualCtc > 0 
                                 ? annualCtc 
-                                : (findternScore > 0 && findternScore < 6 && paidAmountMinor > 0 ? 5000 : monthly);
+                                : (findternScore > 0 && findternScore < 6 && paidAmountMinor > 0 ? 5000 : monthlyFromHourly);
                               return (
                                 <TableRow key={String(p?.id ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
                                   <TableCell className="font-medium">{String(p?.internName ?? p?.candidateName ?? "—")}</TableCell>

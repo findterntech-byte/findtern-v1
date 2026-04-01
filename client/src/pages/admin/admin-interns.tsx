@@ -438,7 +438,12 @@ export default function AdminInternsPage() {
           const offerStatus = String((item as any)?.offerStatus ?? "-");
           const ratings = (onboarding as any)?.extraData?.ratings ?? {};
           const liveStatus = (item as any)?.liveStatus as Intern["liveStatus"] | undefined;
-          const internshipStatus = String((item as any)?.internshipStatus ?? "-");
+          const rawInternshipStatus = String((item as any)?.internshipStatus ?? "-").trim();
+          const internshipStatus = rawInternshipStatus.toLowerCase() === "onboarding" || rawInternshipStatus.toLowerCase() === "ongoing"
+            ? "Ongoing"
+            : rawInternshipStatus.toLowerCase() === "completed"
+            ? "Completed"
+            : "-";
           const paymentStatus = String((item as any)?.paymentStatus ?? "-");
           const isFullTime = Boolean((item as any)?.isFullTime ?? (item as any)?.is_full_time ?? false);
           const bankDetailsRaw = (onboarding as any)?.extraData?.bankDetails ?? {};
