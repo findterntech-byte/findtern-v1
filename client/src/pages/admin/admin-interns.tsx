@@ -619,16 +619,16 @@ export default function AdminInternsPage() {
           row[c.label] = minor / 100;
         }
         if (c.key === "totalToPay") {
-          const minor = intern.totalToPayMinor == null ? null : Number(intern.totalToPayMinor);
-          row[c.label] = minor == null ? "-" : minor / 100;
+          const minor = Number(intern.totalToPayMinor ?? 0) || 0;
+          row[c.label] = minor / 100;
         }
         if (c.key === "paidTillNow") {
           const minor = Number(intern.paidTillNowMinor ?? 0) || 0;
           row[c.label] = minor / 100;
         }
         if (c.key === "leftToPay") {
-          const minor = intern.leftToPayMinor == null ? null : Number(intern.leftToPayMinor);
-          row[c.label] = minor == null ? "-" : minor / 100;
+          const minor = Number(intern.leftToPayMinor ?? 0) || 0;
+          row[c.label] = minor / 100;
         }
         if (c.key === "liveStatus") row[c.label] = intern.liveStatus ?? "Live";
         if (c.key === "internshipStatus") row[c.label] = intern.internshipStatus ?? "-";
@@ -1997,9 +1997,7 @@ export default function AdminInternsPage() {
 
                     {columnVisibility.totalToPay && (
                       <TableCell className="py-4 whitespace-nowrap text-sm font-medium text-muted-foreground">
-                        {intern.totalToPayMinor == null
-                          ? <span className="text-muted-foreground/40">-</span>
-                          : formatPayoutInInrIfUsd(Number(intern.totalToPayMinor), intern.offerCurrency)}
+                        {formatPayoutInInrIfUsd(Number(intern.totalToPayMinor ?? 0) || 0, intern.offerCurrency)}
                       </TableCell>
                     )}
 
@@ -2011,9 +2009,7 @@ export default function AdminInternsPage() {
 
                     {columnVisibility.leftToPay && (
                       <TableCell className="py-4 whitespace-nowrap text-sm font-medium text-amber-600/80">
-                        {intern.leftToPayMinor == null
-                          ? <span className="text-muted-foreground/40">-</span>
-                          : formatPayoutInInrIfUsd(Number(intern.leftToPayMinor), intern.offerCurrency)}
+                        {formatPayoutInInrIfUsd(Number(intern.leftToPayMinor ?? 0) || 0, intern.offerCurrency)}
                       </TableCell>
                     )}
 

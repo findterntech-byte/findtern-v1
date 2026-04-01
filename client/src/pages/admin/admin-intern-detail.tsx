@@ -426,7 +426,7 @@ export default function AdminInternDetailPage() {
           `/api/admin/interns/${encodeURIComponent(internId)}/employer-dues`,
         );
         const json = await res.json().catch(() => null);
-        const items = Array.isArray(json?.items) ? (json.items as any[]) : [];
+        const items = Array.isArray(json?.employerDues) ? (json.employerDues as any[]) : Array.isArray(json?.items) ? (json.items as any[]) : [];
 
         const mapped: EmployerDueRow[] = items.map((r: any) => ({
           proposalId: String(r?.proposalId ?? ""),
@@ -2154,12 +2154,12 @@ export default function AdminInternDetailPage() {
                                   <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{String(r.projectName ?? "-")}</td>
                                   <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">{String(r.startDate ?? "-")}</td>
                                   <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">{String(r.duration ?? "-")}</td>
-                                  <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{String(r.upcomingPaymentDate ?? "-")}</td>
-                                  <td className="p-4 align-middle whitespace-nowrap min-w-[140px]">{formatMoneyInInrIfUsd(employerDueMinor <= 0 ? 0 : (r.monthlyAmountMinor ?? 0), r.currency)}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[150px] text-amber-600 font-medium">{String(r.upcomingPaymentDate ?? "-")}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[140px]">{formatMoneyInInrIfUsd(r.monthlyAmountMinor ?? 0, r.currency)}</td>
                                   <td className="p-4 align-middle whitespace-nowrap min-w-[160px]">{formatMoneyInInrIfUsd(r.totalAmountMinor ?? 0, r.currency)}</td>
-                                  <td className="p-4 align-middle whitespace-nowrap font-medium min-w-[120px]">{formatMoneyInInrIfUsd(employerDueMinor, r.currency)}</td>
-                                  <td className="p-4 align-middle whitespace-nowrap min-w-[140px]">{formatMoneyInInrIfUsd(internMonthlyMinor, r.currency)}</td>
-                                  <td className="p-4 align-middle whitespace-nowrap font-medium min-w-[120px]">{formatMoneyInInrIfUsd(internDueMinor, r.currency)}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap font-bold min-w-[120px] text-rose-600">{formatMoneyInInrIfUsd(r.dueAmountMinor ?? 0, r.currency)}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[140px] text-emerald-600 font-medium">{formatMoneyInInrIfUsd(r.internMonthlyAmountMinor ?? 0, r.currency)}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap font-bold min-w-[120px] text-amber-600">{formatMoneyInInrIfUsd(r.internDueAmountMinor ?? 0, r.currency)}</td>
                                   <td className="p-4 align-middle sticky right-0 z-10 bg-inherit border-l shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] text-right min-w-[120px]">
                                     <Button
                                       size="sm"
