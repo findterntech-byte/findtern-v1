@@ -2116,11 +2116,8 @@ export default function AdminInternDetailPage() {
                               const canPay = internMonthlyMinor > 0 && internDueMinor > 0;
 
                               const isLowScoringIntern = internDueMinor === 0 && monthlyAmountMinor > 0;
-                              const employerMonthlyForDisplay = isLowScoringIntern 
-                                ? monthlyAmountMinor * 2 
-                                : monthlyAmountMinor;
                               const calculatedTotalAmount = isLowScoringIntern 
-                                ? employerMonthlyForDisplay 
+                                ? monthlyAmountMinor 
                                 : totalMonths * monthlyAmountMinor;
 
                               const rawStartDate = String(r.startDate ?? "").trim();
@@ -2167,7 +2164,7 @@ export default function AdminInternDetailPage() {
                                   <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">{String(r.startDate ?? "-")}</td>
                                   <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">{String(r.duration ?? "-")}</td>
                                   <td className="p-4 align-middle whitespace-nowrap min-w-[150px] text-amber-600 font-medium">{upcomingPaymentDateDisplay}</td>
-                                  <td className="p-4 align-middle whitespace-nowrap min-w-[140px]">{formatMoneyInInrIfUsd(employerMonthlyForDisplay, r.currency)}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[140px]">{formatMoneyInInrIfUsd(monthlyAmountMinor, r.currency)}</td>
                                   <td className="p-4 align-middle whitespace-nowrap min-w-[160px] font-bold">{formatMoneyInInrIfUsd(calculatedTotalAmount, r.currency)}</td>
                                   <td className="p-4 align-middle whitespace-nowrap font-bold min-w-[120px] text-rose-600">{formatMoneyInInrIfUsd(employerDueMinor, r.currency)}</td>
                                   <td className="p-4 align-middle whitespace-nowrap min-w-[140px] text-emerald-600 font-medium">{formatMoneyInInrIfUsd(internMonthlyMinor, r.currency)}</td>
@@ -3602,6 +3599,10 @@ export default function AdminInternDetailPage() {
                             selectedProposal?.createdAt ??
                             selectedProposal?.created_at;
                           const updated = formatIsoDate(updatedRaw);
+                          const hiredAtRaw =
+                            selectedProposal?.hiredAt ??
+                            selectedProposal?.hired_at;
+                          const hiredAt = hiredAtRaw ? formatIsoDate(hiredAtRaw) : null;
                           const status = String(selectedProposal?.status ?? "-");
                           const meta = getProjectMeta(selectedProposal);
                           const roleTitle = String(offer?.roleTitle ?? offer?.role_title ?? "-");
@@ -3675,7 +3676,7 @@ export default function AdminInternDetailPage() {
                                     <span>Company: {employerCompanyName || "-"}</span>
                                   </div>
                                   <div className="text-xs text-muted-foreground">
-                                    Proposal ID: {String(selectedProposal?.id ?? "-")} • Updated: {updated}
+                                    Proposal ID: {String(selectedProposal?.id ?? "-")} • Updated: {updated}{hiredAt ? ` • Hired: ${hiredAt}` : ""}
                                   </div>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2">
@@ -3909,6 +3910,8 @@ export default function AdminInternDetailPage() {
                         : "-");
                       const pricingLabel = resolveProposalPricingLabel(p);
                       const updated = formatIsoDate(p?.updatedAt ?? p?.updated_at ?? p?.createdAt ?? p?.created_at);
+                      const hiredAt = p?.hiredAt ?? p?.hired_at;
+                      const hiredAtDisplay = hiredAt ? formatIsoDate(hiredAt) : null;
 
                       return (
                         <Card
@@ -3933,6 +3936,9 @@ export default function AdminInternDetailPage() {
                                     ? "full time hired"
                                     : String(status).toLowerCase()}
                                 </Badge>
+                                {hiredAtDisplay && (
+                                  <span className="text-xs text-muted-foreground">Hired: {hiredAtDisplay}</span>
+                                )}
                                 {isFullTimeOffer && status.toLowerCase() !== "rejected" && status.toLowerCase() !== "hired" && (
                                   <Badge variant="secondary" className="bg-slate-100 text-slate-700 border-slate-200 text-[10px] font-semibold py-0.5 px-2">
                                     Full Time Proposal

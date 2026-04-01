@@ -2520,9 +2520,13 @@ export class PostgresStorage implements IStorage {
     id: string,
     status: string,
   ): Promise<Proposal | undefined> {
+    const setFields: any = { status, updatedAt: sql`now()` };
+    if (status === "hired") {
+      setFields.hiredAt = sql`now()`;
+    }
     const [updated] = await db
       .update(proposals)
-      .set({ status, updatedAt: sql`now()` } as any)
+      .set(setFields)
       .where(eq(proposals.id, id))
       .returning();
     return updated;

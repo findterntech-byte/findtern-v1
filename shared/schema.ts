@@ -816,12 +816,14 @@ export const proposals = pgTable("proposals", {
   skills: jsonb("skills").$type<string[]>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hiredAt: timestamp("hired_at"),
 });
 
 export const insertProposalSchema = createInsertSchema(proposals).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  hiredAt: true,
 });
 
 export type InsertProposal = z.infer<typeof insertProposalSchema>;
