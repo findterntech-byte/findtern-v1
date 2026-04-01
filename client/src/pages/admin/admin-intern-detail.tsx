@@ -150,6 +150,7 @@ type EmployerDueRow = {
   internMonthlyAmountMinor?: number;
   internTotalAmountMinor?: number;
   internDueAmountMinor?: number;
+  proposalStatus?: string;
 };
 
 export default function AdminInternDetailPage() {
@@ -449,6 +450,7 @@ export default function AdminInternDetailPage() {
           internMonthlyAmountMinor: Number(r?.internMonthlyAmountMinor ?? r?.intern_monthly_amount_minor ?? 0) || 0,
           internTotalAmountMinor: Number(r?.internTotalAmountMinor ?? r?.intern_total_amount_minor ?? 0) || 0,
           internDueAmountMinor: Number(r?.internDueAmountMinor ?? r?.intern_due_amount_minor ?? 0) || 0,
+          proposalStatus: String(r?.proposalStatus ?? "").toLowerCase() || "",
         }));
 
         if (items.length === 0) {
@@ -1150,6 +1152,14 @@ export default function AdminInternDetailPage() {
         return "border-amber-400 bg-amber-50 text-amber-700";
       case "rejected":
         return "border-red-400 bg-red-50 text-red-700";
+      case "expired":
+        return "border-red-400 bg-red-50 text-red-700";
+      case "withdrawn":
+        return "border-slate-400 bg-slate-100 text-slate-600";
+      case "draft":
+        return "border-slate-300 bg-slate-50 text-slate-600";
+      case "interview_scheduled":
+        return "border-blue-400 bg-blue-50 text-blue-700";
       default:
         return "border-slate-300 bg-slate-50 text-slate-700";
     }
@@ -1239,6 +1249,7 @@ export default function AdminInternDetailPage() {
     return proposals
       .filter((p) => {
         const status = String(p?.status ?? "").trim().toLowerCase();
+        if (status === "withdrawn") return false;
         if (proposalStatusFilter !== "all" && status !== String(proposalStatusFilter).toLowerCase()) return false;
 
         if (q) {
@@ -2072,6 +2083,7 @@ export default function AdminInternDetailPage() {
                           <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[120px]">Employer due</th>
                           <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[140px]">Intern payout (50%)</th>
                           <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[120px]">Intern due</th>
+                          <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[100px]">Status</th>
                           <th className="h-12 px-4 align-middle font-medium text-muted-foreground sticky right-0 z-40 bg-white border-l shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] text-right min-w-[120px]">Action</th>
                         </tr>
                       </thead>
@@ -2080,7 +2092,7 @@ export default function AdminInternDetailPage() {
                           if (loadingEmployerDues && employerDues.length === 0) {
                             return (
                               <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                <td colSpan={11} className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-sm text-muted-foreground text-center">
+                                <td colSpan={12} className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-sm text-muted-foreground text-center">
                                   Loading employer dues...
                                 </td>
                               </tr>
@@ -2090,7 +2102,7 @@ export default function AdminInternDetailPage() {
                           if (employerDues.length === 0) {
                             return (
                               <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                <td colSpan={11} className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-sm text-muted-foreground text-center">
+                                <td colSpan={12} className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-sm text-muted-foreground text-center">
                                   No dues found.
                                 </td>
                               </tr>
@@ -2169,6 +2181,32 @@ export default function AdminInternDetailPage() {
                                   <td className="p-4 align-middle whitespace-nowrap font-bold min-w-[120px] text-rose-600">{formatMoneyInInrIfUsd(employerDueMinor, r.currency)}</td>
                                   <td className="p-4 align-middle whitespace-nowrap min-w-[140px] text-emerald-600 font-medium">{formatMoneyInInrIfUsd(internMonthlyMinor, r.currency)}</td>
                                   <td className="p-4 align-middle whitespace-nowrap font-bold min-w-[120px] text-amber-600">{formatMoneyInInrIfUsd(internDueMinor, r.currency)}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">
+                                    <Badge
+                                      variant="outline"
+                                      className={(() => {
+                                        const st = String(r.proposalStatus ?? "").toLowerCase();
+                                        switch (st) {
+                                          case "hired":
+                                            return "border-emerald-500 bg-emerald-50 text-emerald-700";
+                                          case "accepted":
+                                            return "border-emerald-500 bg-emerald-50 text-emerald-700";
+                                          case "sent":
+                                            return "border-amber-400 bg-amber-50 text-amber-700";
+                                          case "rejected":
+                                            return "border-red-400 bg-red-50 text-red-700";
+                                          case "expired":
+                                            return "border-red-400 bg-red-50 text-red-700";
+                                          case "withdrawn":
+                                            return "border-slate-400 bg-slate-100 text-slate-600";
+                                          default:
+                                            return "border-slate-300 bg-slate-50 text-slate-700";
+                                        }
+                                      })()}
+                                    >
+                                      {String(r.proposalStatus ?? "-").charAt(0).toUpperCase() + String(r.proposalStatus ?? "-").slice(1)}
+                                    </Badge>
+                                  </td>
                                   <td className="p-4 align-middle sticky right-0 z-10 bg-inherit border-l shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] text-right min-w-[120px]">
                                     <Button
                                       size="sm"
@@ -3867,6 +3905,8 @@ export default function AdminInternDetailPage() {
                     <SelectItem value="accepted">Accepted</SelectItem>
                     <SelectItem value="hired">Hired</SelectItem>
                     <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="expired">Expired</SelectItem>
+                    <SelectItem value="withdrawn">Withdrawn</SelectItem>
                   </SelectContent>
                 </Select>
 

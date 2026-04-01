@@ -16240,6 +16240,9 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
       const hired = (Array.isArray(proposals) ? proposals : []).filter((p: any) => {
         const status = norm(p?.status ?? "");
         if (status === "hired") return true;
+        if (status === "withdrawn") return false;
+        if (status === "expired") return false;
+        if (status === "rejected") return false;
         const offer = (p as any)?.offerDetails ?? (p as any)?.offer_details ?? {};
         const ft = (offer as any)?.fullTimeOffer ?? null;
         const hasFullTimeOffer = !!ft && typeof ft === "object";
@@ -16503,6 +16506,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           internMonthlyAmountMinor,
           internTotalAmountMinor,
           internDueAmountMinor,
+          proposalStatus: norm(p?.status ?? ""),
         };
       });
 
