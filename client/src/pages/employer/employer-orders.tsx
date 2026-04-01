@@ -857,7 +857,7 @@ export default function EmployerOrdersPage() {
 
       const startDate = String(offer?.startDate ?? "").trim();
       const paidMonths = paidForProposal.filter((o: any) => orderPurpose(o) === "employer_monthly_payment").length;
-      const upcomingDate = !isFullyPaid && startDate ? addMonthsToIso(startDate, Math.max(1, paidMonths + 1)) : "";
+      const upcomingDate = !isFullyPaid && startDate ? addMonthsToIso(startDate, Math.max(1, paidMonths)) : "";
 
       const completedAt = (() => {
         if (!isFullyPaid) return "";

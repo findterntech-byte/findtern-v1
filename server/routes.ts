@@ -15646,7 +15646,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           monthlyAmount = totalPriceOffer / months;
         }
         
-        const startDate = proposal?.startDate ?? proposal?.createdAt ?? null;
+        const startDate = offer?.startDate ?? proposal?.startDate ?? proposal?.createdAt ?? null;
         const startDateStr = startDate ? (() => { const d = new Date(startDate); return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10); })() : null;
         
         const proposalPayments = payments.filter((p: any) => {
