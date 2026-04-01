@@ -7243,6 +7243,28 @@ export async function registerRoutes(
         if (email === "ai-interview@findtern.ai") excludedEmployerIds.add(id.toLowerCase());
       }
 
+      const internUsersById = new Map<string, any>();
+      const employersById = new Map<string, any>();
+      const projectsById = new Map<string, any>();
+
+      for (const u of users as any[]) {
+        const id = String(u?.id ?? "").trim();
+        if (!id) continue;
+        internUsersById.set(id, u);
+      }
+
+      for (const e of employers as any[]) {
+        const id = String(e?.id ?? "").trim();
+        if (!id) continue;
+        employersById.set(id, e);
+      }
+
+      for (const p of projects as any[]) {
+        const id = String(p?.id ?? "").trim();
+        if (!id) continue;
+        projectsById.set(id, p);
+      }
+
       const filteredInterviews = (interviews as any[]).filter((i) => {
         const employerId = String(i?.employerId ?? i?.employer_id ?? "").trim().toLowerCase();
         return !excludedEmployerIds.has(employerId);
@@ -12601,6 +12623,7 @@ export async function registerRoutes(
           internName: fullName,
           projectId: (p as any)?.projectId ?? (p as any)?.project_id ?? projectId,
           projectName,
+          startDate: (p as any)?.startDate ?? (p as any)?.start_date ?? (p as any)?.offerDetails?.startDate ?? (p as any)?.offer_details?.start_date ?? null,
           internProfilePhotoName: String(internDocs?.profilePhotoName ?? "") || null,
           intern: intern
             ? {
@@ -15336,6 +15359,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
             proposalIds: ids,
             internName: ids.length > 1 ? "Multiple" : null,
             projectName: ids.length > 1 ? "Multiple" : null,
+            type: "internship",
           };
         }
 
@@ -15476,6 +15500,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
             proposalIds: ids,
             internName: ids.length > 1 ? "Multiple" : null,
             projectName: ids.length > 1 ? "Multiple" : null,
+            type: "internship",
           };
         }
 
@@ -15488,6 +15513,11 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           (p as any)?.projectName ?? (p as any)?.project_name ?? (project as any)?.projectName ?? (project as any)?.project_name ?? "",
         ).trim();
         const internName = String(internNameById[internId] ?? "").trim();
+        
+        const offer = p?.offerDetails ?? p?.offer_details ?? {};
+        const fullTimeOffer = offer?.fullTimeOffer ?? offer?.full_time_offer ?? null;
+        const hasFullTimeOffer = !!fullTimeOffer && typeof fullTimeOffer === "object";
+        const paymentType = hasFullTimeOffer ? "fulltime" : "internship";
 
         return {
           ...r,
@@ -15497,6 +15527,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           internName: internName || null,
           projectId,
           projectName: projectName || null,
+          type: paymentType,
         };
       });
 
@@ -15638,12 +15669,23 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         
         let monthlyAmount = Number(offer?.monthlyAmount ?? offer?.monthly_amount ?? 0);
         
+        const fullTimeOffer = offer?.fullTimeOffer ?? offer?.full_time_offer ?? null;
+        const hasFullTimeOffer = !!fullTimeOffer && typeof fullTimeOffer === "object";
+        const annualCtc = hasFullTimeOffer ? Number(fullTimeOffer?.annualCtc ?? fullTimeOffer?.annual_ctc ?? 0) : 0;
+        
         const totalPriceOffer = Number(offer?.totalPrice ?? offer?.total_price ?? 0);
         const duration = String(offer?.duration ?? "").trim();
         let months = monthsFromDuration(duration);
         
         if (totalPriceOffer > 0 && monthlyAmount === 0) {
           monthlyAmount = totalPriceOffer / months;
+        }
+
+        let totalAmountMinor: number;
+        if (hasFullTimeOffer && Number.isFinite(annualCtc) && annualCtc > 0) {
+          totalAmountMinor = annualCtc * 100;
+        } else {
+          totalAmountMinor = monthlyAmount * months * 100;
         }
         
         const startDate = offer?.startDate ?? proposal?.startDate ?? proposal?.createdAt ?? null;
@@ -15660,7 +15702,6 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           .filter((p: any) => String(p?.status ?? "").trim().toLowerCase() === "paid")
           .reduce((sum: number, p: any) => sum + (Number(p?.amountMinor ?? 0) || 0), 0);
         
-        const totalAmountMinor = monthlyAmount * months * 100;
         const remainingAmountMinor = Math.max(0, totalAmountMinor - paidAmountMinor);
         const paidMonths = monthlyAmount > 0 ? Math.floor(paidAmountMinor / (monthlyAmount * 100)) : 0;
         const remainingMonthsCalc = Math.max(0, months - paidMonths);
@@ -15818,7 +15859,9 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
       const items = proposals
         .filter((p) => String((p as any)?.employerId ?? "") === employerId)
         .map((p) => {
-          const offer = (p as any)?.offerDetails ?? {};
+          const raw = (p as any)?.raw ?? {};
+          const offerDetailsRaw = (p as any)?.offerDetails ?? raw?.offerDetails ?? raw?.offer_details ?? {};
+          const offer = typeof offerDetailsRaw === "string" ? JSON.parse(offerDetailsRaw) : offerDetailsRaw;
 
           const projectId = String((p as any)?.projectId ?? "");
           const internId = String((p as any)?.internId ?? "");
@@ -16095,7 +16138,8 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         const internEmail = intern?.email ?? "";
 
         const raw = (proposal as any)?.raw ?? {};
-        const offer = raw?.offerDetails ?? raw?.offer_details ?? {};
+        const offerDetailsRaw = (proposal as any)?.offerDetails ?? raw?.offerDetails ?? raw?.offer_details ?? {};
+        const offer = typeof offerDetailsRaw === "string" ? JSON.parse(offerDetailsRaw) : offerDetailsRaw;
         const monthly = offer?.monthlyAmount ?? offer?.monthly_amount ?? null;
         const total = offer?.totalPrice ?? offer?.total_price ?? null;
         const duration = offer?.duration ?? offer?.duration ?? "";

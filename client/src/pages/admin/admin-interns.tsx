@@ -1801,9 +1801,12 @@ export default function AdminInternsPage() {
                     {columnVisibility.name && (
                       <TableCell className="py-4">
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-semibold text-sm tracking-tight text-foreground group-hover:text-primary transition-colors">
+                          <button
+                            onClick={() => setLocation(`/admin/interns/${encodeURIComponent(intern.id)}`)}
+                            className="font-semibold text-sm tracking-tight text-foreground group-hover:text-primary transition-colors text-left hover:underline"
+                          >
                             {intern.name}
-                          </span>
+                          </button>
                           {intern.isFullTime && (
                             <Badge className="w-fit bg-indigo-50 text-indigo-700 border-indigo-100 text-[10px] font-bold py-0 h-4 uppercase tracking-wider">
                               Full Time

@@ -464,7 +464,7 @@ export default function AdminOrdersPage() {
                           {detail ? <p className="text-xs text-slate-600 mt-1">{detail}</p> : null}
                         </td>
                         <td className="px-3 py-3 text-right">
-                          <p className="text-sm font-semibold text-slate-900">{formatAmount(subtotalDisplayMinor, currencyCode)}</p>
+                          <p className="text-sm font-semibold text-slate-900">{formatAmount(displayPriceMinor, currencyCode)}</p>
                         </td>
                       </tr>
                     );

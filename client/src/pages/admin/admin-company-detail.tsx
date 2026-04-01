@@ -189,6 +189,10 @@ export default function AdminCompanyDetailPage() {
   const [projectLocationFilter, setProjectLocationFilter] = useState<string>("");
   const [proposalTypeFilter, setProposalTypeFilter] = useState<string>("");
   const [hiredType, setHiredType] = useState<"all" | "fulltime" | "internship">("all");
+  const [hiredStartDateFrom, setHiredStartDateFrom] = useState<string>("");
+  const [hiredStartDateTo, setHiredStartDateTo] = useState<string>("");
+  const [paymentsDateFrom, setPaymentsDateFrom] = useState<string>("");
+  const [paymentsDateTo, setPaymentsDateTo] = useState<string>("");
 
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
@@ -425,7 +429,13 @@ export default function AdminCompanyDetailPage() {
     const proposalList = (proposals ?? []).filter((p: any) => { 
       const s = norm(p?.status ?? "-"); 
       const sf = norm(tabStatus.proposals); 
-      if (sf) { if (sf === "withdrawn") { if (s !== "withdrawn") return false; } else if (s !== sf) return false; } 
+      if (sf) { 
+        if (sf === "withdrawn") { if (s !== "withdrawn") return false; } 
+        else if (sf === "sent") { if (s !== "sent" && s !== "pending" && s !== "created") return false; }
+        else if (sf === "pending") { if (s !== "pending") return false; }
+        else if (s !== sf) return false; 
+      }
+      if (s === "expired") return false; 
       const cfInternName = columnFilters["proposals_internName"];
       if (cfInternName && !norm(p?.internName ?? p?.candidateName ?? "").includes(norm(cfInternName))) return false;
       const cfStatus = columnFilters["proposals_status"];
@@ -476,6 +486,22 @@ export default function AdminCompanyDetailPage() {
       const projectName = String(o?.projectName ?? "").toLowerCase();
       const searchTerm = norm(tabSearch.payments);
       if (searchTerm && !candidateName.includes(searchTerm) && !projectName.includes(searchTerm) && !String(o?.orderId ?? "").toLowerCase().includes(searchTerm)) return false;
+      
+      if (paymentsDateFrom || paymentsDateTo) {
+        const paymentDateRaw = o?.paidAt ?? o?.paid_at ?? o?.createdAt ?? o?.created_at ?? null;
+        if (!paymentDateRaw) return false;
+        const paymentDate = new Date(paymentDateRaw);
+        if (Number.isNaN(paymentDate.getTime())) return false;
+        if (paymentsDateFrom) {
+          const fromDate = new Date(paymentsDateFrom);
+          if (paymentDate < fromDate) return false;
+        }
+        if (paymentsDateTo) {
+          const toDate = new Date(paymentsDateTo);
+          if (paymentDate > toDate) return false;
+        }
+      }
+      
       return true; 
     });
     const upcomingPaymentsList = (paymentSummary?.internEmployerDues ?? []).filter((o: any) => { 
@@ -516,6 +542,19 @@ export default function AdminCompanyDetailPage() {
       if (hiredType === "fulltime" && !isFullTime) return false;
       if (hiredType === "internship" && isFullTime) return false;
       
+      if (hiredStartDateFrom || hiredStartDateTo) {
+        const startDate = p?.startDate ? new Date(p.startDate) : null;
+        if (!startDate || Number.isNaN(startDate.getTime())) return false;
+        if (hiredStartDateFrom) {
+          const fromDate = new Date(hiredStartDateFrom);
+          if (startDate < fromDate) return false;
+        }
+        if (hiredStartDateTo) {
+          const toDate = new Date(hiredStartDateTo);
+          if (startDate > toDate) return false;
+        }
+      }
+      
       const cfInternName = columnFilters["hired_internName"];
       if (cfInternName && !norm(p?.internName ?? p?.candidateName ?? "").includes(norm(cfInternName))) return false;
       
@@ -534,7 +573,7 @@ export default function AdminCompanyDetailPage() {
     });
     const employerDuesList = paymentSummary?.internEmployerDues ?? [];
     return { projectList, proposalList, interviewList, paymentList, upcomingPaymentsList, hiredList, employerDuesList };
-  }, [orders, projects, proposals, interviews, tabSearch, tabStatus, tabSearchCurrency, paymentSummary, hiredType, internUsers, projectFullTimeFilter, projectTimezoneFilter, projectScopeFilter, projectLocationFilter, proposalTypeFilter, columnFilters, upcomingFrom, upcomingTo]);
+  }, [orders, projects, proposals, interviews, tabSearch, tabStatus, tabSearchCurrency, paymentSummary, hiredType, hiredStartDateFrom, hiredStartDateTo, internUsers, projectFullTimeFilter, projectTimezoneFilter, projectScopeFilter, projectLocationFilter, proposalTypeFilter, columnFilters, upcomingFrom, upcomingTo, paymentsDateFrom, paymentsDateTo]);
 
   const pagination = useMemo(() => {
     const getList = (tab: TabKey) => { if (tab === "projects") return tabData.projectList; if (tab === "proposals") return tabData.proposalList; if (tab === "interviews") return tabData.interviewList; if (tab === "payments") return tabData.paymentList; if (tab === "upcomingPayments") return tabData.upcomingPaymentsList; return tabData.hiredList; };
@@ -547,10 +586,11 @@ export default function AdminCompanyDetailPage() {
     return { total, totalPages, safePage, startIndex, endIndex, list, pageList: list.slice(startIndex, endIndex) };
   }, [activeTab, pageSize, tabData, tabPage]);
 
-  useEffect(() => { setTabPage((prev) => ({ ...prev, [activeTab]: 1 })); }, [activeTab, pageSize, tabSearch, tabStatus, columnFilters]);
+  useEffect(() => { setTabPage((prev) => ({ ...prev, [activeTab]: 1 })); }, [activeTab, pageSize, tabSearch, tabStatus, columnFilters, paymentsDateFrom, paymentsDateTo]);
   useEffect(() => { setTabPage((prev) => ({ ...prev, projects: 1 })); }, [projectsCreatedDate]);
   useEffect(() => { if (activeTab !== "hired") setHiredType("all"); }, [activeTab]);
-  useEffect(() => { if (activeTab === "hired") setTabPage((prev) => ({ ...prev, hired: 1 })); }, [hiredType]);
+  useEffect(() => { if (activeTab === "hired") setTabPage((prev) => ({ ...prev, hired: 1 })); }, [hiredType, hiredStartDateFrom, hiredStartDateTo]);
+  useEffect(() => { if (activeTab === "payments") setTabPage((prev) => ({ ...prev, payments: 1 })); }, [paymentsDateFrom, paymentsDateTo]);
 
   const formatDate = (raw: string | null) => { if (!raw) return "—"; const d = new Date(raw); if (Number.isNaN(d.getTime())) return String(raw); return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); };
   const formatAmount = (amountMinor: number, currencyCode: string) => { const cur = String(currencyCode || "INR").toUpperCase(); const locale = cur === "INR" ? "en-IN" : "en-US"; const major = Number.isFinite(amountMinor) ? amountMinor / 100 : 0; return new Intl.NumberFormat(locale, { style: "currency", currency: cur, maximumFractionDigits: 0 }).format(major || 0); };
@@ -593,6 +633,7 @@ export default function AdminCompanyDetailPage() {
     { key: "orderId", label: "Order ID", filterKey: "orderId" },
     { key: "internName", label: "Candidate", filterKey: "internName" },
     { key: "projectName", label: "Project" },
+    { key: "type", label: "Type" },
     { key: "status", label: "Status", filterKey: "status" },
     { key: "currency", label: "Currency", filterKey: "currency" },
   ];
@@ -601,6 +642,7 @@ export default function AdminCompanyDetailPage() {
     { key: "internName", label: "Candidate", filterKey: "internName" },
     { key: "projectName", label: "Project" },
     { key: "type", label: "Type" },
+    { key: "startDate", label: "Start Date" },
   ];
 
   const getColumns = (tab: string) => {
@@ -785,14 +827,26 @@ export default function AdminCompanyDetailPage() {
                     </div>
                     {activeTab === "projects" && <Input type="date" className="h-10 w-full sm:w-[160px] bg-background" value={projectsCreatedDate} onChange={(e) => setProjectsCreatedDate(e.target.value)} />}
                     {activeTab === "hired" && (
-                      <Select value={hiredType} onValueChange={(v) => setHiredType(v as "all" | "fulltime" | "internship")}>
-                        <SelectTrigger className="h-10 w-full sm:w-[160px] bg-background"><SelectValue placeholder="Hire Type" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Hires</SelectItem>
-                          <SelectItem value="fulltime">Full-time</SelectItem>
-                          <SelectItem value="internship">Internship</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Select value={hiredType} onValueChange={(v) => setHiredType(v as "all" | "fulltime" | "internship")}>
+                          <SelectTrigger className="h-10 w-full sm:w-[160px] bg-background"><SelectValue placeholder="Hire Type" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Hires</SelectItem>
+                            <SelectItem value="fulltime">Full-time</SelectItem>
+                            <SelectItem value="internship">Internship</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <div className="flex items-center gap-2">
+                          <Input type="date" className="h-10 w-full sm:w-[140px] bg-background" value={hiredStartDateFrom} onChange={(e) => setHiredStartDateFrom(e.target.value)} placeholder="From" />
+                          <span className="text-muted-foreground">to</span>
+                          <Input type="date" className="h-10 w-full sm:w-[140px] bg-background" value={hiredStartDateTo} onChange={(e) => setHiredStartDateTo(e.target.value)} placeholder="To" />
+                          {(hiredStartDateFrom || hiredStartDateTo) && (
+                            <Button variant="ghost" size="sm" onClick={() => { setHiredStartDateFrom(""); setHiredStartDateTo(""); }} className="h-10 px-2 text-muted-foreground hover:text-destructive">
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     )}
                     {activeTab === "projects" && (
                       <>
@@ -851,6 +905,7 @@ export default function AdminCompanyDetailPage() {
                           <SelectContent>
                             <SelectItem value="all">All Status ({proposals.length})</SelectItem>
                             <SelectItem value="sent">Sent ({proposalStatusCounts["sent"] || 0})</SelectItem>
+                            <SelectItem value="pending">Pending ({proposalStatusCounts["pending"] || 0})</SelectItem>
                             <SelectItem value="accepted">Accepted ({proposalStatusCounts["accepted"] || 0})</SelectItem>
                             <SelectItem value="rejected">Rejected ({proposalStatusCounts["rejected"] || 0})</SelectItem>
                             <SelectItem value="withdrawn">Withdrawn ({proposalStatusCounts["withdrawn"] || 0})</SelectItem>
@@ -930,6 +985,16 @@ export default function AdminCompanyDetailPage() {
                             <SelectItem value="USD">USD</SelectItem>
                           </SelectContent>
                         </Select>
+                        <div className="flex items-center gap-2">
+                          <Input type="date" className="h-10 w-full sm:w-[140px] bg-background" value={paymentsDateFrom} onChange={(e) => setPaymentsDateFrom(e.target.value)} placeholder="From" />
+                          <span className="text-muted-foreground">to</span>
+                          <Input type="date" className="h-10 w-full sm:w-[140px] bg-background" value={paymentsDateTo} onChange={(e) => setPaymentsDateTo(e.target.value)} placeholder="To" />
+                          {(paymentsDateFrom || paymentsDateTo) && (
+                            <Button variant="ghost" size="sm" onClick={() => { setPaymentsDateFrom(""); setPaymentsDateTo(""); }} className="h-10 px-2 text-muted-foreground hover:text-destructive">
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </>
                     )}
                     {activeTab === "upcomingPayments" && (
@@ -1097,7 +1162,18 @@ export default function AdminCompanyDetailPage() {
                                 : (findternScore > 0 && findternScore < 6 && paidAmountMinor > 0 ? 5000 : monthlyFromHourly);
                               return (
                                 <TableRow key={String(p?.id ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
-                                  <TableCell className="font-medium">{String(p?.internName ?? p?.candidateName ?? "—")}</TableCell>
+                                  <TableCell className="font-medium">
+                                    {internId ? (
+                                      <button 
+                                        onClick={() => setLocation(`/admin/interns/${encodeURIComponent(internId)}`)}
+                                        className="text-primary hover:underline text-left"
+                                      >
+                                        {String(p?.internName ?? p?.candidateName ?? "—")}
+                                      </button>
+                                    ) : (
+                                      String(p?.internName ?? p?.candidateName ?? "—")
+                                    )}
+                                  </TableCell>
                                   <TableCell>{String(p?.projectName ?? "—")}</TableCell>
                                   <TableCell><Badge variant="outline">{proposalType}</Badge></TableCell>
                                   <TableCell><StatusBadge status={displayProposalStatus(p?.status)} /></TableCell>
@@ -1243,10 +1319,11 @@ export default function AdminCompanyDetailPage() {
                           <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
                             <TableHead><ColumnHeader col={paymentColumns[0]} tab="payments" /></TableHead>
                             <TableHead><ColumnHeader col={paymentColumns[1]} tab="payments" /></TableHead>
-                            <TableHead>Project</TableHead>
+                            <TableHead><ColumnHeader col={paymentColumns[2]} tab="payments" /></TableHead>
                             <TableHead><ColumnHeader col={paymentColumns[3]} tab="payments" /></TableHead>
-                            <TableHead>Amount</TableHead>
                             <TableHead><ColumnHeader col={paymentColumns[4]} tab="payments" /></TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead><ColumnHeader col={paymentColumns[5]} tab="payments" /></TableHead>
                             <TableHead>Paid At</TableHead>
                             <TableHead>Created</TableHead>
                             <TableHead className="text-right">Action</TableHead>
@@ -1262,11 +1339,13 @@ export default function AdminCompanyDetailPage() {
                                 const cur = String(o?.currency ?? "INR").toUpperCase();
                                 const paidAtRaw = o?.paidAt ?? o?.paid_at ?? null;
                                 const createdAtRaw = o?.createdAt ?? o?.created_at ?? null;
+                                const paymentType = o?.type === "fulltime" || o?.type === "full_time" ? "Full-time" : "Internship";
                                 return (
                                   <TableRow key={String(o?.id ?? orderId ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
                                     <TableCell className="font-mono text-xs">{orderId || "—"}</TableCell>
                                     <TableCell className="font-medium">{candidateName || "—"}</TableCell>
                                     <TableCell>{projectName || "—"}</TableCell>
+                                    <TableCell><Badge variant="outline">{paymentType}</Badge></TableCell>
                                     <TableCell><StatusBadge status={status} /></TableCell>
                                     <TableCell className="font-medium">{formatAmount(amountMinor, cur)}</TableCell>
                                     <TableCell>{cur}</TableCell>
@@ -1436,10 +1515,11 @@ export default function AdminCompanyDetailPage() {
                                 const startDate = d?.startDate ? formatDate(d.startDate) : d?.dueDate ? formatDate(d.dueDate) : "—";
                                 const duration = d?.duration ?? "—";
                                 const hasFullTime = String(duration).toLowerCase().includes("full-time") || String(duration).toLowerCase().includes("pp") || (d?.offerDetails && String(d.offerDetails).toLowerCase().includes("full"));
+                                const paymentType = hasFullTime ? "Full-time" : "Internship";
                                 const currency = String(d?.currency ?? "INR").toUpperCase();
                                 const dueAmountMinor = Number(d?.dueAmountMinor ?? d?.dueAmount ?? d?.amountMinor ?? 0);
                                 const isCompleted = dueAmountMinor <= 0;
-                                const totalAmountMinor = isCompleted ? 0 : Number(d?.totalAmountMinor ?? d?.amountMinor ?? 0);
+                                const totalAmountMinor = Number(d?.totalAmountMinor ?? d?.amountMinor ?? 0);
                                 const findternScore = Number(d?.findternScore ?? 0);
                                 const upcomingPaymentMinor = isCompleted
                                   ? 0
@@ -1483,9 +1563,6 @@ export default function AdminCompanyDetailPage() {
                                         </div>
                                       </div>
                                       <div className="flex items-center gap-2">
-                                        <Badge variant="outline" className={hasFullTime ? "bg-emerald-50 text-emerald-700 border-emerald-200" : ""}>
-                                          {hasFullTime ? "Full-time" : duration}
-                                        </Badge>
                                         {isCompleted ? (
                                           <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
                                             <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -1518,7 +1595,7 @@ export default function AdminCompanyDetailPage() {
                                     </div>
 
                                     {/* Details Grid */}
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 border-t border-slate-100">
+                                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 p-4 border-t border-slate-100">
                                       <div>
                                         <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Start Date</p>
                                         <p className="text-sm font-medium">{startDate}</p>
@@ -1539,6 +1616,12 @@ export default function AdminCompanyDetailPage() {
                                         <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Total Amount</p>
                                         <p className="text-sm font-semibold">{formatAmount(totalAmountMinor, currency)}</p>
                                       </div>
+                                      {/* <div>
+                                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Type</p>
+                                        <Badge variant="outline" className={paymentType === "Full-time" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-blue-50 text-blue-700 border-blue-200"}>
+                                          {paymentType}
+                                        </Badge>
+                                      </div> */}
                                     </div>
 
                                     {/* Due Amount Footer */}
@@ -1590,12 +1673,13 @@ export default function AdminCompanyDetailPage() {
                           <TableHead><ColumnHeader col={hiredColumns[0]} tab="hired" /></TableHead>
                           <TableHead><ColumnHeader col={hiredColumns[1]} tab="hired" /></TableHead>
                           <TableHead><ColumnHeader col={hiredColumns[2]} tab="hired" /></TableHead>
+                          <TableHead><ColumnHeader col={hiredColumns[3]} tab="hired" /></TableHead>
                           <TableHead>Monthly</TableHead>
                           <TableHead>Total</TableHead>
                           <TableHead className="text-right">Action</TableHead>
                         </TableRow></TableHeader>
                         <TableBody>
-                          {tabData.hiredList.length === 0 ? <TableRow><TableCell colSpan={6}><EmptyState icon={Users} title="No hires" description="No resources have been hired yet." /></TableCell></TableRow> :
+                          {tabData.hiredList.length === 0 ? <TableRow><TableCell colSpan={7}><EmptyState icon={Users} title="No hires" description="No resources have been hired yet." /></TableCell></TableRow> :
                             tabData.hiredList.map((p: any, idx: number) => {
                               const offer = p?.offerDetails ?? {};
                               const fullTimeOffer = (offer as any)?.fullTimeOffer ?? null;
@@ -1618,6 +1702,7 @@ export default function AdminCompanyDetailPage() {
                                   <TableCell className="font-medium">{String(p?.internName ?? "—")}</TableCell>
                                   <TableCell>{String(p?.projectName ?? "—")}</TableCell>
                                   <TableCell>{hasFullTimeOffer ? <Badge className="bg-emerald-100 text-emerald-700">Full-time</Badge> : <Badge variant="outline">Internship</Badge>}</TableCell>
+                                  <TableCell>{p?.startDate ? formatDate(p.startDate) : "—"}</TableCell>
                                   <TableCell className="font-medium text-emerald-600">
                                     {displayAmount > 0 ? (
                                       <div className="flex flex-col items-start gap-0.5">
