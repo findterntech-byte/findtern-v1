@@ -7691,6 +7691,7 @@ export async function registerRoutes(
             : "-";
 
           const offerStatus = (() => {
+            if (hired) return "Hired";
             const statusRaw = String((latestProposal as any)?.status ?? "").trim().toLowerCase();
             if (!statusRaw) return "-";
             if (statusRaw === "rejected") return "Rejected";

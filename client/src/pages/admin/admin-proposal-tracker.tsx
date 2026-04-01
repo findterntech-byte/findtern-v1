@@ -256,7 +256,7 @@ export default function AdminProposalTrackerPage() {
       case "withdrawn":
         return <Badge className="bg-rose-100 text-rose-700 border-rose-200 flex items-center gap-1 w-fit"><XCircle className="h-3 w-3" />{status}</Badge>;
       case "pending":
-        return <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1 w-fit"><Clock className="h-3 w-3" />{status}</Badge>;
+        return <Badge className="bg-rose-100 text-rose-700 border-rose-200 flex items-center gap-1 w-fit"><XCircle className="h-3 w-3" />Expired</Badge>;
       default:
         return <Badge variant="outline" className="flex items-center gap-1 w-fit"><AlertCircle className="h-3 w-3" />{status}</Badge>;
     }

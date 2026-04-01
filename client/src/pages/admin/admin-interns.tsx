@@ -91,7 +91,7 @@ type Intern = {
   recordingLink?: string | null;
   latestInterviewId: string | null;
   findternScore?: number;
-  onboardingStatus?: "Onboarding" | "Onboarded" | "Not onboarded";
+  onboardingStatus?: "Onboarded" | "Not onboarded";
   pendingInterviewCount?: number;
   totalInterviewCount?: number;
   interviewSentCount?: number;
@@ -137,9 +137,9 @@ export default function AdminInternsPage() {
   const [search, setSearch] = useState("");
   const [interviewStatusFilter, setInterviewStatusFilter] = useState<"" | "Waiting" | "Applied" | "Interview" | "Completed">("");
   const [liveHiddenFilter, setLiveHiddenFilter] = useState<"" | "Live" | "Hidden" | "Deactivated">("");
-  const [internshipStatusFilter, setInternshipStatusFilter] = useState<"" | "Onboarding" | "Completed" | "-">("");
+  const [internshipStatusFilter, setInternshipStatusFilter] = useState<"" | "Ongoing" | "Completed" | "-">("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<"" | "Paid" | "Unpaid">("");
-  const [onboardingStatusFilter, setOnboardingStatusFilter] = useState<"" | "Onboarding" | "Onboarded" | "Not onboarded">("");
+  const [onboardingStatusFilter, setOnboardingStatusFilter] = useState<"" | "Onboarded" | "Not onboarded">("");
   const [profileStatusFilter, setProfileStatusFilter] = useState<"" | "Complete" | "Incomplete">("");
   const [internPayoutFilter, setInternPayoutFilter] = useState<"" | "Not started" | "Pending" | "Completed">("");
   const [offerStatusFilter, setOfferStatusFilter] = useState<"" | "Rejected">("");
@@ -265,10 +265,10 @@ export default function AdminInternsPage() {
         { key: "interviewPending" as const, label: "Pending" },
         { key: "totalInterview" as const, label: "Total" },
         { key: "findternScore" as const, label: "Findtern Score" },
-        { key: "profileStatus" as const, label: "Findtern Score" },
+        { key: "profileStatus" as const, label: "Profile Status" },
         { key: "onboardingStatus" as const, label: "Onboarding status", filterKey: "onboardingStatus" as const },
         // { key: "pendingProposals" as const, label: "Pending Interviews", sortKey: "pendingInterviewCount" as const },
-        { key: "toPay" as const, label: "Intern payout", sortKey: "toPay" as const },
+        { key: "toPay" as const, label: "Intern payout (50%)", sortKey: "toPay" as const },
         { key: "totalToPay" as const, label: "Total to pay" },
         { key: "paidTillNow" as const, label: "Paid till now" },
         { key: "leftToPay" as const, label: "Left to pay" },
@@ -433,20 +433,13 @@ export default function AdminInternsPage() {
           const leftToPayMinorRaw = payoutTotals?.leftToPayMinor ?? null;
           const offerCurrencyRaw = String((item as any)?.offerCurrency ?? "INR").trim().toUpperCase();
           const offerCurrency: Intern["offerCurrency"] = offerCurrencyRaw === "USD" ? "USD" : "INR";
-          const rawOfferStatus = String((item as any)?.offerStatus ?? "-").trim();
-          const bankDetailsRaw = (onboarding as any)?.extraData?.bankDetails ?? {};
-          const bankAccountNumber = String(bankDetailsRaw?.accountNumber ?? "").trim();
-
-          let offerStatus = rawOfferStatus || "-";
-          if (rawOfferStatus.toLowerCase() !== "hired" && bankAccountNumber) {
-            offerStatus = bankAccountNumber;
-          }
-
+          const offerStatus = String((item as any)?.offerStatus ?? "-");
           const ratings = (onboarding as any)?.extraData?.ratings ?? {};
           const liveStatus = (item as any)?.liveStatus as Intern["liveStatus"] | undefined;
           const internshipStatus = String((item as any)?.internshipStatus ?? "-");
           const paymentStatus = String((item as any)?.paymentStatus ?? "-");
           const isFullTime = Boolean((item as any)?.isFullTime ?? (item as any)?.is_full_time ?? false);
+          const bankDetailsRaw = (onboarding as any)?.extraData?.bankDetails ?? {};
 
           const firstName = String(user?.firstName ?? "");
           const lastName = String(user?.lastName ?? "");
@@ -521,13 +514,7 @@ export default function AdminInternsPage() {
             latestInterviewId,
             ratings,
             findternScore: parsedFindternScore,
-            onboardingStatus: (() => {
-              const lower = onboardingStatus.toLowerCase();
-              if (interview === "Applied") return "Onboarded" as const; // treat applied proposals as onboarded
-              if (lower === "onboarding") return "Onboarding" as const;
-              if (lower === "onboarded") return "Onboarded" as const;
-              return "Not onboarded" as const;
-            })(),
+            onboardingStatus: onboardingStatus.toLowerCase() === "onboarded" ? "Onboarded" : "Not onboarded",
             pendingInterviewCount: Number.isFinite(pendingInterviewCountRaw) ? Math.max(0, Math.floor(pendingInterviewCountRaw)) : 0,
             totalInterviewCount: Number.isFinite(totalInterviewCountRaw) ? Math.max(0, Math.floor(totalInterviewCountRaw)) : 0,
             interviewSentCount: Number.isFinite(interviewSentCountRaw) ? Math.max(0, Math.floor(interviewSentCountRaw)) : 0,
@@ -1033,6 +1020,11 @@ export default function AdminInternsPage() {
     }, 0);
     return Math.max(1, count);
   }, [columnVisibility, columns]);
+
+  const visibleColumns = useMemo(
+    () => columns.filter((c) => columnVisibility[c.key]),
+    [columns, columnVisibility],
+  );
 
   const handleApprovalChange = async (id: string, nextStatus: Intern["approvalStatus"]) => {
     const existing = interns.find((i) => i.id === id);
@@ -1569,6 +1561,9 @@ export default function AdminInternsPage() {
                                   </SelectTrigger>
                                   <SelectContent className="rounded-lg">
                                     <SelectItem value="__clear__">All offer status</SelectItem>
+                                    <SelectItem value="Hired">Hired</SelectItem>
+                                    <SelectItem value="Accepted">Accepted</SelectItem>
+                                    <SelectItem value="Sent">Sent</SelectItem>
                                     <SelectItem value="Rejected">Offer rejected</SelectItem>
                                   </SelectContent>
                                 </Select>
@@ -1592,23 +1587,23 @@ export default function AdminInternsPage() {
                                 </Select>
                               </div>
 
-                                <div className="space-y-2.5">
-                                  <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-2 px-1">
-                                    <GraduationCap className="h-3.5 w-3.5" />
-                                    Internship
-                                  </label>
-                                  <Select value={internshipStatusFilter} onValueChange={(v) => setInternshipStatusFilter(v === "__clear__" ? "" : (v as any))}>
-                                    <SelectTrigger className="h-10 bg-background border-muted-foreground/20 shadow-sm rounded-lg">
-                                      <SelectValue placeholder="All Internship Status" />
-                                    </SelectTrigger>
-                                    <SelectContent className="rounded-lg">
-                                      <SelectItem value="__clear__">All Internship Status</SelectItem>
-                                      <SelectItem value="Onboarding">Onboarding</SelectItem>
-                                      <SelectItem value="Completed">Completed</SelectItem>
-                                      <SelectItem value="-">-</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
+                              <div className="space-y-2.5">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-2 px-1">
+                                  <GraduationCap className="h-3.5 w-3.5" />
+                                  Internship
+                                </label>
+                                <Select value={internshipStatusFilter} onValueChange={(v) => setInternshipStatusFilter(v === "__clear__" ? "" : (v as any))}>
+                                  <SelectTrigger className="h-10 bg-background border-muted-foreground/20 shadow-sm rounded-lg">
+                                    <SelectValue placeholder="All Internship Status" />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-lg">
+                                    <SelectItem value="__clear__">All Internship Status</SelectItem>
+                                    <SelectItem value="Ongoing">Ongoing</SelectItem>
+                                    <SelectItem value="Completed">Completed</SelectItem>
+                                    <SelectItem value="-">-</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
 
                               <div className="space-y-2.5">
                                 <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-2 px-1">
@@ -1638,7 +1633,6 @@ export default function AdminInternsPage() {
                                   </SelectTrigger>
                                   <SelectContent className="rounded-lg">
                                     <SelectItem value="__clear__">All Onboarding</SelectItem>
-                                    <SelectItem value="Onboarding">Onboarding</SelectItem>
                                     <SelectItem value="Onboarded">Onboarded</SelectItem>
                                     <SelectItem value="Not onboarded">Not onboarded</SelectItem>
                                   </SelectContent>
@@ -1747,146 +1741,11 @@ export default function AdminInternsPage() {
                 <Table className="min-w-[1700px]">
                   <TableHeader className="bg-muted/50">
                     <TableRow className="hover:bg-transparent">
-                  {columnVisibility.sno && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[0]} />
+                  {visibleColumns.map((col) => (
+                    <TableHead key={col.key} className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
+                      <ColumnHeader col={col} alignRight={col.key === "actions"} />
                     </TableHead>
-                  )}
-                  {columnVisibility.name && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[1]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.email && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[2]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.phone && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[3]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.createdAt && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[4]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.interview && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[5]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.interviewSent && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[6]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.interviewScheduled && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[7]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.interviewCompleted && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[8]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.findternScore && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[9]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.profileStatus && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[10]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.onboardingStatus && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[11]} />
-                    </TableHead>
-                  )}
-                  {/* {columnVisibility.pendingProposals && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[12]} />
-                    </TableHead>
-                  )} */}
-                  {columnVisibility.toPay && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[13]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.totalToPay && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[14]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.paidTillNow && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[15]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.leftToPay && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[16]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.liveStatus && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[17]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.internshipStatus && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[18]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.paymentStatus && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[19]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.offerStatus && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[20]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.accountNumber && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[21]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.ifsc && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[22]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.bankName && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[23]} />
-                    </TableHead>
-                  )}
-                  {columnVisibility.upi && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[24]} />
-                    </TableHead>
-                  )}
-
-                  {/* {columnVisibility.approval && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[25]} />
-                    </TableHead>
-                  )} */}
-          
-                  {columnVisibility.status && (
-                    <TableHead className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={columns[26]} />
-                    </TableHead>
-                  )}
-                  <TableHead className="whitespace-nowrap text-right text-xs font-semibold text-muted-foreground">
-                    <ColumnHeader col={columns[27]} alignRight />
-                  </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1935,12 +1794,9 @@ export default function AdminInternsPage() {
                     {columnVisibility.name && (
                       <TableCell className="py-4">
                         <div className="flex flex-col gap-0.5">
-                          <button
-                            onClick={() => setLocation(`/admin/interns/${intern.id}`)}
-                            className="font-semibold text-sm tracking-tight text-foreground group-hover:text-primary transition-colors text-left hover:underline"
-                          >
+                          <span className="font-semibold text-sm tracking-tight text-foreground group-hover:text-primary transition-colors">
                             {intern.name}
-                          </button>
+                          </span>
                           {intern.isFullTime && (
                             <Badge className="w-fit bg-indigo-50 text-indigo-700 border-indigo-100 text-[10px] font-bold py-0 h-4 uppercase tracking-wider">
                               Full Time
@@ -2078,7 +1934,21 @@ export default function AdminInternsPage() {
                       </TableCell>
                     )}
 
-                
+                    {columnVisibility.profileStatus && (
+                      <TableCell className="py-4 whitespace-nowrap">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "font-bold text-[10px] uppercase tracking-wider px-2",
+                            intern.isProfileComplete
+                              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
+                              : "border-amber-500/20 bg-amber-500/10 text-amber-700"
+                          )}
+                        >
+                          {intern.isProfileComplete ? "Complete" : "Incomplete"}
+                        </Badge>
+                      </TableCell>
+                    )}
 
                     {columnVisibility.onboardingStatus && (
                       <TableCell className="py-4 whitespace-nowrap text-sm text-muted-foreground">
@@ -2086,8 +1956,6 @@ export default function AdminInternsPage() {
                           "px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider",
                           intern.onboardingStatus === "Onboarded" 
                             ? "bg-emerald-100 text-emerald-700" 
-                            : intern.onboardingStatus === "Onboarding"
-                            ? "bg-amber-100 text-amber-700"
                             : "bg-muted text-muted-foreground"
                         )}>
                           {intern.onboardingStatus ?? "Not onboarded"}
@@ -2104,15 +1972,15 @@ export default function AdminInternsPage() {
                     {columnVisibility.toPay && (
                       <TableCell className="py-4 whitespace-nowrap">
                         {(() => {
-                          const offerStatus = String(intern.offerStatus ?? "").trim().toLowerCase();
-                          const isHired = offerStatus === "hired";
-                          if (!isHired) {
+                          const isOnboarded = String(intern.onboardingStatus ?? "").trim() === "Onboarded";
+                          if (!isOnboarded) {
                             return <span className="text-xs text-muted-foreground/40 italic">Not Onboarded</span>;
                           }
                           const toPayMinor = Number(intern.toPayMinor ?? 0) || 0;
                           const hasUpcoming = Boolean(String(intern.upcomingPaymentDueAt ?? "").trim());
-                          if (!hasUpcoming) {
-                            return <span className="text-sm text-muted-foreground/40">-</span>;
+                          const isComplete = !hasUpcoming || toPayMinor <= 0;
+                          if (isComplete) {
+                            return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold uppercase tracking-wider">Completed</Badge>;
                           }
                           return (
                             <div className="flex flex-col gap-0.5">
@@ -2538,5 +2406,3 @@ export default function AdminInternsPage() {
     </AdminLayout>
   );
 }
-
-
