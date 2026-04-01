@@ -2111,7 +2111,28 @@ export default function AdminInternDetailPage() {
                               const employerDueMinor = Number(r.dueAmountMinor ?? 0) || 0;
                               const internMonthlyMinor = Number(r.internMonthlyAmountMinor ?? 0) || 0;
                               const internDueMinor = Number(r.internDueAmountMinor ?? 0) || 0;
+                              const totalMonths = Number(r.totalMonths ?? 0) || 0;
+                              const monthlyAmountMinor = Number(r.monthlyAmountMinor ?? 0) || 0;
                               const canPay = internMonthlyMinor > 0 && internDueMinor > 0;
+
+                              const isLowScoringIntern = internDueMinor === 0 && monthlyAmountMinor > 0;
+                              const employerMonthlyForDisplay = isLowScoringIntern 
+                                ? monthlyAmountMinor * 2 
+                                : monthlyAmountMinor;
+                              const calculatedTotalAmount = isLowScoringIntern 
+                                ? employerMonthlyForDisplay 
+                                : totalMonths * monthlyAmountMinor;
+
+                              const rawStartDate = String(r.startDate ?? "").trim();
+                              const advanceIsoMonth = (iso: string, months: number) => {
+                                const s = String(iso ?? "").trim();
+                                if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+                                const dt = new Date(`${s}T00:00:00`);
+                                if (Number.isNaN(dt.getTime())) return "";
+                                dt.setMonth(dt.getMonth() + Math.max(0, months));
+                                return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+                              };
+                              const upcomingPaymentDateDisplay = isLowScoringIntern ? "-" : (rawStartDate ? advanceIsoMonth(rawStartDate, 1) : "-");
 
                               const scheduledFor = String(r.upcomingPaymentDate ?? "").trim();
                               const cyclePayout = payouts.find((p) => {
@@ -2126,15 +2147,6 @@ export default function AdminInternDetailPage() {
                               const hasPaidPayoutForCycle = cyclePayoutStatus === "paid";
 
                               const isComplete = internDueMinor <= 0;
-
-                              const advanceIsoMonth = (iso: string, months: number) => {
-                                const s = String(iso ?? "").trim();
-                                if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
-                                const dt = new Date(`${s}T00:00:00`);
-                                if (Number.isNaN(dt.getTime())) return "";
-                                dt.setMonth(dt.getMonth() + Math.max(0, months));
-                                return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-                              };
 
                               const effectiveScheduledFor =
                                 hasPaidPayoutForCycle && scheduledFor ? advanceIsoMonth(scheduledFor, 1) : scheduledFor;
@@ -2154,12 +2166,12 @@ export default function AdminInternDetailPage() {
                                   <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{String(r.projectName ?? "-")}</td>
                                   <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">{String(r.startDate ?? "-")}</td>
                                   <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">{String(r.duration ?? "-")}</td>
-                                  <td className="p-4 align-middle whitespace-nowrap min-w-[150px] text-amber-600 font-medium">{String(r.upcomingPaymentDate ?? "-")}</td>
-                                  <td className="p-4 align-middle whitespace-nowrap min-w-[140px]">{formatMoneyInInrIfUsd(r.monthlyAmountMinor ?? 0, r.currency)}</td>
-                                  <td className="p-4 align-middle whitespace-nowrap min-w-[160px]">{formatMoneyInInrIfUsd(r.totalAmountMinor ?? 0, r.currency)}</td>
-                                  <td className="p-4 align-middle whitespace-nowrap font-bold min-w-[120px] text-rose-600">{formatMoneyInInrIfUsd(r.dueAmountMinor ?? 0, r.currency)}</td>
-                                  <td className="p-4 align-middle whitespace-nowrap min-w-[140px] text-emerald-600 font-medium">{formatMoneyInInrIfUsd(r.internMonthlyAmountMinor ?? 0, r.currency)}</td>
-                                  <td className="p-4 align-middle whitespace-nowrap font-bold min-w-[120px] text-amber-600">{formatMoneyInInrIfUsd(r.internDueAmountMinor ?? 0, r.currency)}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[150px] text-amber-600 font-medium">{upcomingPaymentDateDisplay}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[140px]">{formatMoneyInInrIfUsd(employerMonthlyForDisplay, r.currency)}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[160px] font-bold">{formatMoneyInInrIfUsd(calculatedTotalAmount, r.currency)}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap font-bold min-w-[120px] text-rose-600">{formatMoneyInInrIfUsd(employerDueMinor, r.currency)}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap min-w-[140px] text-emerald-600 font-medium">{formatMoneyInInrIfUsd(internMonthlyMinor, r.currency)}</td>
+                                  <td className="p-4 align-middle whitespace-nowrap font-bold min-w-[120px] text-amber-600">{formatMoneyInInrIfUsd(internDueMinor, r.currency)}</td>
                                   <td className="p-4 align-middle sticky right-0 z-10 bg-inherit border-l shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] text-right min-w-[120px]">
                                     <Button
                                       size="sm"

@@ -234,6 +234,7 @@ export default function AdminInternsPage() {
     | "totalInterview"
     // | "pendingProposals"
     | "toPay"
+    | "upcomingPaymentDate"
     | "totalToPay"
     | "paidTillNow"
     | "leftToPay"
@@ -269,6 +270,7 @@ export default function AdminInternsPage() {
         { key: "onboardingStatus" as const, label: "Onboarding status", filterKey: "onboardingStatus" as const },
         // { key: "pendingProposals" as const, label: "Pending Interviews", sortKey: "pendingInterviewCount" as const },
         { key: "toPay" as const, label: "Intern payout (50%)", sortKey: "toPay" as const },
+        { key: "upcomingPaymentDate" as const, label: "Upcoming payment date" },
         { key: "totalToPay" as const, label: "Total to pay" },
         { key: "paidTillNow" as const, label: "Paid till now" },
         { key: "leftToPay" as const, label: "Left to pay" },
@@ -1978,20 +1980,32 @@ export default function AdminInternsPage() {
                           }
                           const toPayMinor = Number(intern.toPayMinor ?? 0) || 0;
                           const hasUpcoming = Boolean(String(intern.upcomingPaymentDueAt ?? "").trim());
-                          const isComplete = !hasUpcoming || toPayMinor <= 0;
-                          if (isComplete) {
+                          if (toPayMinor <= 0) {
                             return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold uppercase tracking-wider">Completed</Badge>;
                           }
                           return (
                             <div className="flex flex-col gap-0.5">
                               <span className="text-sm font-bold text-emerald-700 tracking-tight">{formatPayoutInInrIfUsd(toPayMinor, intern.offerCurrency)}</span>
-                              <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
-                                <Clock className="h-2.5 w-2.5" />
-                                {formatDueDateOnly(intern.upcomingPaymentDueAt)}
-                              </span>
+                              {hasUpcoming && (
+                                <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
+                                  <Clock className="h-2.5 w-2.5" />
+                                  {formatDueDateOnly(intern.upcomingPaymentDueAt)}
+                                </span>
+                              )}
                             </div>
                           );
                         })()}
+                      </TableCell>
+                    )}
+
+                    {columnVisibility.upcomingPaymentDate && (
+                      <TableCell className="py-4 whitespace-nowrap text-sm">
+                        <span className={cn(
+                          "font-medium",
+                          intern.upcomingPaymentDueAt ? "text-amber-600" : "text-muted-foreground"
+                        )}>
+                          {intern.upcomingPaymentDueAt ? formatDueDateOnly(intern.upcomingPaymentDueAt) : "-"}
+                        </span>
                       </TableCell>
                     )}
 
