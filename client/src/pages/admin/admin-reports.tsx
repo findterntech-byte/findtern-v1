@@ -459,9 +459,9 @@ export default function AdminReportsPage() {
                       employerBehaviorAnalytics ? (
                         <div className="space-y-4">
                           {[
-                            { label: "Posted Projects → Received Proposals", value: employerBehaviorAnalytics.dropOffRate > 0 ? Math.round((1 - employerBehaviorAnalytics.dropOffRate / 100) * 100) : 100, count: platformMetrics.activeProjects, color: "bg-emerald-500" },
-                            { label: "Proposals → Interviews", value: 0, count: 0, color: "bg-blue-500" },
-                            { label: "Interviews → Hires", value: 0, count: 0, color: "bg-purple-500" },
+                            { label: "Active Projects", value: employerBehaviorAnalytics.activeEmployers > 0 ? Math.round((platformMetrics.activeProjects / employerBehaviorAnalytics.activeEmployers) * 100) : 0, count: platformMetrics.activeProjects, color: "bg-emerald-500" },
+                            { label: "Active Employers", value: platformMetrics.totalCompanies > 0 ? Math.round((employerBehaviorAnalytics.activeEmployers / platformMetrics.totalCompanies) * 100) : 0, count: employerBehaviorAnalytics.activeEmployers, color: "bg-blue-500" },
+                            { label: "Repeat Employers", value: employerBehaviorAnalytics.activeEmployers > 0 ? Math.round((employerBehaviorAnalytics.repeatEmployers / employerBehaviorAnalytics.activeEmployers) * 100) : 0, count: employerBehaviorAnalytics.repeatEmployers, color: "bg-purple-500" },
                           ].map((item) => (
                             <div key={item.label} className="space-y-2">
                               <div className="flex items-center justify-between text-sm">
