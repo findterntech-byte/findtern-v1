@@ -91,7 +91,7 @@ type Intern = {
   recordingLink?: string | null;
   latestInterviewId: string | null;
   findternScore?: number;
-  onboardingStatus?: "Onboarded" | "Not onboarded";
+  onboardingStatus?: "Onboarding" | "Not onboarded";
   pendingInterviewCount?: number;
   totalInterviewCount?: number;
   // interviewSentCount?: number;
@@ -115,10 +115,13 @@ type Intern = {
   };
   liveStatus?: "Live" | "Hidden";
   isProfileComplete?: boolean;
+  isHired?: boolean;
+  offerType?: "Full-time" | "Internship" | null;
   internshipStatus?: string;
   paymentStatus?: string;
   isFullTime?: boolean;
   bankDetails?: {
+    accountHolderName?: string | null;
     accountNumber?: string | null;
     ifscCode?: string | null;
     bankName?: string | null;
@@ -139,7 +142,7 @@ export default function AdminInternsPage() {
   const [liveHiddenFilter, setLiveHiddenFilter] = useState<"" | "Live" | "Hidden" | "Deactivated">("");
   const [internshipStatusFilter, setInternshipStatusFilter] = useState<"" | "Ongoing" | "Completed" | "-">("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<"" | "Paid" | "Unpaid">("");
-  const [onboardingStatusFilter, setOnboardingStatusFilter] = useState<"" | "Onboarded" | "Not onboarded">("");
+  const [onboardingStatusFilter, setOnboardingStatusFilter] = useState<"" | "Onboarding" | "Not onboarded">("");
   const [profileStatusFilter, setProfileStatusFilter] = useState<"" | "Complete" | "Incomplete">("");
   const [internPayoutFilter, setInternPayoutFilter] = useState<"" | "Not started" | "Pending" | "Completed">("");
   const [offerStatusFilter, setOfferStatusFilter] = useState<"" | "Rejected">("");
@@ -239,9 +242,11 @@ export default function AdminInternsPage() {
     | "paidTillNow"
     | "leftToPay"
     | "liveStatus"
+    | "offerType"
     | "internshipStatus"
     | "paymentStatus"
     | "offerStatus"
+    | "accountHolder"
     | "accountNumber"
     | "ifsc"
     | "bankName"
@@ -258,7 +263,7 @@ export default function AdminInternsPage() {
         { key: "email" as const, label: "Email", sortKey: "email" as const, filterKey: "email" as const },
         { key: "phone" as const, label: "Phone", sortKey: "phone" as const, filterKey: "phone" as const },
         { key: "createdAt" as const, label: "Created On", sortKey: "createdAt" as const },
-        { key: "interview" as const, label: "Proposal vs Interview" },
+        { key: "interview" as const, label: "AI Interview" },
         // { key: "interviewSent" as const, label: "Sent" },
         { key: "interviewScheduled" as const, label: "Scheduled" },
         { key: "interviewCompleted" as const, label: "Completed" },
@@ -275,9 +280,11 @@ export default function AdminInternsPage() {
         { key: "paidTillNow" as const, label: "Paid till now" },
         { key: "leftToPay" as const, label: "Left to pay" },
         { key: "liveStatus" as const, label: "Live / Hidden" },
+        { key: "offerType" as const, label: "Offer Type" },
         { key: "internshipStatus" as const, label: "Internship Status" },
         { key: "paymentStatus" as const, label: "Payment Status" },
         { key: "offerStatus" as const, label: "Offer Status" },
+        { key: "accountHolder" as const, label: "Account Holder" },
         { key: "accountNumber" as const, label: "Account Number" },
         { key: "ifsc" as const, label: "IFSC" },
         { key: "bankName" as const, label: "Bank Name" },
@@ -308,7 +315,7 @@ export default function AdminInternsPage() {
     const pendingApproval = interns.filter((i) => i.approvalStatus === "Pending").length;
     const approved = interns.filter((i) => i.approvalStatus === "Approved").length;
     const rejected = interns.filter((i) => i.approvalStatus === "Rejected").length;
-    const onboarded = interns.filter((i) => i.onboardingStatus === "Onboarded").length;
+    const onboarded = interns.filter((i) => i.onboardingStatus === "Onboarding").length;
 
     const interviewCounts = interns.reduce(
       (acc, i) => {
@@ -446,6 +453,7 @@ export default function AdminInternsPage() {
             : "-";
           const paymentStatus = String((item as any)?.paymentStatus ?? "-");
           const isFullTime = Boolean((item as any)?.isFullTime ?? (item as any)?.is_full_time ?? false);
+          const isHired = Boolean((item as any)?.isHired ?? false);
           const bankDetailsRaw = (onboarding as any)?.extraData?.bankDetails ?? {};
 
           const firstName = String(user?.firstName ?? "");
@@ -497,7 +505,7 @@ export default function AdminInternsPage() {
                       : "Waiting"
             : "Waiting";
 
-          if (parsedFindternScore !== undefined && !interviewLink && interview !== "Completed") {
+          if (parsedFindternScore !== undefined) {
             interview = "Completed";
           }
 
@@ -521,38 +529,45 @@ export default function AdminInternsPage() {
             latestInterviewId,
             ratings,
             findternScore: parsedFindternScore,
-            onboardingStatus: onboardingStatus.toLowerCase() === "onboarded" ? "Onboarded" : "Not onboarded",
+            onboardingStatus: onboardingStatus.toLowerCase() === "onboarding" ? "Onboarding" as const : "Not onboarded" as const,
             pendingInterviewCount: Number.isFinite(pendingInterviewCountRaw) ? Math.max(0, Math.floor(pendingInterviewCountRaw)) : 0,
             totalInterviewCount: Number.isFinite(totalInterviewCountRaw) ? Math.max(0, Math.floor(totalInterviewCountRaw)) : 0,
             // interviewSentCount: Number.isFinite(interviewSentCountRaw) ? Math.max(0, Math.floor(interviewSentCountRaw)) : 0,
             interviewScheduledCount: Number.isFinite(interviewScheduledCountRaw) ? Math.max(0, Math.floor(interviewScheduledCountRaw)) : 0,
             interviewCompletedCount: Number.isFinite(interviewCompletedCountRaw) ? Math.max(0, Math.floor(interviewCompletedCountRaw)) : 0,
             interviewExpiredCount: Number.isFinite(interviewExpiredCountRaw) ? Math.max(0, Math.floor(interviewExpiredCountRaw)) : 0,
-            toPayMinor: Number.isFinite(toPayMinorRaw) ? Math.max(0, Math.floor(toPayMinorRaw)) : 0,
-            paidTillNowMinor: Number.isFinite(paidTillNowMinorRaw) ? Math.max(0, Math.floor(paidTillNowMinorRaw)) : 0,
+            toPayMinor: isHired ? (Number.isFinite(toPayMinorRaw) ? Math.max(0, Math.floor(toPayMinorRaw)) : 0) : 0,
+            paidTillNowMinor: isHired ? (Number.isFinite(paidTillNowMinorRaw) ? Math.max(0, Math.floor(paidTillNowMinorRaw)) : 0) : 0,
             totalToPayMinor:
-              totalToPayMinorRaw == null
+              !isHired
                 ? null
-                : Number.isFinite(Number(totalToPayMinorRaw))
-                  ? Math.max(0, Math.floor(Number(totalToPayMinorRaw)))
-                  : null,
+                : totalToPayMinorRaw == null
+                  ? null
+                  : Number.isFinite(Number(totalToPayMinorRaw))
+                    ? Math.max(0, Math.floor(Number(totalToPayMinorRaw)))
+                    : null,
             leftToPayMinor:
-              leftToPayMinorRaw == null
+              !isHired
                 ? null
-                : Number.isFinite(Number(leftToPayMinorRaw))
-                  ? Math.max(0, Math.floor(Number(leftToPayMinorRaw)))
-                  : null,
-            upcomingPaymentMinor: Number.isFinite(upcomingPaymentMinorRaw) ? Math.max(0, Math.floor(upcomingPaymentMinorRaw)) : 0,
-            upcomingPaymentDueAt: typeof upcomingPaymentDueAtRaw === "string" && upcomingPaymentDueAtRaw.trim() ? upcomingPaymentDueAtRaw : null,
-            payoutTotalCount: Number.isFinite(payoutTotalCountRaw) ? Math.max(0, Math.floor(payoutTotalCountRaw)) : 0,
+                : leftToPayMinorRaw == null
+                  ? null
+                  : Number.isFinite(Number(leftToPayMinorRaw))
+                    ? Math.max(0, Math.floor(Number(leftToPayMinorRaw)))
+                    : null,
+            upcomingPaymentMinor: isHired ? (Number.isFinite(upcomingPaymentMinorRaw) ? Math.max(0, Math.floor(upcomingPaymentMinorRaw)) : 0) : 0,
+            upcomingPaymentDueAt: isHired ? (typeof upcomingPaymentDueAtRaw === "string" && upcomingPaymentDueAtRaw.trim() ? upcomingPaymentDueAtRaw : null) : null,
+            payoutTotalCount: isHired ? (Number.isFinite(payoutTotalCountRaw) ? Math.max(0, Math.floor(payoutTotalCountRaw)) : 0) : 0,
             offerCurrency,
             offerStatus,
             liveStatus,
             isProfileComplete: Boolean(item.isProfileComplete),
+            isHired,
+            offerType: isFullTime ? ("Full-time" as const) : (isHired ? ("Internship" as const) : null),
             internshipStatus,
             paymentStatus,
             isFullTime,
             bankDetails: {
+              accountHolderName: (bankDetailsRaw as any)?.accountHolderName ?? null,
               accountNumber: (bankDetailsRaw as any)?.accountNumber ?? null,
               ifscCode: (bankDetailsRaw as any)?.ifscCode ?? null,
               bankName: (bankDetailsRaw as any)?.bankName ?? null,
@@ -638,9 +653,11 @@ export default function AdminInternsPage() {
           row[c.label] = minor / 100;
         }
         if (c.key === "liveStatus") row[c.label] = intern.liveStatus ?? "Live";
+        if (c.key === "offerType") row[c.label] = intern.offerType ?? "-";
         if (c.key === "internshipStatus") row[c.label] = intern.internshipStatus ?? "-";
         if (c.key === "paymentStatus") row[c.label] = intern.paymentStatus ?? "-";
         if (c.key === "offerStatus") row[c.label] = intern.offerStatus ?? "-";
+        if (c.key === "accountHolder") row[c.label] = intern.bankDetails?.accountHolderName ?? "-";
         if (c.key === "accountNumber") row[c.label] = intern.bankDetails?.accountNumber ?? "-";
         if (c.key === "ifsc") row[c.label] = intern.bankDetails?.ifscCode ?? "-";
         if (c.key === "bankName") row[c.label] = intern.bankDetails?.bankName ?? "-";
@@ -787,11 +804,11 @@ export default function AdminInternsPage() {
     }
 
     if (internPayoutFilter) {
-      const paidTillNowMinor = Number(intern.paidTillNowMinor ?? 0) || 0;
-      const toPayMinor = Number(intern.toPayMinor ?? 0) || 0;
+      const leftToPayMinor = Number(intern.leftToPayMinor ?? 0) || 0;
+      const totalToPayMinor = Number(intern.totalToPayMinor ?? 0) || 0;
       const hasUpcoming = Boolean(String(intern.upcomingPaymentDueAt ?? "").trim());
-      const isNotStarted = paidTillNowMinor <= 0;
-      const isComplete = !isNotStarted && !hasUpcoming;
+      const isNotStarted = totalToPayMinor <= 0;
+      const isComplete = leftToPayMinor <= 0 && totalToPayMinor > 0;
       const status = isNotStarted ? "Not started" : isComplete ? "Completed" : "Pending";
       if (status !== internPayoutFilter) return false;
     }
@@ -1321,10 +1338,10 @@ export default function AdminInternsPage() {
             </div>
           </Card>
 
-         
+          
           <Card className="flex flex-row items-center justify-between p-6 transition-all hover:shadow-md">
             <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Onboarded</p>
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Onboarding</p>
               <h2 className="text-3xl font-bold tracking-tight text-blue-600">{overview.onboarded}</h2>
             </div>
             <div className="rounded-full bg-blue-50 p-3 text-blue-600">
@@ -1338,7 +1355,7 @@ export default function AdminInternsPage() {
           <Card className="flex flex-col p-6 transition-all hover:shadow-md">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold">Proposal vs Interview</h3>
+                <h3 className="text-lg font-semibold">AI Interview</h3>
                 <p className="text-sm text-muted-foreground">Status distribution of all interns</p>
               </div>
               <LayoutGrid className="h-5 w-5 text-muted-foreground" />
@@ -1640,7 +1657,7 @@ export default function AdminInternsPage() {
                                   </SelectTrigger>
                                   <SelectContent className="rounded-lg">
                                     <SelectItem value="__clear__">All Onboarding</SelectItem>
-                                    <SelectItem value="Onboarded">Onboarded</SelectItem>
+                                    <SelectItem value="Onboarding">Onboarding</SelectItem>
                                     <SelectItem value="Not onboarded">Not onboarded</SelectItem>
                                   </SelectContent>
                                 </Select>
@@ -1964,7 +1981,7 @@ export default function AdminInternsPage() {
                       <TableCell className="py-4 whitespace-nowrap text-sm text-muted-foreground">
                         <span className={cn(
                           "px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider",
-                          intern.onboardingStatus === "Onboarded" 
+                          intern.onboardingStatus === "Onboarding" 
                             ? "bg-emerald-100 text-emerald-700" 
                             : "bg-muted text-muted-foreground"
                         )}>
@@ -1982,14 +1999,20 @@ export default function AdminInternsPage() {
                     {columnVisibility.toPay && (
                       <TableCell className="py-4 whitespace-nowrap">
                         {(() => {
-                          const isOnboarded = String(intern.onboardingStatus ?? "").trim() === "Onboarded";
+                          const isOnboarded = String(intern.onboardingStatus ?? "").trim() === "Onboarding";
                           if (!isOnboarded) {
                             return <span className="text-xs text-muted-foreground/40 italic">Not Onboarded</span>;
                           }
                           const toPayMinor = Number(intern.toPayMinor ?? 0) || 0;
+                          const leftToPayMinor = Number(intern.leftToPayMinor ?? 0) || 0;
+                          const totalToPayMinor = Number(intern.totalToPayMinor ?? 0) || 0;
                           const hasUpcoming = Boolean(String(intern.upcomingPaymentDueAt ?? "").trim());
-                          if (toPayMinor <= 0) {
+                          const isComplete = leftToPayMinor <= 0 && totalToPayMinor > 0;
+                          if (isComplete) {
                             return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold uppercase tracking-wider">Completed</Badge>;
+                          }
+                          if (toPayMinor <= 0 && totalToPayMinor <= 0) {
+                            return <span className="text-xs text-muted-foreground/40 italic">Not started</span>;
                           }
                           return (
                             <div className="flex flex-col gap-0.5">
@@ -2050,6 +2073,25 @@ export default function AdminInternsPage() {
                         </Badge>
                       </TableCell>
                     )}
+                    {columnVisibility.offerType && (
+                      <TableCell className="py-4">
+                        {intern.offerType ? (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "font-bold text-[10px] uppercase tracking-wider px-2",
+                              intern.offerType === "Full-time"
+                                ? "border-indigo-500/20 bg-indigo-500/10 text-indigo-700"
+                                : "border-teal-500/20 bg-teal-500/10 text-teal-700"
+                            )}
+                          >
+                            {intern.offerType}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/40">-</span>
+                        )}
+                      </TableCell>
+                    )}
                     {columnVisibility.internshipStatus && (
                       <TableCell className="py-4 text-sm text-muted-foreground">
                         {intern.internshipStatus ?? "-"}
@@ -2084,6 +2126,11 @@ export default function AdminInternsPage() {
                         >
                           {intern.offerStatus ?? "-"}
                         </Badge>
+                      </TableCell>
+                    )}
+                    {columnVisibility.accountHolder && (
+                      <TableCell className="py-4 whitespace-nowrap text-sm text-muted-foreground">
+                        {intern.bankDetails?.accountHolderName ?? "-"}
                       </TableCell>
                     )}
                     {columnVisibility.accountNumber && (

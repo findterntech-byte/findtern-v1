@@ -1049,10 +1049,13 @@ export default function DashboardPage() {
               </div>
 
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div className="rounded-lg border bg-white/70 px-3 py-2">
+                <button 
+                  onClick={() => setLocation("/interviews")}
+                  className="rounded-lg border bg-white/70 px-3 py-2 text-left hover:bg-emerald-50 transition-colors cursor-pointer"
+                >
                   <div className="text-[11px] text-slate-500">Scheduled</div>
                   <div className="text-sm font-semibold text-slate-900">{interviewStats.scheduled}</div>
-                </div>
+                </button>
                 <div className="rounded-lg border bg-white/70 px-3 py-2">
                   <div className="text-[11px] text-slate-500">Upcoming</div>
                   <div className="text-sm font-semibold text-slate-900">
@@ -1063,7 +1066,7 @@ export default function DashboardPage() {
 
               <div className="mt-4">
                 <Button variant="outline" className="h-9 w-full rounded-full" onClick={() => setLocation("/interviews")}>
-                  View interviews
+                  View all interviews
                 </Button>
               </div>
             </div>

@@ -336,8 +336,8 @@ export default function AdminOrdersPage() {
       return Math.round(feeMajor * 100);
     };
 
-    const subtotalMinor = items.reduce((sum: number, it: any) => sum + invoiceItemBaseMinor(it), 0);
-    const totalMinor = Number(payment?.amountMinor ?? payment?.amount_minor ?? subtotalMinor);
+    const rawSubtotalMinor = items.reduce((sum: number, it: any) => sum + invoiceItemBaseMinor(it), 0);
+    const totalMinor = Number(payment?.amountMinor ?? payment?.amount_minor ?? rawSubtotalMinor);
 
     const gstRate = 18;
     const gstApplicable = !isFullTimeInvoice && currencyCode === "INR" && Number.isFinite(totalMinor) && totalMinor > 0;
@@ -346,8 +346,10 @@ export default function AdminOrdersPage() {
     const gstMinor = gstApplicable ? Math.max(0, Math.max(0, totalMinor) - subtotalFromTotalMinor) : 0;
     const totalWithTaxMinor = Math.max(0, totalMinor);
 
-    const discountMinorRaw = Math.max(0, subtotalMinor - totalWithTaxMinor);
-    const discountRatio = subtotalMinor > 0 ? discountMinorRaw / subtotalMinor : 0;
+    const useGstAdjustedPrices = gstApplicable && subtotalFromTotalMinor > 0 && rawSubtotalMinor > 0 && rawSubtotalMinor !== subtotalFromTotalMinor;
+
+    const discountMinorRaw = Math.max(0, rawSubtotalMinor - totalWithTaxMinor);
+    const discountRatio = rawSubtotalMinor > 0 ? discountMinorRaw / rawSubtotalMinor : 0;
     const showTenPercentDiscount = discountMinorRaw > 0 && Math.abs(discountRatio - 0.1) <= 0.02;
     const discountMinor = showTenPercentDiscount ? discountMinorRaw : 0;
 
@@ -355,7 +357,7 @@ export default function AdminOrdersPage() {
       ? totalWithTaxMinor
       : gstApplicable
         ? subtotalFromTotalMinor
-        : subtotalMinor;
+        : rawSubtotalMinor;
 
     return (
       <div ref={invoicePrintRef} className="invoice-print-root mx-auto w-full max-w-[980px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -448,9 +450,14 @@ export default function AdminOrdersPage() {
 
                     const detail = detailParts.join(" · ");
                     const rowMinor = invoiceItemBaseMinor(item);
-                    const displayPriceMinor = isFullTimeOffer && Number.isFinite(annualCtc) && annualCtc > 0
-                      ? Math.round(annualCtc * 100)
-                      : rowMinor;
+                    let displayPriceMinor: number;
+                    if (isFullTimeOffer && Number.isFinite(annualCtc) && annualCtc > 0) {
+                      displayPriceMinor = Math.round(annualCtc * 100);
+                    } else if (useGstAdjustedPrices && rawSubtotalMinor > 0 && subtotalFromTotalMinor > 0) {
+                      displayPriceMinor = Math.round(rowMinor * subtotalFromTotalMinor / rawSubtotalMinor);
+                    } else {
+                      displayPriceMinor = rowMinor;
+                    }
                     const rowKey = String(item?.proposalId ?? item?.id ?? item?.internId ?? idx);
 
                     const displayTitle = isFullTimeOffer

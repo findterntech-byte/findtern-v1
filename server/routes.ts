@@ -7406,6 +7406,7 @@ export async function registerRoutes(
       }
 
       const latestHiredProposalByInternId = new Map<string, any>();
+      const allHiredProposalsByInternId = new Map<string, any[]>();
       for (const p of proposals as any[]) {
         const internId = String(p?.internId ?? p?.intern_id ?? "").trim();
         if (!internId) continue;
@@ -7413,6 +7414,9 @@ export async function registerRoutes(
         if (status !== "hired") continue;
         const existing = latestHiredProposalByInternId.get(internId);
         latestHiredProposalByInternId.set(internId, existing ? pickNewer(existing, p) : p);
+        const existingList = allHiredProposalsByInternId.get(internId) ?? [];
+        existingList.push(p);
+        allHiredProposalsByInternId.set(internId, existingList);
       }
 
       const payoutAggByInternId = new Map<
@@ -7557,17 +7561,7 @@ export async function registerRoutes(
           const accepted = latestAcceptedProposalByInternId.get(internId) ?? null;
           const latestProposal = latestProposalByInternId.get(internId) ?? null;
 
-          const onboardingStatus = (() => {
-            const explicit = (extra as any)?.onboardingStatus;
-            if (typeof explicit === "string" && explicit.trim()) return explicit.trim();
-            const explicitBool = (extra as any)?.isOnboarded;
-            if (typeof explicitBool === "boolean") return explicitBool ? "Onboarded" : "Not onboarded";
-            const isPaid = Boolean(extra?.payment?.isPaid);
-            if (!isPaid) return "Not onboarded";
-            const proposalStatus = latestProposal ? String((latestProposal as any)?.status ?? "").trim().toLowerCase() : "";
-            const isReadyForOnboarding = proposalStatus === "accepted" || proposalStatus === "hired";
-            return isReadyForOnboarding ? "Onboarded" : "Not onboarded";
-          })();
+          const onboardingStatus = hired ? "Onboarding" : "Not onboarded";
 
           const payoutAgg = payoutAggByInternId.get(internId) ?? {
             pendingSumMinor: 0,
@@ -7612,10 +7606,26 @@ export async function registerRoutes(
             internMonthlyMinor = Math.round(internMonthlyMinor * 100);
           }
 
+          const allHiredProposals = allHiredProposalsByInternId.get(internId) ?? [];
           const totalPlannedMinor = (() => {
-            if (!offerSource || !Number.isFinite(internMonthlyMinor) || internMonthlyMinor <= 0) return null;
-            const totalMonths = Math.max(1, monthsFromDuration((offerDetails as any)?.duration));
-            return Math.max(0, Math.floor(internMonthlyMinor * totalMonths));
+            if (allHiredProposals.length === 0) return null;
+            let sum = 0;
+            for (const prop of allHiredProposals) {
+              const od = (prop as any)?.offerDetails ?? (prop as any)?.offer_details ?? {};
+              const cur = String((prop as any)?.currency ?? od?.currency ?? "INR").trim().toUpperCase();
+              const isUsd = cur === "USD";
+              const maj = Number(od?.monthlyAmount ?? od?.monthly_amount ?? 0);
+              if (!Number.isFinite(maj) || maj <= 0) continue;
+              let empMin = Math.round(maj * 100);
+              let intMin = Math.round(empMin * 0.5);
+              if (isUsd) {
+                empMin = Math.round(empMin * 100);
+                intMin = Math.round(intMin * 100);
+              }
+              const months = Math.max(1, monthsFromDuration(od?.duration));
+              sum += Math.max(0, Math.floor(intMin * months));
+            }
+            return sum > 0 ? sum : null;
           })();
           const leftToPayMinor = (() => {
             if (totalPlannedMinor === null) return null;
@@ -7624,10 +7634,30 @@ export async function registerRoutes(
           })();
 
           const scheduledAgg = (() => {
-            if (!offerSource || !startDate || !Number.isFinite(internMonthlyMinor) || internMonthlyMinor <= 0) return null;
+            if (allHiredProposals.length === 0) return null;
+
+            // Find the earliest start date among all hired proposals
+            let earliestStartDate: Date | null = null;
+            for (const prop of allHiredProposals) {
+              const od = (prop as any)?.offerDetails ?? (prop as any)?.offer_details ?? {};
+              const sd = parseDateOnly(od?.startDate ?? od?.start_date);
+              if (sd) {
+                if (!earliestStartDate || sd.getTime() < earliestStartDate.getTime()) {
+                  earliestStartDate = sd;
+                }
+              }
+            }
+
+            if (!earliestStartDate || !Number.isFinite(internMonthlyMinor) || internMonthlyMinor <= 0) return null;
 
             const paidMonths = Math.floor((Number(payoutAgg.paidSumMinor ?? 0) || 0) / internMonthlyMinor);
-            const totalMonths = Math.max(1, monthsFromDuration((offerDetails as any)?.duration));
+            // Calculate total months from all hired proposals
+            let totalMonthsSum = 0;
+            for (const prop of allHiredProposals) {
+              const od = (prop as any)?.offerDetails ?? (prop as any)?.offer_details ?? {};
+              totalMonthsSum += monthsFromDuration(od?.duration);
+            }
+            const totalMonths = Math.max(1, totalMonthsSum);
             if (paidMonths >= totalMonths) {
               return {
                 nextDueIso: null as string | null,
@@ -7636,21 +7666,21 @@ export async function registerRoutes(
               };
             }
 
-            // Month-wise due date on the same day as the start date:
+            // Month-wise due date on the same day as the earliest start date:
             // Start: 2026-02-11 => 1st due: 2026-03-11
             // After paying 1 month => 2026-04-11, and so on.
-            const nextDueAt = addMonths(startDate, Math.max(0, paidMonths + 1));
+            const nextDueAt = addMonths(earliestStartDate, Math.max(0, paidMonths + 1));
             const nextDueIso = nextDueAt.toISOString();
 
             const now = new Date();
             const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
 
             const dueCount = (() => {
-              if (todayUtc.getTime() < startDate.getTime()) return 0;
-              const yDiff = todayUtc.getUTCFullYear() - startDate.getUTCFullYear();
-              const mDiff = todayUtc.getUTCMonth() - startDate.getUTCMonth();
+              if (todayUtc.getTime() < earliestStartDate.getTime()) return 0;
+              const yDiff = todayUtc.getUTCFullYear() - earliestStartDate.getUTCFullYear();
+              const mDiff = todayUtc.getUTCMonth() - earliestStartDate.getUTCMonth();
               let months = yDiff * 12 + mDiff;
-              const dueThisMonth = todayUtc.getUTCDate() >= startDate.getUTCDate();
+              const dueThisMonth = todayUtc.getUTCDate() >= earliestStartDate.getUTCDate();
               months += dueThisMonth ? 1 : 0;
               return Math.max(0, months);
             })();
@@ -7725,6 +7755,13 @@ export async function registerRoutes(
             return statusRaw;
           })();
 
+          const isFullTime = (() => {
+            if (!offerSource) return false;
+            const offer = (offerSource as any)?.offerDetails ?? (offerSource as any)?.offer_details ?? {};
+            const ft = offer?.fullTimeOffer;
+            return !!ft && typeof ft === "object";
+          })();
+
           return {
             user,
             onboarding,
@@ -7736,6 +7773,8 @@ export async function registerRoutes(
             onboardingStatus,
             offerCurrency,
             offerStatus,
+            isHired: !!hired,
+            isFullTime,
             payoutAgg: payoutAggFinal,
             payoutTotals: {
               totalPlannedMinor,
@@ -15728,6 +15767,8 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           remainingMonths: remainingMonthsCalc,
           status: remainingAmountMinor <= 0 ? "completed" : "active",
           findternScore: safeFindternScore,
+          isFullTime: hasFullTimeOffer,
+          annualCtc: hasFullTimeOffer ? annualCtc : 0,
         });
       }
 

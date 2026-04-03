@@ -804,6 +804,7 @@ export default function AdminProposalTrackerPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-slate-50/80">
+                    <TableHead className="w-[50px]">#</TableHead>
                     <TableHead className="w-[200px]">Intern</TableHead>
                     <TableHead>Employer / Project</TableHead>
                     <TableHead>Status</TableHead>
@@ -814,15 +815,16 @@ export default function AdminProposalTrackerPage() {
                 <TableBody>
                   {filteredProposals.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">No proposals found matching your filters.</TableCell>
+                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No proposals found matching your filters.</TableCell>
                     </TableRow>
                   ) : (
-                    filteredProposals.map((p) => {
+                    filteredProposals.map((p, idx) => {
                       const intern = internsById.get(p.internId);
                       const employer = employersById.get(p.employerId);
                       const project = projectsById.get(p.projectId);
                       return (
                         <TableRow key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                          <TableCell className="text-muted-foreground font-medium">{idx + 1}</TableCell>
                           <TableCell>
                             <div className="flex flex-col">
                               <span className="font-bold text-slate-900">{intern ? `${intern.firstName} ${intern.lastName}` : "Unknown"}</span>
@@ -884,6 +886,7 @@ export default function AdminProposalTrackerPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-slate-50/80">
+                    <TableHead className="w-[50px]">#</TableHead>
                     <TableHead className="w-[200px]">Intern</TableHead>
                     <TableHead>Employer / Project</TableHead>
                     <TableHead>Slots & Schedule</TableHead>
@@ -894,10 +897,10 @@ export default function AdminProposalTrackerPage() {
                 <TableBody>
                   {filteredInterviews.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">No interviews found matching your filters.</TableCell>
+                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No interviews found matching your filters.</TableCell>
                     </TableRow>
                   ) : (
-                    filteredInterviews.map((i) => {
+                    filteredInterviews.map((i, idx) => {
                       const intern = internsById.get(i.internId);
                       const employer = employersById.get(i.employerId);
                       const project = i.projectId ? projectsById.get(i.projectId) : null;
@@ -905,6 +908,7 @@ export default function AdminProposalTrackerPage() {
 
                       return (
                         <TableRow key={i.id} className="hover:bg-slate-50/50 transition-colors">
+                          <TableCell className="text-muted-foreground font-medium">{idx + 1}</TableCell>
                           <TableCell>
                             <div className="flex flex-col">
                               <span className="font-bold text-slate-900">{intern ? `${intern.firstName} ${intern.lastName}` : "Unknown"}</span>

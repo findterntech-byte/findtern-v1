@@ -23,7 +23,7 @@ import {
   Building2, FileText, ExternalLink, TrendingUp, Users, Search, Calendar, MapPin, Globe, Mail, Phone, Briefcase,
   CheckCircle2, Clock, AlertCircle, X, ChevronRight, DollarSign, ArrowUpRight, ArrowDownRight, Loader2,
   CreditCard, User, FileCheck, MoreHorizontal, Eye, ArrowLeft, ArrowRight, AlertTriangle,
-  ArrowDown, ArrowUp, Filter, EyeOff, Columns, MoreVertical, FileVideo, MessageSquare
+  ArrowDown, ArrowUp, Filter, EyeOff, Columns, MoreVertical, FileVideo, MessageSquare, SlidersHorizontal, XCircle
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useRoute } from "wouter";
@@ -159,6 +159,69 @@ function EmptyState({ icon: Icon, title, description }: { icon: React.ElementTyp
   );
 }
 
+interface FilterChipProps {
+  label: string;
+  value: string;
+  onRemove: () => void;
+}
+
+function FilterChip({ label, value, onRemove }: FilterChipProps) {
+  return (
+    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0E6049]/10 text-[#0E6049] border border-[#0E6049]/20 text-xs font-medium group hover:bg-[#0E6049]/20 transition-colors">
+      <span className="text-[#0E6049]/70">{label}:</span>
+      <span className="max-w-[120px] truncate">{value}</span>
+      <button
+        onClick={onRemove}
+        className="flex items-center justify-center h-4 w-4 rounded-full bg-[#0E6049]/20 hover:bg-[#0E6049]/40 text-[#0E6049] transition-colors"
+      >
+        <X className="h-2.5 w-2.5" />
+      </button>
+    </div>
+  );
+}
+
+function ActiveFiltersBar({ 
+  filters, 
+  onClearAll 
+}: { 
+  filters: { label: string; value: string; key: string }[]; 
+  onClearAll: () => void;
+}) {
+  if (filters.length === 0) return null;
+  
+  return (
+    <div className="flex flex-wrap items-center gap-2 p-3 bg-gradient-to-r from-[#0E6049]/5 to-transparent rounded-lg border border-[#0E6049]/10">
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <SlidersHorizontal className="h-3.5 w-3.5" />
+        <span>Active Filters:</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {filters.map((filter) => (
+          <FilterChip
+            key={filter.key}
+            label={filter.label}
+            value={filter.value}
+            onRemove={() => {
+              if (filter.key.startsWith("tabStatus_")) {
+                const tab = filter.key.replace("tabStatus_", "");
+              }
+            }}
+          />
+        ))}
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onClearAll}
+        className="ml-auto h-7 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+      >
+        <XCircle className="h-3.5 w-3.5 mr-1" />
+        Clear All
+      </Button>
+    </div>
+  );
+}
+
 export default function AdminCompanyDetailPage() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/admin/companies/:id");
@@ -188,11 +251,16 @@ export default function AdminCompanyDetailPage() {
   const [projectScopeFilter, setProjectScopeFilter] = useState<string>("");
   const [projectLocationFilter, setProjectLocationFilter] = useState<string>("");
   const [proposalTypeFilter, setProposalTypeFilter] = useState<string>("");
+  const [proposalDurationFrom, setProposalDurationFrom] = useState<string>("");
+  const [proposalDurationTo, setProposalDurationTo] = useState<string>("");
+  const [proposalCreatedDateFrom, setProposalCreatedDateFrom] = useState<string>("");
+  const [proposalCreatedDateTo, setProposalCreatedDateTo] = useState<string>("");
   const [hiredType, setHiredType] = useState<"all" | "fulltime" | "internship">("all");
   const [hiredStartDateFrom, setHiredStartDateFrom] = useState<string>("");
   const [hiredStartDateTo, setHiredStartDateTo] = useState<string>("");
   const [paymentsDateFrom, setPaymentsDateFrom] = useState<string>("");
   const [paymentsDateTo, setPaymentsDateTo] = useState<string>("");
+  const [paymentType, setPaymentType] = useState<"all" | "fulltime" | "internship">("all");
 
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
@@ -446,6 +514,27 @@ export default function AdminCompanyDetailPage() {
       const proposalType = hasFullTimeOffer ? "ppo" : "internship";
       const typeFilter = norm(proposalTypeFilter);
       if (typeFilter && proposalType !== typeFilter) return false;
+      const duration = String(offer?.duration ?? "").trim();
+      const durationNum = parseInt(duration, 10);
+      if (proposalDurationFrom || proposalDurationTo) {
+        if (!Number.isFinite(durationNum) || durationNum <= 0) return false;
+        if (proposalDurationFrom && durationNum < parseInt(proposalDurationFrom, 10)) return false;
+        if (proposalDurationTo && durationNum > parseInt(proposalDurationTo, 10)) return false;
+      }
+      if (proposalCreatedDateFrom || proposalCreatedDateTo) {
+        const createdAtRaw = p?.createdAt ?? p?.created_at ?? p?.createdAt ?? null;
+        if (!createdAtRaw) return false;
+        const createdAt = new Date(createdAtRaw);
+        if (Number.isNaN(createdAt.getTime())) return false;
+        if (proposalCreatedDateFrom) {
+          const fromDate = new Date(proposalCreatedDateFrom);
+          if (createdAt < fromDate) return false;
+        }
+        if (proposalCreatedDateTo) {
+          const toDate = new Date(proposalCreatedDateTo);
+          if (createdAt > toDate) return false;
+        }
+      }
       const hay = `${p?.internName ?? p?.candidateName ?? ""} ${p?.projectName ?? ""} ${p?.currency ?? ""}`;
       return matches(hay, tabSearch.proposals); 
     });
@@ -501,6 +590,12 @@ export default function AdminCompanyDetailPage() {
           if (paymentDate > toDate) return false;
         }
       }
+
+      if (paymentType !== "all") {
+        const orderType = String(o?.type ?? "internship").toLowerCase();
+        if (paymentType === "fulltime" && orderType !== "fulltime") return false;
+        if (paymentType === "internship" && orderType !== "internship") return false;
+      }
       
       return true; 
     });
@@ -510,6 +605,8 @@ export default function AdminCompanyDetailPage() {
       if (sf === "completed" && s !== "completed") return false; 
       if (sf === "active" && s !== "active") return false; 
       if (sf && sf !== "completed" && sf !== "active" && s !== sf) return false; 
+
+      if (o?.isFullTime) return false; 
 
       // Date range filter using next payment date and start date for visibility
       const nextPaymentDate = parseDate(o?.nextPaymentAt ?? o?.next_payment_at ?? o?.upcomingPaymentDate ?? o?.upcoming_payment_date ?? null)
@@ -573,7 +670,7 @@ export default function AdminCompanyDetailPage() {
     });
     const employerDuesList = paymentSummary?.internEmployerDues ?? [];
     return { projectList, proposalList, interviewList, paymentList, upcomingPaymentsList, hiredList, employerDuesList };
-  }, [orders, projects, proposals, interviews, tabSearch, tabStatus, tabSearchCurrency, paymentSummary, hiredType, hiredStartDateFrom, hiredStartDateTo, internUsers, projectFullTimeFilter, projectTimezoneFilter, projectScopeFilter, projectLocationFilter, proposalTypeFilter, columnFilters, upcomingFrom, upcomingTo, paymentsDateFrom, paymentsDateTo]);
+  }, [orders, projects, proposals, interviews, tabSearch, tabStatus, tabSearchCurrency, paymentSummary, hiredType, hiredStartDateFrom, hiredStartDateTo, internUsers, projectFullTimeFilter, projectTimezoneFilter, projectScopeFilter, projectLocationFilter, proposalTypeFilter, proposalDurationFrom, proposalDurationTo, proposalCreatedDateFrom, proposalCreatedDateTo, columnFilters, upcomingFrom, upcomingTo, paymentsDateFrom, paymentsDateTo, paymentType]);
 
   const pagination = useMemo(() => {
     const getList = (tab: TabKey) => { if (tab === "projects") return tabData.projectList; if (tab === "proposals") return tabData.proposalList; if (tab === "interviews") return tabData.interviewList; if (tab === "payments") return tabData.paymentList; if (tab === "upcomingPayments") return tabData.upcomingPaymentsList; return tabData.hiredList; };
@@ -588,9 +685,9 @@ export default function AdminCompanyDetailPage() {
 
   useEffect(() => { setTabPage((prev) => ({ ...prev, [activeTab]: 1 })); }, [activeTab, pageSize, tabSearch, tabStatus, columnFilters, paymentsDateFrom, paymentsDateTo]);
   useEffect(() => { setTabPage((prev) => ({ ...prev, projects: 1 })); }, [projectsCreatedDate]);
-  useEffect(() => { if (activeTab !== "hired") setHiredType("all"); }, [activeTab]);
+  useEffect(() => { setTabPage((prev) => ({ ...prev, proposals: 1 })); }, [proposalTypeFilter, proposalDurationFrom, proposalDurationTo, proposalCreatedDateFrom, proposalCreatedDateTo]);
   useEffect(() => { if (activeTab === "hired") setTabPage((prev) => ({ ...prev, hired: 1 })); }, [hiredType, hiredStartDateFrom, hiredStartDateTo]);
-  useEffect(() => { if (activeTab === "payments") setTabPage((prev) => ({ ...prev, payments: 1 })); }, [paymentsDateFrom, paymentsDateTo]);
+  useEffect(() => { if (activeTab === "payments") setTabPage((prev) => ({ ...prev, payments: 1 })); }, [paymentsDateFrom, paymentsDateTo, paymentType]);
 
   const formatDate = (raw: string | null) => { if (!raw) return "—"; const d = new Date(raw); if (Number.isNaN(d.getTime())) return String(raw); return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); };
   const formatAmount = (amountMinor: number, currencyCode: string) => { const cur = String(currencyCode || "INR").toUpperCase(); const locale = cur === "INR" ? "en-IN" : "en-US"; const major = Number.isFinite(amountMinor) ? amountMinor / 100 : 0; return new Intl.NumberFormat(locale, { style: "currency", currency: cur, maximumFractionDigits: 0 }).format(major || 0); };
@@ -616,7 +713,7 @@ export default function AdminCompanyDetailPage() {
     { key: "projectName", label: "Project" },
     { key: "type", label: "Type" },
     { key: "status", label: "Status", filterKey: "status" },
-    { key: "monthly", label: "Monthly" },
+    { key: "monthly", label: "Monthly", filterKey: "monthly" },
     { key: "duration", label: "Duration" },
     { key: "createdAt", label: "Created" },
   ];
@@ -667,20 +764,58 @@ export default function AdminCompanyDetailPage() {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className={cn("flex items-center gap-1.5 transition-colors", isFiltered && "text-primary")}>
+          <button className={cn(
+            "flex items-center gap-1.5 transition-all hover:text-[#0E6049] group",
+            isFiltered && "text-[#0E6049] font-medium"
+          )}>
             <span className="truncate">{col.label}</span>
-            {isFiltered && <span className="h-2 w-2 rounded-full bg-primary" />}
-            <MoreVertical className="h-4 w-4 opacity-50" />
+            {isFiltered ? (
+              <span className="h-4 w-4 rounded bg-[#0E6049] text-white text-[10px] flex items-center justify-center font-bold">F</span>
+            ) : (
+              <MoreVertical className="h-4 w-4 opacity-30 group-hover:opacity-60" />
+            )}
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-52">
-          <DropdownMenuLabel className="text-xs">{col.label}</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuItem disabled={!col.filterKey} onClick={openFilter}>
-              <Filter className="h-4 w-4" /> {isFiltered ? "Edit Filter" : "Add Filter"}
+        <DropdownMenuContent align="start" className="w-56 p-2">
+          <div className="px-2 py-1.5">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{col.label}</p>
+            {isFiltered && (
+              <p className="text-xs text-[#0E6049] mt-0.5">
+                Active: "{columnFilters[`${tab}_${col.key}`]}"
+              </p>
+            )}
+          </div>
+          <DropdownMenuSeparator className="my-2" />
+          <DropdownMenuItem 
+            disabled={!col.filterKey} 
+            onClick={openFilter}
+            className={cn(
+              "cursor-pointer rounded-md",
+              isFiltered ? "bg-[#0E6049]/10 text-[#0E6049] focus:bg-[#0E6049]/20" : "focus:bg-muted"
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              <span className="font-medium">{isFiltered ? "Edit Filter" : "Add Filter"}</span>
+            </div>
+          </DropdownMenuItem>
+          {isFiltered && (
+            <DropdownMenuItem 
+              onClick={() => {
+                setColumnFilters((prev) => {
+                  const next = { ...prev };
+                  delete next[`${tab}_${col.key}`];
+                  return next;
+                });
+              }}
+              className="cursor-pointer rounded-md focus:bg-destructive/10 text-destructive focus:text-destructive"
+            >
+              <div className="flex items-center gap-2">
+                <XCircle className="h-4 w-4" />
+                <span className="font-medium">Clear Filter</span>
+              </div>
             </DropdownMenuItem>
-          </DropdownMenuGroup>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     );
@@ -818,200 +953,402 @@ export default function AdminCompanyDetailPage() {
 
             <div className="p-6">
               {activeTab !== "profile" && (
-                <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
-                  <div className="text-lg font-semibold">{(activeTab === "upcomingPayments" ? "Upcoming Payments" : activeTab.charAt(0).toUpperCase() + activeTab.slice(1))} List</div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative w-full sm:w-[280px]">
-                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input className="h-10 pl-10 bg-background" placeholder={`Search ${activeTab}...`} value={tabSearch[activeTab]} onChange={(e) => setTabSearch((prev) => ({ ...prev, [activeTab]: e.target.value }))} />
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="text-lg font-semibold">{(activeTab === "upcomingPayments" ? "Upcoming Payments" : activeTab.charAt(0).toUpperCase() + activeTab.slice(1))} List</div>
+                      <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-[#0E6049]/10 text-[#0E6049]">
+                        {activeTab === "projects" ? tabData.projectList.length : 
+                         activeTab === "proposals" ? tabData.proposalList.length : 
+                         activeTab === "interviews" ? tabData.interviewList.length : 
+                         activeTab === "payments" ? tabData.paymentList.length : 
+                         activeTab === "upcomingPayments" ? tabData.upcomingPaymentsList.length : 
+                         tabData.hiredList.length} items
+                      </span>
                     </div>
-                    {activeTab === "projects" && <Input type="date" className="h-10 w-full sm:w-[160px] bg-background" value={projectsCreatedDate} onChange={(e) => setProjectsCreatedDate(e.target.value)} />}
-                    {activeTab === "hired" && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Select value={hiredType} onValueChange={(v) => setHiredType(v as "all" | "fulltime" | "internship")}>
-                          <SelectTrigger className="h-10 w-full sm:w-[160px] bg-background"><SelectValue placeholder="Hire Type" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Hires</SelectItem>
-                            <SelectItem value="fulltime">Full-time</SelectItem>
-                            <SelectItem value="internship">Internship</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <div className="flex items-center gap-2">
-                          <Input type="date" className="h-10 w-full sm:w-[140px] bg-background" value={hiredStartDateFrom} onChange={(e) => setHiredStartDateFrom(e.target.value)} placeholder="From" />
-                          <span className="text-muted-foreground">to</span>
-                          <Input type="date" className="h-10 w-full sm:w-[140px] bg-background" value={hiredStartDateTo} onChange={(e) => setHiredStartDateTo(e.target.value)} placeholder="To" />
-                          {(hiredStartDateFrom || hiredStartDateTo) && (
-                            <Button variant="ghost" size="sm" onClick={() => { setHiredStartDateFrom(""); setHiredStartDateTo(""); }} className="h-10 px-2 text-muted-foreground hover:text-destructive">
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="relative flex-1 min-w-[200px] max-w-[280px]">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input className="h-10 pl-10 pr-10 bg-background border-slate-200 focus:border-[#0E6049] focus:ring-[#0E6049]/20" placeholder={`Search ${activeTab}...`} value={tabSearch[activeTab]} onChange={(e) => setTabSearch((prev) => ({ ...prev, [activeTab]: e.target.value }))} />
+                        {tabSearch[activeTab] && (
+                          <button 
+                            onClick={() => setTabSearch((prev) => ({ ...prev, [activeTab]: "" }))}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
-                    )}
-                    {activeTab === "projects" && (
-                      <>
+                      
+                      {activeTab === "projects" && (
+                        <>
+                          <Select value={tabStatus[activeTab] || "__all__"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, [activeTab]: v === "__all__" ? "" : v }))}>
+                            <SelectTrigger className={cn("h-10 w-full sm:w-[140px] bg-background border-slate-200", tabStatus[activeTab] && "border-[#0E6049] bg-[#0E6049]/5")}>
+                              <SelectValue placeholder="Status" />
+                              {tabStatus[activeTab] && <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-[#0E6049]" />}
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__all__">All Status</SelectItem>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select value={projectFullTimeFilter} onValueChange={(v) => setProjectFullTimeFilter(v as "all" | "yes" | "no")}>
+                            <SelectTrigger className={cn("h-10 w-full sm:w-[150px] bg-background border-slate-200", projectFullTimeFilter !== "all" && "border-[#0E6049] bg-[#0E6049]/5")}>
+                              <SelectValue placeholder="Full-time" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Types</SelectItem>
+                              <SelectItem value="yes">Full-time Only</SelectItem>
+                              <SelectItem value="no">Internship Only</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select value={projectTimezoneFilter || "__all__"} onValueChange={(v) => setProjectTimezoneFilter(v === "__all__" ? "" : v)}>
+                            <SelectTrigger className={cn("h-10 w-full sm:w-[160px] bg-background border-slate-200", projectTimezoneFilter && "border-[#0E6049] bg-[#0E6049]/5")}>
+                              <SelectValue placeholder="Timezone" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__all__">All Timezones</SelectItem>
+                              {availableProjectTimezones.map(tz => (
+                                <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Select value={projectScopeFilter || "__all__"} onValueChange={(v) => setProjectScopeFilter(v === "__all__" ? "" : v)}>
+                            <SelectTrigger className={cn("h-10 w-full sm:w-[140px] bg-background border-slate-200", projectScopeFilter && "border-[#0E6049] bg-[#0E6049]/5")}>
+                              <SelectValue placeholder="Scope" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__all__">All Scopes</SelectItem>
+                              {availableProjectScopes.map(scope => (
+                                <SelectItem key={scope} value={scope}>{scope}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Select value={projectLocationFilter || "__all__"} onValueChange={(v) => setProjectLocationFilter(v === "__all__" ? "" : v)}>
+                            <SelectTrigger className={cn("h-10 w-full sm:w-[140px] bg-background border-slate-200", projectLocationFilter && "border-[#0E6049] bg-[#0E6049]/5")}>
+                              <SelectValue placeholder="Location" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__all__">All Locations</SelectItem>
+                              <SelectItem value="Onsite">Onsite</SelectItem>
+                              <SelectItem value="Hybrid">Hybrid</SelectItem>
+                              <SelectItem value="Remote">Remote</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <div className="flex items-center gap-2 bg-background border border-slate-200 rounded-md px-3 h-10">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <Input 
+                              type="date" 
+                              className="w-[130px] h-8 border-0 p-0 bg-transparent focus:ring-0 text-sm"
+                              value={projectsCreatedDate} 
+                              onChange={(e) => setProjectsCreatedDate(e.target.value)}
+                            />
+                            {projectsCreatedDate && (
+                              <button 
+                                onClick={() => setProjectsCreatedDate("")}
+                                className="text-muted-foreground hover:text-destructive"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                      
+                      {activeTab === "hired" && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Select value={hiredType} onValueChange={(v) => setHiredType(v as "all" | "fulltime" | "internship")}>
+                            <SelectTrigger className={cn("h-10 w-full sm:w-[150px] bg-background border-slate-200", hiredType !== "all" && "border-[#0E6049] bg-[#0E6049]/5")}>
+                              <SelectValue placeholder="Hire Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Hires</SelectItem>
+                              <SelectItem value="fulltime">Full-time</SelectItem>
+                              <SelectItem value="internship">Internship</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <div className="flex items-center gap-2 bg-background border border-slate-200 rounded-md px-3 h-10">
+                            <span className="text-xs text-muted-foreground">From</span>
+                            <Input 
+                              type="date" 
+                              className="w-[120px] h-8 border-0 p-0 bg-transparent focus:ring-0 text-sm"
+                              value={hiredStartDateFrom} 
+                              onChange={(e) => setHiredStartDateFrom(e.target.value)} 
+                            />
+                            <span className="text-xs text-muted-foreground">to</span>
+                            <Input 
+                              type="date" 
+                              className="w-[120px] h-8 border-0 p-0 bg-transparent focus:ring-0 text-sm"
+                              value={hiredStartDateTo} 
+                              onChange={(e) => setHiredStartDateTo(e.target.value)} 
+                            />
+                            {(hiredStartDateFrom || hiredStartDateTo) && (
+                              <button 
+                                onClick={() => { setHiredStartDateFrom(""); setHiredStartDateTo(""); }}
+                                className="text-muted-foreground hover:text-destructive"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {activeTab === "proposals" && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Select value={tabStatus.proposals || "all"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, proposals: v === "all" ? "" : v }))}>
+                            <SelectTrigger className={cn("w-[150px] h-10 bg-background border-slate-200", tabStatus.proposals && "border-[#0E6049] bg-[#0E6049]/5")}>
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Status ({proposals.length})</SelectItem>
+                              <SelectItem value="sent">Sent ({proposalStatusCounts["sent"] || 0})</SelectItem>
+                              <SelectItem value="pending">Pending ({proposalStatusCounts["pending"] || 0})</SelectItem>
+                              <SelectItem value="accepted">Accepted ({proposalStatusCounts["accepted"] || 0})</SelectItem>
+                              <SelectItem value="rejected">Rejected ({proposalStatusCounts["rejected"] || 0})</SelectItem>
+                              <SelectItem value="withdrawn">Withdrawn ({proposalStatusCounts["withdrawn"] || 0})</SelectItem>
+                              <SelectItem value="hired">Hired ({proposalStatusCounts["hired"] || 0})</SelectItem>
+                              <SelectItem value="expired">Expired ({proposalStatusCounts["expired"] || 0})</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select value={proposalTypeFilter || "all"} onValueChange={(v) => setProposalTypeFilter(v === "all" ? "" : v)}>
+                            <SelectTrigger className={cn("w-[140px] h-10 bg-background border-slate-200", proposalTypeFilter && "border-[#0E6049] bg-[#0E6049]/5")}>
+                              <SelectValue placeholder="Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Types</SelectItem>
+                              <SelectItem value="ppo">PPO</SelectItem>
+                              <SelectItem value="internship">Internship</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <div className="flex items-center gap-2 bg-background border border-slate-200 rounded-md px-3 h-10">
+                            <span className="text-xs text-muted-foreground">Duration:</span>
+                            <Input
+                              type="number"
+                              min="1"
+                              className="w-[60px] h-8 border-0 p-0 bg-transparent focus:ring-0 text-sm"
+                              placeholder="From"
+                              value={proposalDurationFrom}
+                              onChange={(e) => setProposalDurationFrom(e.target.value)}
+                            />
+                            <span className="text-xs text-muted-foreground">to</span>
+                            <Input
+                              type="number"
+                              min="1"
+                              className="w-[60px] h-8 border-0 p-0 bg-transparent focus:ring-0 text-sm"
+                              placeholder="To"
+                              value={proposalDurationTo}
+                              onChange={(e) => setProposalDurationTo(e.target.value)}
+                            />
+                            {(proposalDurationFrom || proposalDurationTo) && (
+                              <button 
+                                onClick={() => { setProposalDurationFrom(""); setProposalDurationTo(""); }}
+                                className="text-muted-foreground hover:text-destructive"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 bg-background border border-slate-200 rounded-md px-3 h-10">
+                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                            <Input
+                              type="date"
+                              className="w-[110px] h-8 border-0 p-0 bg-transparent focus:ring-0 text-sm"
+                              value={proposalCreatedDateFrom}
+                              onChange={(e) => setProposalCreatedDateFrom(e.target.value)}
+                            />
+                            <span className="text-xs text-muted-foreground">to</span>
+                            <Input
+                              type="date"
+                              className="w-[110px] h-8 border-0 p-0 bg-transparent focus:ring-0 text-sm"
+                              value={proposalCreatedDateTo}
+                              onChange={(e) => setProposalCreatedDateTo(e.target.value)}
+                            />
+                            {(proposalCreatedDateFrom || proposalCreatedDateTo) && (
+                              <button 
+                                onClick={() => { setProposalCreatedDateFrom(""); setProposalCreatedDateTo(""); }}
+                                className="text-muted-foreground hover:text-destructive"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {activeTab === "interviews" && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Select value={tabStatus.interviews || "all"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, interviews: v === "all" ? "" : v }))}>
+                            <SelectTrigger className={cn("w-[150px] h-10 bg-background border-slate-200", tabStatus.interviews && "border-[#0E6049] bg-[#0E6049]/5")}>
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All ({interviews.length})</SelectItem>
+                              <SelectItem value="sent">Sent ({interviewStatusCounts["sent"] || 0})</SelectItem>
+                              <SelectItem value="scheduled">Scheduled ({interviewStatusCounts["scheduled"] || 0})</SelectItem>
+                              <SelectItem value="completed">Completed ({interviewStatusCounts["completed"] || 0})</SelectItem>
+                              <SelectItem value="expired">Expired ({interviewStatusCounts["expired"] || 0})</SelectItem>
+                              <SelectItem value="missed">Missed ({interviewStatusCounts["missed"] || 0})</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select value={interviewTimezoneFilter || "__all__"} onValueChange={(v) => setInterviewTimezoneFilter(v === "__all__" ? "" : v)}>
+                            <SelectTrigger className={cn("w-[160px] h-10 bg-background border-slate-200", interviewTimezoneFilter && "border-[#0E6049] bg-[#0E6049]/5")}>
+                              <SelectValue placeholder="Timezone" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-[300px]">
+                              <SelectItem value="__all__">
+                                <div className="flex items-center justify-between w-full">
+                                  <span>All Timezones</span>
+                                  <span className="ml-2 text-xs bg-slate-100 px-1.5 py-0.5 rounded-full">{interviews.length}</span>
+                                </div>
+                              </SelectItem>
+                              {availableTimezones.map(tz => {
+                                const count = interviews.filter((i: any) => String(i?.timezone ?? "").trim() === tz).length;
+                                return (
+                                  <SelectItem key={tz} value={tz}>
+                                    <div className="flex items-center justify-between w-full">
+                                      <span>{tz}</span>
+                                      <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">{count}</span>
+                                    </div>
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      
+                      {activeTab === "payments" && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Select value={tabStatus[activeTab] || "__all__"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, [activeTab]: v === "__all__" ? "" : v }))}>
+                            <SelectTrigger className={cn("h-10 w-full sm:w-[140px] bg-background border-slate-200", tabStatus[activeTab] && "border-[#0E6049] bg-[#0E6049]/5")}>
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__all__">All Status</SelectItem>
+                              <SelectItem value="paid">Paid</SelectItem>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="failed">Failed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select value={tabSearchCurrency.payments || "__all__"} onValueChange={(v) => setTabSearchCurrency((prev) => ({ ...prev, payments: v === "__all__" ? "" : v }))}>
+                            <SelectTrigger className={cn("h-10 w-full sm:w-[120px] bg-background border-slate-200", tabSearchCurrency.payments && "border-[#0E6049] bg-[#0E6049]/5")}>
+                              <SelectValue placeholder="Currency" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__all__">All Currency</SelectItem>
+                              <SelectItem value="INR">INR</SelectItem>
+                              <SelectItem value="USD">USD</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select value={paymentType} onValueChange={(v) => setPaymentType(v as "all" | "fulltime" | "internship")}>
+                            <SelectTrigger className={cn("h-10 w-full sm:w-[130px] bg-background border-slate-200", paymentType !== "all" && "border-[#0E6049] bg-[#0E6049]/5")}>
+                              <SelectValue placeholder="Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Types</SelectItem>
+                              <SelectItem value="fulltime">Full-time</SelectItem>
+                              <SelectItem value="internship">Internship</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <div className="flex items-center gap-2 bg-background border border-slate-200 rounded-md px-3 h-10">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <Input type="date" className="w-[120px] h-8 border-0 p-0 bg-transparent focus:ring-0 text-sm" value={paymentsDateFrom} onChange={(e) => setPaymentsDateFrom(e.target.value)} />
+                            <span className="text-xs text-muted-foreground">to</span>
+                            <Input type="date" className="w-[120px] h-8 border-0 p-0 bg-transparent focus:ring-0 text-sm" value={paymentsDateTo} onChange={(e) => setPaymentsDateTo(e.target.value)} />
+                            {(paymentsDateFrom || paymentsDateTo) && (
+                              <button 
+                                onClick={() => { setPaymentsDateFrom(""); setPaymentsDateTo(""); }}
+                                className="text-muted-foreground hover:text-destructive"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {activeTab === "upcomingPayments" && (
                         <Select value={tabStatus[activeTab] || "__all__"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, [activeTab]: v === "__all__" ? "" : v }))}>
-                          <SelectTrigger className="h-10 w-full sm:w-[140px] bg-background"><SelectValue placeholder="Status" /></SelectTrigger>
+                          <SelectTrigger className={cn("h-10 w-full sm:w-[160px] bg-background border-slate-200", tabStatus[activeTab] && "border-[#0E6049] bg-[#0E6049]/5")}>
+                            <SelectValue placeholder="Status" />
+                          </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__all__">All Status</SelectItem>
                             <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="inactive">Inactive</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
                           </SelectContent>
                         </Select>
-                        <Select value={projectFullTimeFilter} onValueChange={(v) => setProjectFullTimeFilter(v as "all" | "yes" | "no")}>
-                          <SelectTrigger className="h-10 w-full sm:w-[140px] bg-background"><SelectValue placeholder="Full-time" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All</SelectItem>
-                            <SelectItem value="yes">Full-time: Yes</SelectItem>
-                            <SelectItem value="no">Full-time: No</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Select value={projectTimezoneFilter || "__all__"} onValueChange={(v) => setProjectTimezoneFilter(v === "__all__" ? "" : v)}>
-                          <SelectTrigger className="h-10 w-full sm:w-[160px] bg-background"><SelectValue placeholder="Timezone" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__all__">All Timezones</SelectItem>
-                            {availableProjectTimezones.map(tz => (
-                              <SelectItem key={tz} value={tz}>{tz}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Select value={projectScopeFilter || "__all__"} onValueChange={(v) => setProjectScopeFilter(v === "__all__" ? "" : v)}>
-                          <SelectTrigger className="h-10 w-full sm:w-[140px] bg-background"><SelectValue placeholder="Scope" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__all__">All Scopes</SelectItem>
-                            {availableProjectScopes.map(scope => (
-                              <SelectItem key={scope} value={scope}>{scope}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Select value={projectLocationFilter || "__all__"} onValueChange={(v) => setProjectLocationFilter(v === "__all__" ? "" : v)}>
-                          <SelectTrigger className="h-10 w-full sm:w-[140px] bg-background"><SelectValue placeholder="Location" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__all__">All Locations</SelectItem>
-                            <SelectItem value="Onsite">Onsite</SelectItem>
-                            <SelectItem value="Hybrid">Hybrid</SelectItem>
-                            <SelectItem value="Remote">Remote</SelectItem>
-                           
-                          </SelectContent>
-                        </Select>
-                      </>
-                    )}
-                    {activeTab === "proposals" && (
-                      <div className="flex gap-2">
-                        <Select value={tabStatus.proposals || "all"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, proposals: v === "all" ? "" : v }))}>
-                          <SelectTrigger className="w-[150px] h-8 text-xs bg-white">
-                            <SelectValue placeholder="Status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Status ({proposals.length})</SelectItem>
-                            <SelectItem value="sent">Sent ({proposalStatusCounts["sent"] || 0})</SelectItem>
-                            <SelectItem value="pending">Pending ({proposalStatusCounts["pending"] || 0})</SelectItem>
-                            <SelectItem value="accepted">Accepted ({proposalStatusCounts["accepted"] || 0})</SelectItem>
-                            <SelectItem value="rejected">Rejected ({proposalStatusCounts["rejected"] || 0})</SelectItem>
-                            <SelectItem value="withdrawn">Withdrawn ({proposalStatusCounts["withdrawn"] || 0})</SelectItem>
-                            <SelectItem value="hired">Hired ({proposalStatusCounts["hired"] || 0})</SelectItem>
-                            <SelectItem value="expired">Expired ({proposalStatusCounts["expired"] || 0})</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Select value={proposalTypeFilter || "all"} onValueChange={(v) => setProposalTypeFilter(v === "all" ? "" : v)}>
-                          <SelectTrigger className="w-[150px] h-8 text-xs bg-white">
-                            <SelectValue placeholder="Proposal Type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Types</SelectItem>
-                            <SelectItem value="ppo">PPO</SelectItem>
-                            <SelectItem value="internship">Internship</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    {activeTab === "interviews" && (
-                      <>
-                        <Select value={tabStatus.interviews || "all"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, interviews: v === "all" ? "" : v }))}>
-                          <SelectTrigger className="w-[150px] h-8 text-xs bg-white">
-                            <SelectValue placeholder="Status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Status ({interviews.length})</SelectItem>
-                            <SelectItem value="sent">Sent ({interviewStatusCounts["sent"] || 0})</SelectItem>
-                            <SelectItem value="scheduled">Scheduled ({interviewStatusCounts["scheduled"] || 0})</SelectItem>
-                            <SelectItem value="completed">Completed ({interviewStatusCounts["completed"] || 0})</SelectItem>
-                            <SelectItem value="expired">Expired ({interviewStatusCounts["expired"] || 0})</SelectItem>
-                            <SelectItem value="missed">Missed ({interviewStatusCounts["missed"] || 0})</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Select value={interviewTimezoneFilter || "__all__"} onValueChange={(v) => setInterviewTimezoneFilter(v === "__all__" ? "" : v)}>
-                          <SelectTrigger className="w-[160px] h-8 text-xs bg-white border-slate-200">
-                            <SelectValue placeholder="Filter by Timezone" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-[300px]">
-                            <SelectItem value="__all__">
-                              <div className="flex items-center justify-between w-full">
-                                <span>All Timezones</span>
-                                <span className="ml-2 text-xs bg-slate-100 px-1.5 py-0.5 rounded-full">{interviews.length}</span>
-                              </div>
-                            </SelectItem>
-                            {availableTimezones.map(tz => {
-                              const count = interviews.filter((i: any) => String(i?.timezone ?? "").trim() === tz).length;
-                              return (
-                                <SelectItem key={tz} value={tz}>
-                                  <div className="flex items-center justify-between w-full">
-                                    <span>{tz}</span>
-                                    <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">{count}</span>
-                                  </div>
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectContent>
-                        </Select>
-                      </>
-                    )}
-                    {activeTab === "payments" && (
-                      <>
-                        <Select value={tabStatus[activeTab] || "__all__"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, [activeTab]: v === "__all__" ? "" : v }))}>
-                          <SelectTrigger className="h-10 w-full sm:w-[140px] bg-background"><SelectValue placeholder="Status" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__all__">All Status</SelectItem>
-                            <SelectItem value="paid">Paid</SelectItem>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="failed">Failed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Select value={tabSearchCurrency.payments || "__all__"} onValueChange={(v) => setTabSearchCurrency((prev) => ({ ...prev, payments: v === "__all__" ? "" : v }))}>
-                          <SelectTrigger className="h-10 w-full sm:w-[120px] bg-background"><SelectValue placeholder="Currency" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__all__">All Currency</SelectItem>
-                            <SelectItem value="INR">INR</SelectItem>
-                            <SelectItem value="USD">USD</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <div className="flex items-center gap-2">
-                          <Input type="date" className="h-10 w-full sm:w-[140px] bg-background" value={paymentsDateFrom} onChange={(e) => setPaymentsDateFrom(e.target.value)} placeholder="From" />
-                          <span className="text-muted-foreground">to</span>
-                          <Input type="date" className="h-10 w-full sm:w-[140px] bg-background" value={paymentsDateTo} onChange={(e) => setPaymentsDateTo(e.target.value)} placeholder="To" />
-                          {(paymentsDateFrom || paymentsDateTo) && (
-                            <Button variant="ghost" size="sm" onClick={() => { setPaymentsDateFrom(""); setPaymentsDateTo(""); }} className="h-10 px-2 text-muted-foreground hover:text-destructive">
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </>
-                    )}
-                    {activeTab === "upcomingPayments" && (
-                      <Select value={tabStatus[activeTab] || "__all__"} onValueChange={(v) => setTabStatus((prev) => ({ ...prev, [activeTab]: v === "__all__" ? "" : v }))}>
-                        <SelectTrigger className="h-10 w-full sm:w-[160px] bg-background"><SelectValue placeholder="Status" /></SelectTrigger>
+                      )}
+                      
+                      <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v) as 5 | 10 | 25 | 50)}>
+                        <SelectTrigger className="h-10 w-[110px] bg-background border-slate-200">
+                          <SelectValue placeholder="Rows" />
+                        </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__all__">All Status</SelectItem>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="5">5 rows</SelectItem>
+                          <SelectItem value="10">10 rows</SelectItem>
+                          <SelectItem value="25">25 rows</SelectItem>
+                          <SelectItem value="50">50 rows</SelectItem>
                         </SelectContent>
                       </Select>
-                    )}
-                    <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v) as 5 | 10 | 25 | 50)}>
-                      <SelectTrigger className="h-10 w-[120px] bg-background"><SelectValue placeholder="Rows" /></SelectTrigger>
-                      <SelectContent><SelectItem value="5">5 / Page</SelectItem><SelectItem value="10">10 / Page</SelectItem><SelectItem value="25">25 / Page</SelectItem><SelectItem value="50">50 / Page</SelectItem></SelectContent>
-                    </Select>
+                    </div>
                   </div>
+                  
+                  {/* Active Filters Bar */}
+                  <ActiveFiltersBar 
+                    filters={[
+                      tabSearch[activeTab] && activeTab !== "profile" ? { label: "Search", value: tabSearch[activeTab], key: `search_${activeTab}` } : null,
+                      tabStatus[activeTab] ? { label: "Status", value: tabStatus[activeTab], key: `tabStatus_${activeTab}` } : null,
+                      activeTab === "projects" && projectFullTimeFilter !== "all" ? { label: "Type", value: projectFullTimeFilter === "yes" ? "Full-time" : "Internship", key: "projectFullTimeFilter" } : null,
+                      activeTab === "projects" && projectTimezoneFilter ? { label: "Timezone", value: projectTimezoneFilter, key: "projectTimezoneFilter" } : null,
+                      activeTab === "projects" && projectScopeFilter ? { label: "Scope", value: projectScopeFilter, key: "projectScopeFilter" } : null,
+                      activeTab === "projects" && projectLocationFilter ? { label: "Location", value: projectLocationFilter, key: "projectLocationFilter" } : null,
+                      activeTab === "projects" && projectsCreatedDate ? { label: "Created", value: projectsCreatedDate, key: "projectsCreatedDate" } : null,
+                      activeTab === "hired" && hiredType !== "all" ? { label: "Hire Type", value: hiredType === "fulltime" ? "Full-time" : "Internship", key: "hiredType" } : null,
+                      activeTab === "hired" && (hiredStartDateFrom || hiredStartDateTo) ? { label: "Start Date", value: `${hiredStartDateFrom || "..."} - ${hiredStartDateTo || "..."}`, key: "hiredStartDate" } : null,
+                      activeTab === "proposals" && proposalTypeFilter ? { label: "Type", value: proposalTypeFilter === "ppo" ? "PPO" : "Internship", key: "proposalTypeFilter" } : null,
+                      activeTab === "proposals" && (proposalDurationFrom || proposalDurationTo) ? { label: "Duration", value: `${proposalDurationFrom || "1"} - ${proposalDurationTo || "..."} mo`, key: "proposalDuration" } : null,
+                      activeTab === "proposals" && (proposalCreatedDateFrom || proposalCreatedDateTo) ? { label: "Created", value: `${proposalCreatedDateFrom || "..."} - ${proposalCreatedDateTo || "..."}`, key: "proposalCreatedDate" } : null,
+                      activeTab === "interviews" && interviewTimezoneFilter ? { label: "Timezone", value: interviewTimezoneFilter, key: "interviewTimezoneFilter" } : null,
+                      activeTab === "payments" && tabSearchCurrency.payments ? { label: "Currency", value: tabSearchCurrency.payments, key: "currency" } : null,
+                      activeTab === "payments" && paymentType !== "all" ? { label: "Type", value: paymentType === "fulltime" ? "Full-time" : "Internship", key: "paymentType" } : null,
+                      activeTab === "payments" && (paymentsDateFrom || paymentsDateTo) ? { label: "Date", value: `${paymentsDateFrom || "..."} - ${paymentsDateTo || "..."}`, key: "paymentsDate" } : null,
+                    ].filter(Boolean) as { label: string; value: string; key: string }[]}
+                    onClearAll={() => {
+                      setTabSearch((prev) => ({ ...prev, [activeTab]: "" }));
+                      setTabStatus((prev) => ({ ...prev, [activeTab]: "" }));
+                      if (activeTab === "projects") {
+                        setProjectFullTimeFilter("all");
+                        setProjectTimezoneFilter("");
+                        setProjectScopeFilter("");
+                        setProjectLocationFilter("");
+                        setProjectsCreatedDate("");
+                      }
+                      if (activeTab === "hired") {
+                        setHiredType("all");
+                        setHiredStartDateFrom("");
+                        setHiredStartDateTo("");
+                      }
+                      if (activeTab === "proposals") {
+                        setProposalTypeFilter("");
+                        setProposalDurationFrom("");
+                        setProposalDurationTo("");
+                        setProposalCreatedDateFrom("");
+                        setProposalCreatedDateTo("");
+                      }
+                      if (activeTab === "interviews") {
+                        setInterviewTimezoneFilter("");
+                      }
+                      if (activeTab === "payments") {
+                        setTabSearchCurrency((prev) => ({ ...prev, payments: "" }));
+                        setPaymentsDateFrom("");
+                        setPaymentsDateTo("");
+                        setPaymentType("all");
+                      }
+                    }}
+                  />
                 </div>
               )}
 
@@ -1131,15 +1468,9 @@ export default function AdminCompanyDetailPage() {
                               const fullTimeOffer = (offer as any)?.fullTimeOffer ?? null;
                               const hasFullTimeOffer = !!fullTimeOffer && typeof fullTimeOffer === "object";
                               const currency = String(p?.currency ?? offer?.currency ?? "INR").toUpperCase();
-                              const monthly = typeof offer?.monthlyAmount === "number" ? offer.monthlyAmount : 0;
+                              const monthlyAmount = typeof offer?.monthlyAmount === "number" ? offer.monthlyAmount : (typeof p?.monthlyAmount === "number" ? p.monthlyAmount : 0);
                               const duration = String(offer?.duration ?? offer?.internshipDuration ?? "").trim();
-                              const months = monthsFromDuration(duration);
-                              const totalRaw = Number(offer?.totalPrice ?? offer?.total_price ?? 0);
-                              const derivedTotal = Number.isFinite(monthly) ? Number(monthly) * months : 0;
-                              const total = Number.isFinite(totalRaw) && totalRaw > 0 ? totalRaw : derivedTotal;
                               const annualCtc = Number((fullTimeOffer as any)?.annualCtc ?? 0);
-                              const monthlyInr = currency === "USD" ? convertToInrIfUsd(monthly, currency) : monthly;
-                              const annualCtcInr = currency === "USD" ? convertToInrIfUsd(annualCtc, currency) : annualCtc;
                               const proposalType = hasFullTimeOffer ? "PPO" : "Internship";
                               const createdAtRaw = p?.createdAt ?? p?.created_at ?? null;
                               const createdAt = createdAtRaw ? (() => { const d = new Date(createdAtRaw); return Number.isNaN(d.getTime()) ? String(createdAtRaw) : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); })() : "—";
@@ -1148,18 +1479,29 @@ export default function AdminCompanyDetailPage() {
                               const internUser = internUsers[internId];
                               const internExtra = internUser?.extraData ?? {};
                               const findternScore = Number(internExtra?.findternScore ?? 0);
-                              const internFromDues = (paymentSummary?.internEmployerDues ?? []).find((d: any) => d?.internId === internId);
-                              const paidAmountMinor = Number(internFromDues?.paidAmountMinor ?? 0);
                               const monthlyHours = 160;
-                              const monthlyFromHourly = monthly > 0 ? monthly : (() => {
-                                if (!Number.isFinite(findternScore) || findternScore === 0) return 0;
-                                if (findternScore < 6) return currency === "USD" ? 50 : 5000;
-                                if (findternScore < 8) return currency === "USD" ? 1 * monthlyHours : 100 * monthlyHours;
-                                return currency === "USD" ? 2 * monthlyHours : 200 * monthlyHours;
-                              })();
-                              const displayAmount = hasFullTimeOffer && annualCtc > 0 
-                                ? annualCtc 
-                                : (findternScore > 0 && findternScore < 6 && paidAmountMinor > 0 ? 5000 : monthlyFromHourly);
+                              const isBelowSix = findternScore > 0 && findternScore < 6;
+                              let displayAmount = 0;
+                              let displayLabel = "";
+                              if (hasFullTimeOffer && annualCtc > 0) {
+                                displayAmount = annualCtc;
+                                displayLabel = "CTC";
+                              } else if (isBelowSix) {
+                                displayAmount = currency === "USD" ? 50 : 5000;
+                                displayLabel = "One time";
+                              } else if (monthlyAmount > 0) {
+                                displayAmount = monthlyAmount;
+                                displayLabel = "Monthly";
+                              } else if (findternScore >= 6) {
+                                if (findternScore < 8) {
+                                  displayAmount = currency === "USD" ? 1 * monthlyHours : 100 * monthlyHours;
+                                  displayLabel = "Monthly";
+                                } else {
+                                  displayAmount = currency === "USD" ? 2 * monthlyHours : 200 * monthlyHours;
+                                  displayLabel = "Monthly";
+                                }
+                              }
+                              const durationDisplay = hasFullTimeOffer ? "Full-time" : (duration || "—");
                               return (
                                 <TableRow key={String(p?.id ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
                                   <TableCell className="font-medium">
@@ -1177,15 +1519,15 @@ export default function AdminCompanyDetailPage() {
                                   <TableCell>{String(p?.projectName ?? "—")}</TableCell>
                                   <TableCell><Badge variant="outline">{proposalType}</Badge></TableCell>
                                   <TableCell><StatusBadge status={displayProposalStatus(p?.status)} /></TableCell>
-                                  <TableCell className="font-medium text-emerald-600">
+                                  <TableCell className="font-medium">
                                     {displayAmount > 0 ? (
                                       <div className="flex flex-col items-start gap-0.5">
-                                        <span>{formatMajorMoney(displayAmount, currency)}</span>
-                                        <span className="text-xs text-muted-foreground">{hasFullTimeOffer ? "Annual CTC" : "Monthly stipend"}</span>
+                                        <span className="text-emerald-600">{currency === "USD" ? "$" : "₹"}{displayAmount.toLocaleString("en-IN")}</span>
+                                        <span className={cn("text-[10px]", displayLabel === "One time" ? "text-amber-600 font-medium" : "text-muted-foreground")}>{displayLabel}</span>
                                       </div>
                                     ) : "—"}
                                   </TableCell>
-                                  <TableCell>{hasFullTimeOffer ? "Full-time" : duration || "—"}</TableCell>
+                                  <TableCell className="text-muted-foreground">{durationDisplay}</TableCell>
                                   <TableCell className="text-muted-foreground">{createdAt}</TableCell>
                                   <TableCell className="text-right">
                                     <div className="flex justify-end gap-2">
@@ -1385,18 +1727,16 @@ export default function AdminCompanyDetailPage() {
                                 return due > 0;
                               }).length;
                               const completed = tabData.upcomingPaymentsList.length - active;
-                              const totalDue = tabData.upcomingPaymentsList.reduce((sum: number, d: any) => sum + Number(d?.dueAmountMinor ?? d?.amountMinor ?? 0), 0);
                               return (
                                 <>
                                   <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
-                                    <div className="h-2 w-2 rounded-full bg-amber-500" />
+                                    <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
                                     <span className="text-xs font-medium text-amber-700">{active} Active</span>
                                   </div>
                                   <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
                                     <div className="h-2 w-2 rounded-full bg-emerald-500" />
                                     <span className="text-xs font-medium text-emerald-700">{completed} Completed</span>
                                   </div>
-                                  
                                 </>
                               );
                             })()}
@@ -1406,84 +1746,98 @@ export default function AdminCompanyDetailPage() {
 
                       <div className="p-4 sm:p-5">
                         {/* Filter Tabs */}
-                        <div className="space-y-3 mb-5">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-medium text-muted-foreground mr-2">Status:</span>
-                            {[
-                              { key: "all", label: "All", count: tabData.upcomingPaymentsList.length },
-                              { key: "active", label: "Active", count: tabData.upcomingPaymentsList.filter((d: any) => { const due = Number(d?.dueAmountMinor ?? d?.dueAmount ?? 0); return due > 0; }).length, color: "amber" },
-                              { key: "completed", label: "Completed", count: tabData.upcomingPaymentsList.filter((d: any) => { const due = Number(d?.dueAmountMinor ?? d?.dueAmount ?? 0); return due <= 0; }).length, color: "emerald" },
-                            ].map((filter) => (
-                              <button
-                                key={filter.key}
-                                onClick={() => setTabStatus((prev) => ({ ...prev, upcomingPayments: filter.key === "all" ? "" : filter.key }))}
-                                className={cn(
-                                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
-                                  (filter.key === "all" && !tabStatus.upcomingPayments) || tabStatus.upcomingPayments === filter.key
-                                    ? filter.color === "amber" ? "bg-amber-100 text-amber-700 border border-amber-300"
-                                    : filter.color === "emerald" ? "bg-emerald-100 text-emerald-700 border border-emerald-300"
-                                    : "bg-[#0E6049] text-white border border-[#0E6049]"
-                                    : "bg-muted text-muted-foreground hover:bg-muted/80 border border-transparent"
-                                )}
-                              >
-                                {filter.label}
-                                <span className={cn(
-                                  "px-1.5 py-0.5 rounded-full text-[10px]",
-                                  (filter.key === "all" && !tabStatus.upcomingPayments) || tabStatus.upcomingPayments === filter.key
-                                    ? filter.color === "amber" ? "bg-amber-200 text-amber-800"
-                                    : filter.color === "emerald" ? "bg-emerald-200 text-emerald-800"
-                                    : "bg-white/20"
-                                    : "bg-background"
-                                )}>
-                                  {filter.count}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                          
-                          {/* Currency Filter */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-medium text-muted-foreground mr-2">Currency:</span>
-                            {[
-                              { key: "all", label: "All", count: tabData.upcomingPaymentsList.length },
-                              { key: "INR", label: "₹ INR", count: tabData.upcomingPaymentsList.filter((d: any) => String(d?.currency ?? "INR").toUpperCase() === "INR").length, color: "blue" },
-                              { key: "USD", label: "$ USD", count: tabData.upcomingPaymentsList.filter((d: any) => String(d?.currency ?? "INR").toUpperCase() === "USD").length, color: "blue" },
-                            ].map((filter) => (
-                              <button
-                                key={`currency-${filter.key}`}
-                                onClick={() => setTabSearch((prev) => ({ ...prev, upcomingPayments: filter.key === "all" ? "" : filter.key }))}
-                                className={cn(
-                                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
-                                  tabSearch.upcomingPayments === filter.key
-                                    ? filter.key === "INR" ? "bg-blue-100 text-blue-700 border border-blue-300"
-                                    : filter.key === "USD" ? "bg-purple-100 text-purple-700 border border-purple-300"
-                                    : "bg-[#0E6049] text-white border border-[#0E6049]"
-                                    : "bg-muted text-muted-foreground hover:bg-muted/80 border border-transparent"
-                                )}
-                              >
-                                {filter.label}
-                                <span className={cn(
-                                  "px-1.5 py-0.5 rounded-full text-[10px]",
-                                  tabSearch.upcomingPayments === filter.key
-                                    ? filter.color === "blue" ? "bg-blue-200 text-blue-800"
-                                    : "bg-white/20"
-                                    : "bg-background"
-                                )}>
-                                  {filter.count}
-                                </span>
-                              </button>
-                            ))}
+                        <div className="space-y-4">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex items-center gap-2 mr-2">
+                              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-xs font-medium text-muted-foreground">Filters:</span>
+                            </div>
+                            
+                            {/* Status Filter Pills */}
+                            <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+                              {[
+                                { key: "all", label: "All", count: tabData.upcomingPaymentsList.length },
+                                { key: "active", label: "Active", count: tabData.upcomingPaymentsList.filter((d: any) => { const due = Number(d?.dueAmountMinor ?? d?.dueAmount ?? 0); return due > 0; }).length, color: "amber" },
+                                { key: "completed", label: "Completed", count: tabData.upcomingPaymentsList.filter((d: any) => { const due = Number(d?.dueAmountMinor ?? d?.dueAmount ?? 0); return due <= 0; }).length, color: "emerald" },
+                              ].map((filter) => (
+                                <button
+                                  key={filter.key}
+                                  onClick={() => setTabStatus((prev) => ({ ...prev, upcomingPayments: filter.key === "all" ? "" : filter.key }))}
+                                  className={cn(
+                                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                                    (filter.key === "all" && !tabStatus.upcomingPayments) || tabStatus.upcomingPayments === filter.key
+                                      ? filter.color === "amber" ? "bg-amber-500 text-white shadow-sm"
+                                      : filter.color === "emerald" ? "bg-emerald-500 text-white shadow-sm"
+                                      : "bg-white text-slate-700 shadow-sm"
+                                      : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+                                  )}
+                                >
+                                  {filter.label}
+                                  <span className={cn(
+                                    "px-1.5 py-0.5 rounded-full text-[10px]",
+                                    (filter.key === "all" && !tabStatus.upcomingPayments) || tabStatus.upcomingPayments === filter.key
+                                      ? "bg-white/20"
+                                      : "bg-slate-200"
+                                  )}>
+                                    {filter.count}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                            
+                            {/* Currency Filter Pills */}
+                            <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+                              {[
+                                { key: "all", label: "All Currency", count: tabData.upcomingPaymentsList.length },
+                                { key: "INR", label: "₹ INR", count: tabData.upcomingPaymentsList.filter((d: any) => String(d?.currency ?? "INR").toUpperCase() === "INR").length },
+                                { key: "USD", label: "$ USD", count: tabData.upcomingPaymentsList.filter((d: any) => String(d?.currency ?? "INR").toUpperCase() === "USD").length },
+                              ].map((filter) => (
+                                <button
+                                  key={`currency-${filter.key}`}
+                                  onClick={() => setTabSearch((prev) => ({ ...prev, upcomingPayments: filter.key === "all" ? "" : filter.key }))}
+                                  className={cn(
+                                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                                    tabSearch.upcomingPayments === filter.key
+                                      ? "bg-[#0E6049] text-white shadow-sm"
+                                      : "text-slate-600 hover:text-slate-900 hover:bg-white/50 bg-white"
+                                  )}
+                                >
+                                  {filter.label}
+                                  <span className={cn(
+                                    "px-1.5 py-0.5 rounded-full text-[10px]",
+                                    tabSearch.upcomingPayments === filter.key ? "bg-white/20" : "bg-slate-200"
+                                  )}>
+                                    {filter.count}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
                           </div>
 
                           {/* Date filter */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-medium text-muted-foreground mr-2">Date range:</span>
-                            <Input type="date" value={upcomingFrom} onChange={(e) => setUpcomingFrom(e.target.value)} className="h-8 w-40" />
-                            <span className="text-xs text-muted-foreground">to</span>
-                            <Input type="date" value={upcomingTo} onChange={(e) => setUpcomingTo(e.target.value)} className="h-8 w-40" />
-                            <Button size="sm" type="button" variant="outline" onClick={() => { setUpcomingFrom(""); setUpcomingTo(""); }}>
-                              Clear
-                            </Button>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex items-center gap-2 bg-background border border-slate-200 rounded-md px-3 h-10">
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              <Input type="date" value={upcomingFrom} onChange={(e) => setUpcomingFrom(e.target.value)} className="w-[120px] h-8 border-0 p-0 bg-transparent focus:ring-0 text-sm" />
+                              <span className="text-xs text-muted-foreground">to</span>
+                              <Input type="date" value={upcomingTo} onChange={(e) => setUpcomingTo(e.target.value)} className="w-[120px] h-8 border-0 p-0 bg-transparent focus:ring-0 text-sm" />
+                              {(upcomingFrom || upcomingTo) && (
+                                <button 
+                                  onClick={() => { setUpcomingFrom(""); setUpcomingTo(""); }}
+                                  className="text-muted-foreground hover:text-destructive"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                            
+                            {(upcomingFrom || upcomingTo) && (
+                              <FilterChip 
+                                label="Date Range" 
+                                value={`${upcomingFrom || "..."} - ${upcomingTo || "..."}`}
+                                onRemove={() => { setUpcomingFrom(""); setUpcomingTo(""); }}
+                              />
+                            )}
                           </div>
                         </div>
 
@@ -2054,28 +2408,59 @@ export default function AdminCompanyDetailPage() {
         </Dialog>
 
         <Dialog open={openFilterFor !== null} onOpenChange={(open) => { if (!open) { setOpenFilterFor(null); setFilterDraft(""); } }}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                Filter: {openFilterFor ? openFilterFor.split("_").pop() : ""}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
+          <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden">
+            <div className="bg-gradient-to-r from-[#0E6049] to-[#0d7a5f] p-5">
+              <DialogHeader className="text-white">
+                <DialogTitle className="flex items-center gap-2 text-lg">
+                  <div className="p-2 rounded-lg bg-white/20">
+                    <Filter className="h-5 w-5" />
+                  </div>
+                  Column Filter
+                </DialogTitle>
+                <p className="text-white/80 text-sm mt-1">
+                  Filter by: {openFilterFor ? openFilterFor.split("_").pop()?.replace(/([A-Z])/g, ' $1').trim() : ""}
+                </p>
+              </DialogHeader>
+            </div>
+            <div className="p-5 space-y-5">
               <div className="space-y-2">
-                <Input
-                  placeholder={`Enter value to filter...`}
-                  value={filterDraft}
-                  onChange={(e) => setFilterDraft(e.target.value)}
-                  autoFocus
-                  onKeyDown={(e) => { if (e.key === "Enter") { setColumnFilters((prev) => ({ ...prev, [openFilterFor!]: filterDraft })); setOpenFilterFor(null); setFilterDraft(""); } }}
-                />
+                <label className="text-sm font-medium text-muted-foreground">Enter filter value</label>
+                <div className="relative">
+                  <Input
+                    placeholder={`Type to filter...`}
+                    value={filterDraft}
+                    onChange={(e) => setFilterDraft(e.target.value)}
+                    autoFocus
+                    className="h-11 border-slate-200 focus:border-[#0E6049] focus:ring-[#0E6049]/20 pr-20"
+                    onKeyDown={(e) => { if (e.key === "Enter") { setColumnFilters((prev) => ({ ...prev, [openFilterFor!]: filterDraft })); setOpenFilterFor(null); setFilterDraft(""); } }}
+                  />
+                  {filterDraft && (
+                    <button
+                      onClick={() => setFilterDraft("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Press Enter or click Apply to filter
+                </p>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => { if (!openFilterFor) return; setColumnFilters((prev) => { const next = { ...prev }; delete next[openFilterFor]; return next; }); setOpenFilterFor(null); setFilterDraft(""); }}>
+              <div className="flex gap-3 pt-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1 h-11 border-slate-200 hover:bg-slate-50" 
+                  onClick={() => { if (!openFilterFor) return; setColumnFilters((prev) => { const next = { ...prev }; delete next[openFilterFor]; return next; }); setOpenFilterFor(null); setFilterDraft(""); }}
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
                   Clear
                 </Button>
-                <Button className="flex-1" onClick={() => { if (!openFilterFor) return; setColumnFilters((prev) => ({ ...prev, [openFilterFor]: filterDraft })); setOpenFilterFor(null); setFilterDraft(""); }}>
+                <Button 
+                  className="flex-1 h-11 bg-[#0E6049] hover:bg-[#0d7a5f]" 
+                  onClick={() => { if (!openFilterFor) return; setColumnFilters((prev) => ({ ...prev, [openFilterFor]: filterDraft })); setOpenFilterFor(null); setFilterDraft(""); }}
+                >
+                  <Filter className="h-4 w-4 mr-2" />
                   Apply Filter
                 </Button>
               </div>

@@ -643,7 +643,7 @@ export default function AdminDashboardPage() {
             subValue="Employer scheduled"
             icon={Clock}
             color="orange"
-            onClick={() => setLocation("/admin/interns")}
+            onClick={() => setLocation("/admin/proposal-tracker?tab=interviews")}
           />
 
           <StatCard
@@ -651,7 +651,7 @@ export default function AdminDashboardPage() {
             value={dashboardLoading ? "..." : totalAIInterviews}
             icon={CheckCircle2}
             color="purple"
-            onClick={() => setLocation("/admin/interns")}
+            onClick={() => setLocation("/admin/proposal-tracker?tab=interviews")}
           />
         </div>
 

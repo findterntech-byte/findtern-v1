@@ -64,6 +64,7 @@ import {
   UserCheck,
   AlertCircle,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { apiRequest } from "@/lib/queryClient";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
@@ -510,6 +511,7 @@ export default function AdminCompaniesPage() {
     const isSortable = Boolean((col as any).sortKey);
     const sortKey = (col as any).sortKey as typeof sortBy | undefined;
     const isFiltered = Boolean(String((columnFilters as any)[col.key] ?? "").trim());
+    const currentFilter = String((columnFilters as any)[col.key] ?? "");
 
     const onSort = (dir: "asc" | "desc") => {
       if (!sortKey) return;
@@ -517,51 +519,108 @@ export default function AdminCompaniesPage() {
       setSortDir(dir);
     };
 
-    const openFilter = () => {
-      if (!(col as any).filterKey) return;
-      setOpenFilterFor(col.key);
-      setFilterDraft(String((columnFilters as any)[col.key] ?? ""));
+    const applyFilter = () => {
+      if (!openFilterFor) return;
+      setColumnFilters((prev) => ({ ...prev, [openFilterFor]: filterDraft }));
+      setOpenFilterFor(null);
+      setFilterDraft("");
+    };
+
+    const clearFilter = () => {
+      if (!openFilterFor) return;
+      setColumnFilters((prev) => {
+        const next = { ...prev };
+        delete next[openFilterFor];
+        return next;
+      });
+      setOpenFilterFor(null);
+      setFilterDraft("");
     };
 
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className={cn("flex items-center gap-1.5 transition-colors", isFiltered && "text-primary")}>
-            <span className="truncate">{col.label}</span>
-            {isFiltered && <span className="h-2 w-2 rounded-full bg-primary" />}
-            <MoreVertical className="h-4 w-4 opacity-50" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-52">
-          <DropdownMenuLabel className="text-xs">{col.label}</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuItem disabled={!isSortable} onClick={() => onSort("asc")}>
-              <ArrowUp className="h-4 w-4" /> Sort Ascending
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={!isSortable} onClick={() => onSort("desc")}>
-              <ArrowDown className="h-4 w-4" /> Sort Descending
-            </DropdownMenuItem>
+      <div className="relative flex items-center gap-1">
+        <Popover open={openFilterFor === col.key} onOpenChange={(open) => { if (!open) { setOpenFilterFor(null); setFilterDraft(""); } }}>
+          <PopoverTrigger asChild>
+            <button 
+              className={cn(
+                "flex items-center gap-1 transition-colors hover:text-primary text-left",
+                isFiltered && "text-primary"
+              )}
+            >
+              <span className="truncate">{col.label}</span>
+              {isFiltered && <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-64 p-3">
+            <div className="space-y-3">
+              <div className="text-sm font-medium text-foreground">Filter: {col.label}</div>
+              <Input
+                placeholder={`Enter ${col.label}...`}
+                value={filterDraft}
+                onChange={(e) => setFilterDraft(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => { if (e.key === "Enter") applyFilter(); }}
+              />
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1" onClick={clearFilter}>
+                  Clear
+                </Button>
+                <Button size="sm" className="flex-1" onClick={applyFilter}>
+                  Apply
+                </Button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+        {(col as any).filterKey && (
+          <Popover open={false} onOpenChange={() => {}}>
+            <PopoverTrigger asChild>
+              <button 
+                className={cn(
+                  "p-0.5 rounded hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity",
+                  openFilterFor === col.key && "opacity-100"
+                )}
+                onClick={(e) => { e.stopPropagation(); setOpenFilterFor(col.key); setFilterDraft(currentFilter); }}
+              >
+                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            </PopoverTrigger>
+          </Popover>
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="ml-auto p-1 rounded hover:bg-muted opacity-50 hover:opacity-100 transition-opacity">
+              <MoreVertical className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel className="text-xs">{col.label}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem disabled={!(col as any).filterKey} onClick={openFilter}>
-              <Filter className="h-4 w-4" /> {isFiltered ? "Edit Filter" : "Add Filter"}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setColumnVisibility((prev) => ({ ...prev, [col.key]: false }))} disabled={col.key === "actions"}>
-              <EyeOff className="h-4 w-4" /> Hide Column
-            </DropdownMenuItem>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger><Columns className="h-4 w-4" /> Manage Columns</DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-56">
-                {columns.filter((c) => c.key !== "actions").map((c) => (
-                  <DropdownMenuCheckboxItem key={c.key} checked={Boolean(columnVisibility[c.key])} onCheckedChange={(checked) => setColumnVisibility((prev) => ({ ...prev, [c.key]: Boolean(checked) }))}>
-                    {c.label}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
+            <DropdownMenuGroup>
+              <DropdownMenuItem disabled={!isSortable} onClick={() => onSort("asc")}>
+                <ArrowUp className="h-4 w-4 mr-2" /> Sort A → Z
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={!isSortable} onClick={() => onSort("desc")}>
+                <ArrowDown className="h-4 w-4 mr-2" /> Sort Z → A
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setColumnVisibility((prev) => ({ ...prev, [col.key]: false }))} disabled={col.key === "actions"}>
+                <EyeOff className="h-4 w-4 mr-2" /> Hide Column
+              </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger><Columns className="h-4 w-4 mr-2" /> Manage Columns</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-56">
+                  {columns.filter((c) => c.key !== "actions").map((c) => (
+                    <DropdownMenuCheckboxItem key={c.key} checked={Boolean(columnVisibility[c.key])} onCheckedChange={(checked) => setColumnVisibility((prev) => ({ ...prev, [c.key]: Boolean(checked) }))}>
+                      {c.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     );
   };
 

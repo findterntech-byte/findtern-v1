@@ -35,6 +35,9 @@ import {
   Code,
   Bot,
   Brain,
+  Eye,
+  Sparkles,
+  Download,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useRoute } from "wouter";
@@ -786,8 +789,15 @@ export default function AdminInternDetailPage() {
 
   const kpis = useMemo(() => {
     const currency = payouts[0]?.currency ? String(payouts[0].currency).toUpperCase() : "INR";
-    const totalPaid = payouts.reduce((sum, p) => sum + (Number(p.amountMinor ?? 0) || 0), 0) / 100;
+    const totalPaid = payouts
+      .filter(p => String(p.status ?? "").toLowerCase() === "paid")
+      .reduce((sum, p) => sum + (Number(p.amountMinor ?? 0) || 0), 0) / 100;
     const totalPaidRounded = Math.round(totalPaid * 100) / 100;
+    
+    const totalPending = payouts
+      .filter(p => String(p.status ?? "").toLowerCase() === "pending")
+      .reduce((sum, p) => sum + (Number(p.amountMinor ?? 0) || 0), 0) / 100;
+    const totalPendingRounded = Math.round(totalPending * 100) / 100;
 
     const comm = Number((summary as any)?.ratings?.communication);
     const coding = Number((summary as any)?.ratings?.coding);
@@ -801,6 +811,8 @@ export default function AdminInternDetailPage() {
     return {
       currency,
       totalPaid: totalPaidRounded,
+      totalPending: totalPendingRounded,
+      hasPaidPayouts: totalPaidRounded > 0,
       interviews: interviews.length,
       proposals: proposals.length,
       skills: skillsForDisplay.length,
@@ -1091,13 +1103,15 @@ export default function AdminInternDetailPage() {
   const resolveProposalPricingLabel = (proposal: any) => {
     const score = Number(proposal?.findternScore ?? 0);
     const offer = (proposal?.offerDetails || proposal?.offer_details || {}) as any;
-    const cur = String(offer?.currency ?? "INR").toUpperCase();
-    const isFullTime = Boolean(offer?.isFullTime ?? offer?.is_full_time ?? proposal?.isFullTime ?? proposal?.is_full_time ?? false);
+    const fullTimeOffer = offer?.fullTimeOffer ?? offer?.full_time_offer ?? null;
+    const hasFullTimeOffer = !!fullTimeOffer && typeof fullTimeOffer === "object";
+    const cur = String(fullTimeOffer?.ctcCurrency ?? offer?.currency ?? "INR").toUpperCase();
 
-    if (isFullTime) {
-      const annualCTC = Number(offer?.annualCTC ?? offer?.annual_ctc ?? 0);
+    if (hasFullTimeOffer) {
+      const annualCTC = Number(fullTimeOffer?.annualCtc ?? fullTimeOffer?.annual_ctc ?? 0);
       if (annualCTC > 0) {
-        return `Annual CTC: ${cur === "USD" ? "$" : "₹"}${annualCTC.toLocaleString()}`;
+        const symbol = cur === "USD" ? "$" : "₹";
+        return `Annual CTC: ${symbol}${annualCTC.toLocaleString("en-IN")}`;
       }
       return "Full-time offer";
     }
@@ -1251,7 +1265,6 @@ export default function AdminInternDetailPage() {
     return proposals
       .filter((p) => {
         const status = String(p?.status ?? "").trim().toLowerCase();
-        if (status === "withdrawn") return false;
         if (proposalStatusFilter !== "all" && status !== String(proposalStatusFilter).toLowerCase()) return false;
 
         if (q) {
@@ -1685,9 +1698,15 @@ export default function AdminInternDetailPage() {
           <div className="relative p-5">
             <div className="flex items-start justify-between">
               <div className="space-y-1">
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Total Payouts</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight text-emerald-600">{kpis.currency} {kpis.totalPaid.toLocaleString()}</p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Paid</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+                  {kpis.totalPending > 0 ? "Pending Payouts" : "Total Payouts"}
+                </p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight text-emerald-600">
+                  {kpis.currency} {kpis.totalPending > 0 ? kpis.totalPending.toLocaleString() : kpis.totalPaid.toLocaleString()}
+                </p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">
+                  {kpis.totalPending > 0 ? "Pending" : "Paid"}
+                </p>
               </div>
               <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-emerald-100 flex items-center justify-center shadow-sm">
                 <IndianRupee className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
@@ -1861,9 +1880,9 @@ export default function AdminInternDetailPage() {
             </div>
           </div>
           <div className="p-4 sm:p-5">
-            {payoutsChart.data.length === 0 ? (
+            {!kpis.hasPaidPayouts ? (
               <div className="h-[200px] sm:h-[240px] flex items-center justify-center text-muted-foreground text-sm">
-                No payouts recorded
+                {kpis.totalPending > 0 ? "Payouts pending - chart will appear after first payment" : "No payouts recorded"}
               </div>
             ) : (
               <ChartContainer config={payoutsChart.config as any} className="h-[200px] sm:h-[240px] w-full">
@@ -3552,75 +3571,113 @@ export default function AdminInternDetailPage() {
                       const employerLabel = String(i?.employerName ?? "").trim();
                       const tz = String(i?.timezone ?? "-").trim() || "-";
                       const meet = String(i?.meet_link ?? i?.meetingLink ?? "").trim();
+                      const projectMeta = getProjectMeta(i);
 
                       const updated = formatIsoDate(i?.updatedAt ?? i?.updated_at ?? i?.createdAt ?? i?.created_at);
 
                       return (
                         <Card key={String(i?.id ?? Math.random())} className="p-5">
-                          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                            <div className="min-w-0 space-y-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <div className="text-sm font-semibold truncate">{companyLabel}</div>
-                                {employerLabel && employerLabel !== companyLabel && (
-                                  <div className="text-xs text-muted-foreground truncate">({employerLabel})</div>
-                                )}
+                          <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                              <div className="min-w-0 space-y-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="text-sm font-semibold truncate">{companyLabel}</div>
+                                  {employerLabel && employerLabel !== companyLabel && (
+                                    <div className="text-xs text-muted-foreground truncate">({employerLabel})</div>
+                                  )}
+                                  <Badge variant="outline" className={statusBadgeClass(status)}>
+                                    {status}
+                                  </Badge>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                  <span className="inline-flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" /> {projectMeta.locationType || "Remote"}
+                                    {projectMeta.location ? ` • ${projectMeta.location}` : ""}
+                                  </span>
+                                  <span className="inline-flex items-center gap-1">
+                                    <Link2 className="h-3 w-3" /> {tz}
+                                  </span>
+                                  <span>Project: {projectMeta.name || "-"}</span>
+                                  <span>Updated: {updated}</span>
+                                </div>
                               </div>
-                              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                <span className="inline-flex items-center gap-1">
-                                  <Link2 className="h-3 w-3" /> {tz}
-                                </span>
-                                <span>Updated: {updated}</span>
-                                {String(getProjectMeta(i).name ?? "").trim() && (
-                                  <span className="truncate">Project: {String(getProjectMeta(i).name)}</span>
-                                )}
+
+                              <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedInterview(i);
+                                    setOpenInterviewDetails(true);
+                                  }}
+                                >
+                                  View details
+                                </Button>
                               </div>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                              <Badge variant="outline" className={statusBadgeClass(status)}>
-                                {status}
-                              </Badge>
-                              <Badge
-                                variant="outline"
-                                className={
-                                  selected
-                                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                                    : "border-slate-300 bg-slate-50 text-slate-700"
-                                }
-                              >
-                                {selected
-                                  ? `Slot ${selected} • ${String(getSelectedSlotMeta(i).label)}`
-                                  : "No slot"}
-                              </Badge>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setSelectedInterview(i);
-                                  setOpenInterviewDetails(true);
-                                }}
-                              >
-                                View details
-                              </Button>
-                            </div>
-                          </div>
+                            <div className="rounded-md border bg-muted/20 p-3">
+                              <div className="flex items-center justify-between mb-3">
+                                <p className="text-xs font-medium text-muted-foreground">Time Slots</p>
+                                <span className="text-[10px] text-muted-foreground">({tz})</span>
+                              </div>
+                              <div className="grid gap-2 sm:grid-cols-3">
+                                {([1, 2, 3] as const).map((n) => {
+                                  const key = `slot${n}` as const;
+                                  const slotTime = i?.[key];
+                                  const isSelected = selected === n;
+                                  const slotLabel = slotTime ? formatSlot(slotTime, tz) : null;
+                                  const localLabel = slotTime ? formatSlot(slotTime, undefined) : null;
+                                  const showLocal = tz && tz !== Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-                          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                            <div className="min-w-0 text-xs text-muted-foreground">
-                              {meet ? (
-                                <span className="truncate block max-w-[760px]">Meeting: {meet}</span>
-                              ) : (
-                                <span>Meeting: -</span>
-                              )}
+                                  return (
+                                    <div
+                                      key={n}
+                                      className={
+                                        isSelected
+                                          ? "flex items-center justify-between gap-2 rounded-md border-2 border-emerald-300 bg-emerald-50 px-3 py-2"
+                                          : "flex items-center justify-between gap-2 rounded-md border bg-white px-3 py-2"
+                                      }
+                                    >
+                                      <div className="flex flex-col min-w-0">
+                                        <span className="text-[10px] font-semibold uppercase text-muted-foreground">Slot {n}</span>
+                                        <span className="text-xs font-medium truncate" title={`Local: ${localLabel}`}>
+                                          {slotLabel || "-"}
+                                        </span>
+                                        {showLocal && localLabel && (
+                                          <span className="text-[10px] text-blue-600 truncate" title={`Your local time`}>
+                                            Local: {localLabel}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {isSelected && (
+                                        <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-300 text-[10px] shrink-0">
+                                          Selected
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Button size="sm" variant="outline" disabled={!meet} onClick={() => copyToClipboard(meet)}>
-                                <Copy className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="outline" disabled={!meet} onClick={() => openExternal(meet)}>
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
-                            </div>
+
+                            {meet && (
+                              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2">
+                                <div className="min-w-0 text-xs text-muted-foreground">
+                                  <span className="truncate block max-w-[600px]">
+                                    <span className="font-medium">Meeting Link:</span> {meet}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Button size="sm" variant="outline" disabled={!meet} onClick={() => copyToClipboard(meet)}>
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
+                                  <Button size="sm" variant="outline" disabled={!meet} onClick={() => openExternal(meet)}>
+                                    <ExternalLink className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </Card>
                       );
@@ -3719,20 +3776,21 @@ export default function AdminInternDetailPage() {
                             return addMonthsUtc(startUtc, durationMonths).toISOString().slice(0, 10);
                           })();
 
-                          const isFullTimeOffer = Boolean(offer?.isFullTime ?? offer?.is_full_time ?? selectedProposal?.isFullTime ?? selectedProposal?.is_full_time ?? false);
+                          const fullTimeOffer = offer?.fullTimeOffer ?? offer?.full_time_offer ?? null;
+                          const hasFullTimeOffer = !!fullTimeOffer && typeof fullTimeOffer === "object";
+                          const displayRoleTitle = hasFullTimeOffer
+                            ? String(fullTimeOffer?.jobTitle ?? fullTimeOffer?.job_title ?? roleTitle).trim() || roleTitle
+                            : roleTitle;
 
-                          const durationLabel = isFullTimeOffer ? "Full-time" : (durationMonths === 1 ? "1 month" : `${durationMonths} months`);
+                          const durationLabel = hasFullTimeOffer ? "Full-time" : (durationMonths === 1 ? "1 month" : `${durationMonths} months`);
 
-                          const fullTimeOfferLabel =
-                            typeof offer?.isFullTime === "boolean" || typeof offer?.is_full_time === "boolean"
-                              ? (offer.isFullTime || offer.is_full_time ? "Yes" : "No")
-                              : "-";
+                          const fullTimeOfferLabel = hasFullTimeOffer ? "Yes" : "-";
 
                           return (
                             <>
                               <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="space-y-1">
-                                  <div className="text-sm font-semibold">{roleTitle}</div>
+                                  <div className="text-sm font-semibold">{displayRoleTitle}</div>
                                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                     <span>Company: {employerCompanyName || "-"}</span>
                                   </div>
@@ -3748,11 +3806,11 @@ export default function AdminInternDetailPage() {
                                       status.toLowerCase() === "hired" ? "bg-emerald-600 text-white border-none font-bold px-3 py-1" : ""
                                     )}
                                   >
-                                    {status.toLowerCase() === "hired" && isFullTimeOffer
+                                    {status.toLowerCase() === "hired" && hasFullTimeOffer
                                       ? "full time hired"
                                       : String(status).toLowerCase()}
                                   </Badge>
-                                  {isFullTimeOffer && status.toLowerCase() !== "rejected" && status.toLowerCase() !== "hired" && (
+                                  {hasFullTimeOffer && status.toLowerCase() !== "rejected" && status.toLowerCase() !== "hired" && (
                                     <Badge variant="secondary" className="bg-slate-100 text-slate-700 border-slate-200 text-[10px] font-semibold py-1 px-3">
                                       Full Time Proposal
                                     </Badge>
@@ -3808,10 +3866,17 @@ export default function AdminInternDetailPage() {
                                   <p className="text-xs font-medium text-muted-foreground">Offer summary</p>
                                   <div className="mt-2 space-y-1 text-sm">
                                     <p>
-                                      <span className="text-muted-foreground">Mode:</span> {String(offer?.mode ?? "-")}
+                                      <span className="text-muted-foreground">Mode:</span> {hasFullTimeOffer ? String(fullTimeOffer?.jobMode ?? fullTimeOffer?.job_mode ?? offer?.mode ?? "-") : String(offer?.mode ?? "-")}
                                     </p>
                                     <p>
-                                      <span className="text-muted-foreground">Location:</span> {String(offer?.location ?? "-")}
+                                      <span className="text-muted-foreground">Location:</span> {hasFullTimeOffer ? (() => {
+                                        const mode = String(fullTimeOffer?.jobMode ?? fullTimeOffer?.job_mode ?? "").trim().toLowerCase();
+                                        if (mode === "remote") return "Remote";
+                                        const city = String(fullTimeOffer?.jobLocationCity ?? "").trim();
+                                        const state = String(fullTimeOffer?.jobLocationState ?? "").trim();
+                                        const loc = [city, state].filter(Boolean).join(", ");
+                                        return loc || String(offer?.location ?? "-");
+                                      })() : String(offer?.location ?? "-")}
                                     </p>
                                     <p>
                                       <span className="text-muted-foreground">Start:</span> {String(offer?.startDate ?? offer?.start_date ?? "-")}
@@ -3820,7 +3885,7 @@ export default function AdminInternDetailPage() {
                                       <span className="text-muted-foreground">Duration:</span> {durationLabel}
                                     </p>
                                     <p>
-                                      <span className="text-muted-foreground">End:</span> {endDate}
+                                      <span className="text-muted-foreground">End:</span> {hasFullTimeOffer ? "-" : endDate}
                                     </p>
                                     <p>
                                       <span className="text-muted-foreground">Full-time conversion:</span> {fullTimeOfferLabel}
@@ -3832,7 +3897,7 @@ export default function AdminInternDetailPage() {
                                         : ""}
                                     </p>
                                     <p>
-                                      <span className="text-muted-foreground">Timezone:</span> {String(offer?.timezone ?? "-")}
+                                      <span className="text-muted-foreground">Timezone:</span> {String(fullTimeOffer?.timezone ?? offer?.timezone ?? "-")}
                                     </p>
                                   </div>
                                 </Card>
@@ -3845,48 +3910,131 @@ export default function AdminInternDetailPage() {
                                     <p>
                                       <span className="text-muted-foreground">Tier:</span> {resolveProposalPricingLabel(selectedProposal)}
                                     </p>
-                                    <p>
-                                      <span className="text-muted-foreground">Monthly hours:</span> {String(offer?.monthlyHours ?? offer?.monthly_hours ?? "-")}
-                                    </p>
-                                    <p>
-                                      <span className="text-muted-foreground">Monthly amount:</span> {isFullTimeOffer ? "-" : (monthlyAmount ? `${String(offer?.currency ?? "INR")} ${monthlyAmount.toLocaleString()}` : "-")}
-                                    </p>
-                                    <p>
-                                      <span className="text-muted-foreground">Total price:</span> {isFullTimeOffer ? "-" : (totalPrice ? `${String(offer?.currency ?? "INR")} ${totalPrice.toLocaleString()}` : "-")}
-                                    </p>
+                                    {hasFullTimeOffer ? (
+                                      <>
+                                        <p>
+                                          <span className="text-muted-foreground">Annual CTC:</span> {(() => {
+                                            const ctcVal = Number(fullTimeOffer?.annualCtc ?? fullTimeOffer?.annual_ctc ?? 0);
+                                            const ctcCur = String(fullTimeOffer?.ctcCurrency ?? "INR").toUpperCase();
+                                            if (ctcVal > 0) {
+                                              const symbol = ctcCur === "USD" ? "$" : "₹";
+                                              return `${symbol}${ctcVal.toLocaleString("en-IN")}`;
+                                            }
+                                            return "-";
+                                          })()}
+                                        </p>
+                                        <p>
+                                          <span className="text-muted-foreground">Currency:</span> {String(fullTimeOffer?.ctcCurrency ?? offer?.currency ?? "INR").toUpperCase()}
+                                        </p>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <p>
+                                          <span className="text-muted-foreground">Monthly hours:</span> {String(offer?.monthlyHours ?? offer?.monthly_hours ?? "-")}
+                                        </p>
+                                        <p>
+                                          <span className="text-muted-foreground">Monthly amount:</span> {monthlyAmount ? `${String(offer?.currency ?? "INR")} ${monthlyAmount.toLocaleString()}` : "-"}
+                                        </p>
+                                        <p>
+                                          <span className="text-muted-foreground">Total price:</span> {totalPrice ? `${String(offer?.currency ?? "INR")} ${totalPrice.toLocaleString()}` : "-"}
+                                        </p>
+                                      </>
+                                    )}
                                   </div>
                                 </Card>
 
-                                <Card className="p-4">
-                                  <p className="text-xs font-medium text-muted-foreground">Policy</p>
-                                  <div className="mt-2 space-y-1 text-sm">
-                                    <p>
-                                      <span className="text-muted-foreground">Laptop:</span> {String(offer?.laptop ?? "-")}
-                                    </p>
-                                    <p>
-                                      <span className="text-muted-foreground">Paid leaves / month:</span> {String(offer?.paidLeavesPerMonth ?? offer?.paid_leaves_per_month ?? "-")}
-                                    </p>
-                                    <p>
-                                      <span className="text-muted-foreground">Schedule:</span> {String(offer?.weeklySchedule ?? offer?.weekly_schedule ?? "-")}
-                                    </p>
-                                  </div>
-                                </Card>
+                                {hasFullTimeOffer ? (
+                                  <Card className="p-4 border-emerald-200 bg-emerald-50/50">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Sparkles className="w-4 h-4 text-emerald-600" />
+                                      <p className="text-xs font-medium text-emerald-700">Full-time Offer Details</p>
+                                    </div>
+                                    <div className="mt-2 space-y-1 text-sm">
+                                      <p>
+                                        <span className="text-muted-foreground">Job Title:</span> {String(fullTimeOffer?.jobTitle ?? fullTimeOffer?.job_title ?? "-")}
+                                      </p>
+                                      <p>
+                                        <span className="text-muted-foreground">Location:</span> {(() => {
+                                          const city = String(fullTimeOffer?.jobLocationCity ?? fullTimeOffer?.job_location_city ?? "").trim();
+                                          const state = String(fullTimeOffer?.jobLocationState ?? fullTimeOffer?.job_location_state ?? "").trim();
+                                          const mode = String(fullTimeOffer?.jobMode ?? fullTimeOffer?.job_mode ?? "").trim().toLowerCase();
+                                          if (mode === "remote") return "Remote";
+                                          const loc = [city, state].filter(Boolean).join(", ");
+                                          return loc || String(offer?.location ?? "-");
+                                        })()}
+                                      </p>
+                                      <p>
+                                        <span className="text-muted-foreground">Mode:</span> {String(fullTimeOffer?.jobMode ?? fullTimeOffer?.job_mode ?? offer?.mode ?? "-")}
+                                      </p>
+                                    </div>
+                                  </Card>
+                                ) : (
+                                  <Card className="p-4">
+                                    <p className="text-xs font-medium text-muted-foreground">Policy</p>
+                                    <div className="mt-2 space-y-1 text-sm">
+                                      <p>
+                                        <span className="text-muted-foreground">Laptop:</span> {String(offer?.laptop ?? "-")}
+                                      </p>
+                                      <p>
+                                        <span className="text-muted-foreground">Paid leaves / month:</span> {String(offer?.paidLeavesPerMonth ?? offer?.paid_leaves_per_month ?? "-")}
+                                      </p>
+                                      <p>
+                                        <span className="text-muted-foreground">Schedule:</span> {String(offer?.weeklySchedule ?? offer?.weekly_schedule ?? "-")}
+                                      </p>
+                                    </div>
+                                  </Card>
+                                )}
 
                                 <Card className="p-4">
                                   <p className="text-xs font-medium text-muted-foreground">Work setup</p>
                                   <div className="mt-2 space-y-1 text-sm">
-                                    <p>
-                                      <span className="text-muted-foreground">WFH days:</span> {String(offer?.workFromHomeDays ?? offer?.work_from_home_days ?? "-")}
-                                    </p>
-                                    <p>
-                                      <span className="text-muted-foreground">Office days:</span> {String(offer?.workFromOfficeDays ?? offer?.work_from_office_days ?? "-")}
-                                    </p>
+                                    {hasFullTimeOffer ? (
+                                      <>
+                                        <p>
+                                          <span className="text-muted-foreground">WFH days:</span> {String(offer?.workFromHomeDays ?? offer?.work_from_home_days ?? "-")}
+                                        </p>
+                                        <p>
+                                          <span className="text-muted-foreground">Office days:</span> {String(offer?.workFromOfficeDays ?? offer?.work_from_office_days ?? "-")}
+                                        </p>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <p>
+                                          <span className="text-muted-foreground">Laptop:</span> {String(offer?.laptop ?? "-")}
+                                        </p>
+                                        <p>
+                                          <span className="text-muted-foreground">WFH days:</span> {String(offer?.workFromHomeDays ?? offer?.work_from_home_days ?? "-")}
+                                        </p>
+                                        <p>
+                                          <span className="text-muted-foreground">Office days:</span> {String(offer?.workFromOfficeDays ?? offer?.work_from_office_days ?? "-")}
+                                        </p>
+                                      </>
+                                    )}
                                   </div>
                                 </Card>
                               </div>
 
                               <Card className="p-4">
-                                <p className="text-xs font-medium text-muted-foreground">Job description</p>
+                                <div className="flex items-center justify-between">
+                                  <p className="text-xs font-medium text-muted-foreground">
+                                    {hasFullTimeOffer ? "Full-time offer details" : "Job description"}
+                                  </p>
+                                  {hasFullTimeOffer && String(fullTimeOffer?.offerLetterUrl ?? "").trim() ? (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2 text-xs bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 hover:border-emerald-700"
+                                      onClick={() => {
+                                        const url = String(fullTimeOffer?.offerLetterUrl ?? "").trim();
+                                        if (!url) return;
+                                        window.open(`https://findtern.in/${url}`, "_blank", "noopener,noreferrer");
+                                      }}
+                                    >
+                                      <Download className="w-3 h-3 mr-1" />
+                                      Offer letter
+                                    </Button>
+                                  ) : null}
+                                </div>
                                 {jdSafeHtml ? (
                                   <div
                                     className="mt-2 rounded-md border bg-muted/20 p-3 text-sm prose prose-slate prose-sm max-w-none break-words [overflow-wrap:anywhere]"
@@ -3956,12 +4104,13 @@ export default function AdminInternDetailPage() {
                     <p className="text-sm text-muted-foreground">No proposals match your filters.</p>
                   </Card>
                 ) : (
-                  <div className="grid gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredProposals.map((p: any) => {
                       const meta = getProjectMeta(p);
                       const offer = (p?.offerDetails || p?.offer_details || {}) as any;
-                      const isFullTimeOffer = Boolean(offer?.isFullTime ?? offer?.is_full_time ?? p?.isFullTime ?? p?.is_full_time ?? false);
-                      const status = String(p?.status ?? "-");
+                      const fullTimeOffer = offer?.fullTimeOffer ?? offer?.full_time_offer ?? p?.fullTimeOffer ?? p?.full_time_offer ?? null;
+                      const isFullTimeOffer = !!fullTimeOffer && typeof fullTimeOffer === "object";
+                      const status = String(p?.status ?? "-").toLowerCase();
                       const role = String(offer?.roleTitle ?? offer?.role_title ?? "-");
                       const mode = String(offer?.mode ?? meta.locationType ?? "-");
                       const location = String(offer?.location ?? meta.location ?? "-");
@@ -3975,84 +4124,208 @@ export default function AdminInternDetailPage() {
                       const updated = formatIsoDate(p?.updatedAt ?? p?.updated_at ?? p?.createdAt ?? p?.created_at);
                       const hiredAt = p?.hiredAt ?? p?.hired_at;
                       const hiredAtDisplay = hiredAt ? formatIsoDate(hiredAt) : null;
+                      const findternScore = Number(p?.findternScore ?? 0);
+                      const jdRaw = String(offer?.jd ?? "").trim();
+                      const jd = stripHtml(jdRaw);
+
+                      const requiredSkills = (() => {
+                        const fromOffer = (offer as any)?.requiredSkills;
+                        const fromOfferB = (offer as any)?.projectSkills;
+                        const fromProposal = (p as any)?.skills;
+                        const arr =
+                          Array.isArray(fromOffer) && fromOffer.length > 0
+                            ? fromOffer
+                            : Array.isArray(fromOfferB) && fromOfferB.length > 0
+                              ? fromOfferB
+                              : Array.isArray(fromProposal)
+                                ? fromProposal
+                                : [];
+                        return arr
+                          .map((s: any) => String(s ?? "").trim())
+                          .filter((s: string) => s.length > 0);
+                      })();
+                      const normalizedRequiredSkills = new Set(requiredSkills.map((s) => s.toLowerCase()));
+
+                      const badge = (() => {
+                        if (status === "hired") {
+                          return {
+                            label: "Hired",
+                            className:
+                              "absolute top-3 right-3 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-700 border border-emerald-200",
+                          };
+                        }
+                        if (status === "accepted") {
+                          return {
+                            label: "Approved",
+                            className:
+                              "absolute top-3 right-3 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-700 border border-emerald-200",
+                          };
+                        }
+                        if (status === "rejected") {
+                          return {
+                            label: "Rejected",
+                            className:
+                              "absolute top-3 right-3 inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[11px] text-red-700 border border-red-200",
+                          };
+                        }
+                        if (status === "expired" || status === "withdrawn") {
+                          return {
+                            label: "Withdrawn",
+                            className:
+                              "absolute top-3 right-3 inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[11px] text-red-700 border border-red-200",
+                          };
+                        }
+                        return null;
+                      })();
+
+                      const fullProposalBadge = isFullTimeOffer
+                        ? {
+                            label: "Full Time Job Role - Proposal",
+                            className:
+                              "absolute top-0 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white border border-emerald-700/40 shadow-sm",
+                          }
+                        : null;
 
                       return (
                         <Card
                           key={String(p?.id ?? Math.random())}
-                          className={cn(
-                            "p-5 transition-all hover:shadow-md",
-                            isFullTimeOffer ? "border-l-4 border-l-indigo-500 bg-indigo-50/30" : ""
-                          )}
+                          className={
+                            "shadow-sm rounded-2xl p-4 md:p-5 flex flex-col gap-4 relative " +
+                            (isFullTimeOffer
+                              ? "border border-emerald-200/70 ring-1 ring-emerald-100 bg-gradient-to-br from-emerald-50/40 to-background"
+                              : "border border-emerald-50")
+                          }
                         >
-                          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                            <div className="min-w-0 space-y-2">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <div className="text-sm font-semibold truncate">{role}</div>
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    proposalBadgeClass(status),
-                                    status.toLowerCase() === "hired" ? "bg-emerald-600 text-white border-none font-bold" : ""
-                                  )}
-                                >
-                                  {status.toLowerCase() === "hired" && isFullTimeOffer
-                                    ? "full time hired"
-                                    : String(status).toLowerCase()}
-                                </Badge>
-                                {hiredAtDisplay && (
-                                  <span className="text-xs text-muted-foreground">Hired: {hiredAtDisplay}</span>
+                          {badge ? <span className={badge.className}>{badge.label}</span> : null}
+                          {fullProposalBadge ? (
+                            <span className={fullProposalBadge.className}>
+                              <Sparkles className="w-3.5 h-3.5 text-white/90" />
+                              {fullProposalBadge.label}
+                            </span>
+                          ) : null}
+                          
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-col gap-0.5 mb-1">
+                                <div className="flex items-center gap-2">
+                                  <GraduationCap className="w-4 h-4 text-emerald-600" />
+                                  <p className="text-sm font-semibold text-slate-900 line-clamp-1 break-words [overflow-wrap:anywhere]">
+                                    {isFullTimeOffer
+                                      ? String((fullTimeOffer as any)?.jobTitle ?? "").trim() || "Full-time Offer"
+                                      : role}
+                                  </p>
+                                </div>
+                                {meta.name && (
+                                  <div className="flex items-center gap-1 ml-6">
+                                    <span className="text-[10px] font-medium text-slate-500 uppercase tracking-tight">Project:</span>
+                                    <span className="text-[11px] font-semibold text-emerald-700">{meta.name}</span>
+                                  </div>
                                 )}
-                                {isFullTimeOffer && status.toLowerCase() !== "rejected" && status.toLowerCase() !== "hired" && (
-                                  <Badge variant="secondary" className="bg-slate-100 text-slate-700 border-slate-200 text-[10px] font-semibold py-0.5 px-2">
-                                    Full Time Proposal
-                                  </Badge>
-                                )}
                               </div>
-                              <div className="text-xs text-muted-foreground">
-                                <span className="font-medium text-slate-700">{meta.name}</span>
-                                {meta.locationType ? ` • ${meta.locationType}` : ""}
-                                {meta.location ? ` • ${meta.location}` : ""}
-                              </div>
-                              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                                <span>Mode: {mode}</span>
-                                <span>Location: {location}</span>
-                                <span>Start: {start}</span>
-                                <span>End: {endDate}</span>
-                                <span>Updated: {updated}</span>
-                              </div>
-                            </div>
+                              <p className="flex items-center gap-1 text-xs text-slate-600">
+                                <MapPin className="w-3.5 h-3.5 text-red-400" />
+                                {isFullTimeOffer
+                                  ? (() => {
+                                      const ftMode = String((fullTimeOffer as any)?.jobMode ?? "").trim().toLowerCase();
+                                      if (ftMode === "remote") return "Remote";
+                                      const ftCity = String((fullTimeOffer as any)?.jobLocationCity ?? "").trim();
+                                      const ftState = String((fullTimeOffer as any)?.jobLocationState ?? "").trim();
+                                      const ftLoc = [ftCity, ftState].filter(Boolean).join(", ");
+                                      return ftLoc || "Location not specified";
+                                    })()
+                                  : `${mode} • ${location || "Location not specified"}`}
+                              </p>
 
-                            <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  "bg-white font-semibold",
-                                  isFullTimeOffer ? "text-indigo-700 border-indigo-200" : ""
-                                )}
-                              >
-                                {pricingLabel}
-                              </Badge>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setSelectedProposal(p);
-                                  setOpenProposalDetails(true);
-                                }}
-                              >
-                                View details
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  const pid = String(meta.projectId ?? "").trim();
-                                  if (!pid) return;
-                                  setLocation(`/admin/projects?projectId=${encodeURIComponent(pid)}`);
-                                }}
-                              >
-                                View Project Details
-                              </Button>
+                              <div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
+                                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-slate-700 border border-slate-200">
+                                  Start: {start}
+                                </span>
+                                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-slate-700 border border-slate-200">
+                                  {isFullTimeOffer ? "Full-time" : `Duration: ${duration || "N/A"}`}
+                                </span>
+                              </div>
+
+                              {jd && (
+                                <p className="mt-1 text-[11px] text-slate-600 line-clamp-2 break-words [overflow-wrap:anywhere]">
+                                  <span className="font-semibold text-slate-700">JD:</span> {jd}
+                                </p>
+                              )}
+
+                              <div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
+                                <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-amber-700 border border-amber-100">
+                                  {pricingLabel}
+                                </span>
+                              </div>
                             </div>
+                          </div>
+
+                          <div className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs">
+                            <p className="mb-1 flex items-center gap-1 font-semibold text-slate-800">
+                              <Sparkles className="w-3 h-3 text-amber-400" />
+                              AI Interview Ratings
+                            </p>
+                            <div className="grid grid-cols-2 gap-1.5 text-[11px] text-slate-700">
+                              <span className="flex items-center justify-between">
+                                <span>Findtern Score</span>
+                                <span className="font-semibold text-emerald-700">{Number.isFinite(findternScore) ? findternScore.toFixed(1) : "-"}</span>
+                              </span>
+                              <span className="flex items-center justify-between">
+                                <span>Updated</span>
+                                <span className="text-slate-500">{updated}</span>
+                              </span>
+                              {hiredAtDisplay && (
+                                <span className="flex items-center justify-between col-span-2">
+                                  <span>Hired</span>
+                                  <span className="font-semibold text-emerald-700">{hiredAtDisplay}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className="mb-1 text-xs font-semibold text-slate-800">Project Skills</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {requiredSkills.length === 0 && (
+                                <span className="text-[11px] text-slate-500">No project skills data available</span>
+                              )}
+                              {requiredSkills.map((skill) => (
+                                <span
+                                  key={skill}
+                                  className={
+                                    normalizedRequiredSkills.has(String(skill).toLowerCase())
+                                      ? "inline-flex items-center rounded-full bg-emerald-50 border border-emerald-300 px-2 py-0.5 text-[11px] text-emerald-800"
+                                      : "inline-flex items-center rounded-full bg-emerald-50/60 border border-emerald-200 px-2 py-0.5 text-[11px] text-emerald-700"
+                                  }
+                                >
+                                  {skill}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <Button
+                              className="w-full rounded-full h-9 text-xs font-medium flex items-center justify-center gap-1.5 bg-[#0E6049] hover:bg-[#0b4b3a]"
+                              variant="default"
+                              onClick={() => {
+                                setSelectedProposal(p);
+                                setOpenProposalDetails(true);
+                              }}
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              View Proposal
+                            </Button>
+                            <Button
+                              className="w-full rounded-full h-9 text-xs font-medium border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+                              variant="outline"
+                              onClick={() => {
+                                const pid = String(meta.projectId ?? "").trim();
+                                if (!pid) return;
+                                setLocation(`/admin/projects?projectId=${encodeURIComponent(pid)}`);
+                              }}
+                            >
+                              View Project Details
+                            </Button>
                           </div>
                         </Card>
                       );
