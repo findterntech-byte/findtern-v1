@@ -315,14 +315,21 @@ export default function EmployerProposalsPage() {
 
       // For internship proposals, we want to show multiple proposals if they are in different terminal states
       // (withdrawn, rejected, expired) so they don't overwrite each other.
+      // Each terminal proposal gets its own unique key using the proposal ID.
       const isTerminal = p.status === "withdrawn" || p.status === "rejected" || p.status === "expired";
-      const statusKey = p.isFullTimeOffer ? String(p.status ?? "sent") : isTerminal ? `terminal:${p.status}:${p.id}` : "active";
-
-      const key = `${projectId}:${internId}:${typeKey}:${statusKey}`;
+      let key: string;
       if (!internId || !projectId) {
+        // No intern/project - treat as misc
         latestByKey.set(`__misc__:${String(p.id)}`, p);
         continue;
       }
+      if (isTerminal) {
+        // Each terminal proposal (withdrawn, rejected, expired) keeps its own entry
+        key = `${projectId}:${internId}:${typeKey}:terminal:${p.id}`;
+      } else {
+        key = `${projectId}:${internId}:${typeKey}:active`;
+      }
+
       const prev = latestByKey.get(key);
       if (!prev) {
         latestByKey.set(key, p);
