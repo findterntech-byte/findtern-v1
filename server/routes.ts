@@ -15309,6 +15309,49 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
     }
   });
 
+  app.post("/api/employer/:employerId/payment/cancel", async (req, res) => {
+    try {
+      const employerId = String(req.params.employerId ?? "").trim();
+      if (!employerId) return res.status(400).json({ message: "employerId is required" });
+
+      const employer = await storage.getEmployer(employerId);
+      if (!employer) return res.status(404).json({ message: "Employer not found" });
+
+      const body = req.body as any;
+      const proposalIds = Array.isArray(body?.proposalIds) 
+        ? body.proposalIds.map((v: any) => String(v ?? "").trim()).filter(Boolean)
+        : [];
+
+      if (!proposalIds.length) {
+        return res.status(400).json({ message: "proposalIds is required" });
+      }
+
+      const proposals = await storage.getProposalsByIds(proposalIds);
+      const proposalById = (Array.isArray(proposals) ? proposals : []).reduce<Record<string, any>>((acc, p: any) => {
+        const id = String(p?.id ?? "").trim();
+        if (id) acc[id] = p;
+        return acc;
+      }, {});
+
+      const updatedIds: string[] = [];
+      for (const id of proposalIds) {
+        const p = proposalById[String(id ?? "").trim()];
+        if (!p) continue;
+        if (String(p?.employerId ?? p?.employer_id ?? "").trim() !== employerId) continue;
+        const status = String(p?.status ?? "").toLowerCase();
+        if (status === "processing") {
+          await storage.updateProposalStatus(String(id ?? "").trim(), "accepted");
+          updatedIds.push(String(id ?? "").trim());
+        }
+      }
+
+      return res.json({ status: "success", message: "Payment cancelled", updatedProposalIds: updatedIds });
+    } catch (error) {
+      console.error("Cancel employer payment error:", error);
+      return res.status(500).json({ message: error instanceof Error ? error.message : "Failed to cancel payment" });
+    }
+  });
+
   app.get("/api/employer/:employerId/orders", async (req, res) => {
     try {
       const employerId = String(req.params.employerId ?? "").trim();
