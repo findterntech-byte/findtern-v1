@@ -102,8 +102,10 @@ export default function AdminProposalTrackerPage() {
   const [activeTab, setActiveTab] = useState("interns");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [internFilter, setInternFilter] = useState("all");
   const [employerFilter, setEmployerFilter] = useState("all");
+  const [timezoneFilter, setTimezoneFilter] = useState("all");
 
   // Date Filters
   const [startDate, setStartDate] = useState<string>("");
@@ -212,16 +214,37 @@ export default function AdminProposalTrackerPage() {
       const employer = employersById.get(p.employerId);
       const project = projectsById.get(p.projectId);
 
+      const offerDetails = p.offerDetails || {};
+      const fullTimeOffer = offerDetails?.fullTimeOffer;
+      const isFullTime = !!fullTimeOffer && typeof fullTimeOffer === "object";
+      const proposalType = isFullTime ? "full_time" : "internship";
+
       const searchStr = `${intern?.firstName} ${intern?.lastName} ${employer?.companyName} ${project?.projectName} ${p.status}`.toLowerCase();
       const matchesSearch = searchStr.includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === "all" || p.status === statusFilter;
+      const matchesType = typeFilter === "all" || proposalType === typeFilter;
       const matchesIntern = internFilter === "all" || p.internId === internFilter;
       const matchesEmployer = employerFilter === "all" || p.employerId === employerFilter;
       const matchesDate = isWithinDateRange(p.createdAt);
 
-      return matchesSearch && matchesStatus && matchesIntern && matchesEmployer && matchesDate;
+      return matchesSearch && matchesStatus && matchesType && matchesIntern && matchesEmployer && matchesDate;
     });
-  }, [proposals, searchQuery, statusFilter, internFilter, employerFilter, startDate, endDate, internsById, employersById, projectsById]);
+  }, [proposals, searchQuery, statusFilter, typeFilter, internFilter, employerFilter, startDate, endDate, internsById, employersById, projectsById]);
+
+  const proposalTypeCounts = useMemo(() => {
+    const counts = { full_time: 0, internship: 0 };
+    proposals.forEach(p => {
+      const offerDetails = p.offerDetails || {};
+      const fullTimeOffer = offerDetails?.fullTimeOffer;
+      const isFullTime = !!fullTimeOffer && typeof fullTimeOffer === "object";
+      if (isFullTime) {
+        counts.full_time++;
+      } else {
+        counts.internship++;
+      }
+    });
+    return counts;
+  }, [proposals]);
 
   const filteredInterviews = useMemo(() => {
     return interviews.filter((i) => {
@@ -229,16 +252,26 @@ export default function AdminProposalTrackerPage() {
       const employer = employersById.get(i.employerId);
       const project = i.projectId ? projectsById.get(i.projectId) : null;
 
+      const normalizedStatus = i.status === "pending" ? "sent" : i.status;
       const searchStr = `${intern?.firstName} ${intern?.lastName} ${employer?.companyName} ${project?.projectName || ""} ${i.status}`.toLowerCase();
       const matchesSearch = searchStr.includes(searchQuery.toLowerCase());
-      const matchesStatus = statusFilter === "all" || i.status === statusFilter;
+      const matchesStatus = statusFilter === "all" || normalizedStatus === statusFilter;
       const matchesIntern = internFilter === "all" || i.internId === internFilter;
       const matchesEmployer = employerFilter === "all" || i.employerId === employerFilter;
+      const matchesTimezone = timezoneFilter === "all" || i.timezone === timezoneFilter;
       const matchesDate = isWithinDateRange(i.createdAt);
 
-      return matchesSearch && matchesStatus && matchesIntern && matchesEmployer && matchesDate;
+      return matchesSearch && matchesStatus && matchesIntern && matchesEmployer && matchesTimezone && matchesDate;
     });
-  }, [interviews, searchQuery, statusFilter, internFilter, employerFilter, startDate, endDate, internsById, employersById, projectsById]);
+  }, [interviews, searchQuery, statusFilter, internFilter, employerFilter, timezoneFilter, startDate, endDate, internsById, employersById, projectsById]);
+
+  const availableTimezones = useMemo(() => {
+    const tzSet = new Set<string>();
+    interviews.forEach(i => {
+      if (i.timezone) tzSet.add(i.timezone);
+    });
+    return Array.from(tzSet).sort();
+  }, [interviews]);
 
   const getStatusBadge = (status: string) => {
     const s = status.toLowerCase();
@@ -250,13 +283,14 @@ export default function AdminProposalTrackerPage() {
       case "scheduled":
         return <Badge className="bg-blue-100 text-blue-700 border-blue-200 flex items-center gap-1 w-fit"><Calendar className="h-3 w-3" />{status}</Badge>;
       case "sent":
-        return <Badge className="bg-purple-100 text-purple-700 border-purple-200 flex items-center gap-1 w-fit"><Send className="h-3 w-3" />{status}</Badge>;
+      case "pending":
+        return <Badge className="bg-purple-100 text-purple-700 border-purple-200 flex items-center gap-1 w-fit"><Send className="h-3 w-3" />sent</Badge>;
       case "rejected":
       case "expired":
       case "withdrawn":
         return <Badge className="bg-rose-100 text-rose-700 border-rose-200 flex items-center gap-1 w-fit"><XCircle className="h-3 w-3" />{status}</Badge>;
-      case "pending":
-        return <Badge className="bg-rose-100 text-rose-700 border-rose-200 flex items-center gap-1 w-fit"><XCircle className="h-3 w-3" />Expired</Badge>;
+      case "processing":
+        return <Badge className="bg-cyan-100 text-cyan-700 border-cyan-200 flex items-center gap-1 w-fit"><Activity className="h-3 w-3" />{status}</Badge>;
       default:
         return <Badge variant="outline" className="flex items-center gap-1 w-fit"><AlertCircle className="h-3 w-3" />{status}</Badge>;
     }
@@ -300,7 +334,8 @@ export default function AdminProposalTrackerPage() {
   const interviewStatusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     interviews.forEach(i => {
-      counts[i.status] = (counts[i.status] || 0) + 1;
+      const status = i.status === "pending" ? "sent" : i.status;
+      counts[status] = (counts[status] || 0) + 1;
     });
     return counts;
   }, [interviews]);
@@ -807,6 +842,7 @@ export default function AdminProposalTrackerPage() {
                     <TableHead className="w-[50px]">#</TableHead>
                     <TableHead className="w-[200px]">Intern</TableHead>
                     <TableHead>Employer / Project</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created At</TableHead>
                     <TableHead className="text-right">Action</TableHead>
@@ -815,13 +851,16 @@ export default function AdminProposalTrackerPage() {
                 <TableBody>
                   {filteredProposals.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No proposals found matching your filters.</TableCell>
+                      <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">No proposals found matching your filters.</TableCell>
                     </TableRow>
                   ) : (
                     filteredProposals.map((p, idx) => {
                       const intern = internsById.get(p.internId);
                       const employer = employersById.get(p.employerId);
                       const project = projectsById.get(p.projectId);
+                      const offerDetails = p.offerDetails || {};
+                      const fullTimeOffer = offerDetails?.fullTimeOffer;
+                      const isFullTime = !!fullTimeOffer && typeof fullTimeOffer === "object";
                       return (
                         <TableRow key={p.id} className="hover:bg-slate-50/50 transition-colors">
                           <TableCell className="text-muted-foreground font-medium">{idx + 1}</TableCell>
@@ -842,6 +881,17 @@ export default function AdminProposalTrackerPage() {
                                 <span>{project?.projectName || "Unknown"}</span>
                               </div>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            {isFullTime ? (
+                              <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 text-xs">
+                                Full Time
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-teal-100 text-teal-700 border-teal-200 text-xs">
+                                Internship
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell>{getStatusBadge(p.status)}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{formatDate(p.createdAt)}</TableCell>
@@ -874,10 +924,20 @@ export default function AdminProposalTrackerPage() {
                   <SelectContent>
                     <SelectItem value="all">All Status ({interviews.length})</SelectItem>
                     <SelectItem value="sent">Sent ({interviewStatusCounts["sent"] || 0})</SelectItem>
-                    <SelectItem value="pending">Pending ({interviewStatusCounts["pending"] || 0})</SelectItem>
                     <SelectItem value="scheduled">Scheduled ({interviewStatusCounts["scheduled"] || 0})</SelectItem>
                     <SelectItem value="completed">Completed ({interviewStatusCounts["completed"] || 0})</SelectItem>
                     <SelectItem value="expired">Expired ({interviewStatusCounts["expired"] || 0})</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={timezoneFilter} onValueChange={setTimezoneFilter}>
+                  <SelectTrigger className="w-[160px] h-8 text-xs bg-white">
+                    <SelectValue placeholder="Timezone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Timezones</SelectItem>
+                    {availableTimezones.map(tz => (
+                      <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -890,6 +950,8 @@ export default function AdminProposalTrackerPage() {
                     <TableHead className="w-[200px]">Intern</TableHead>
                     <TableHead>Employer / Project</TableHead>
                     <TableHead>Slots & Schedule</TableHead>
+                    <TableHead>Timezone</TableHead>
+                    <TableHead>Meeting Link</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
@@ -897,7 +959,7 @@ export default function AdminProposalTrackerPage() {
                 <TableBody>
                   {filteredInterviews.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No interviews found matching your filters.</TableCell>
+                      <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">No interviews found matching your filters.</TableCell>
                     </TableRow>
                   ) : (
                     filteredInterviews.map((i, idx) => {
@@ -945,6 +1007,24 @@ export default function AdminProposalTrackerPage() {
                                 </div>
                               )}
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs font-medium text-slate-700">{i.timezone || "-"}</span>
+                          </TableCell>
+                          <TableCell>
+                            {i.meetingLink ? (
+                              <a
+                                href={i.meetingLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                              >
+                                <LinkIcon className="h-3 w-3" />
+                                Join
+                              </a>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                           <TableCell>{getStatusBadge(i.status)}</TableCell>
                           <TableCell className="text-right">
