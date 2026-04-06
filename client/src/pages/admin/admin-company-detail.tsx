@@ -664,7 +664,7 @@ export default function AdminCompanyDetailPage() {
       const internUserFromDues = (paymentSummary?.internEmployerDues ?? []).find((d: any) => d?.internId === internId);
       return { 
         ...p, 
-        findternScore: internExtra?.findternScore ?? internUserFromDues?.findternScore ?? 0, 
+        findternScore: p?.findternScore ?? internExtra?.findternScore ?? internUserFromDues?.findternScore ?? 0, 
         paidAmountMinor: internUserFromDues?.paidAmountMinor ?? 0 
       };
     });
@@ -739,6 +739,7 @@ export default function AdminCompanyDetailPage() {
     { key: "internName", label: "Candidate", filterKey: "internName" },
     { key: "projectName", label: "Project" },
     { key: "type", label: "Type" },
+    { key: "amount", label: "Amount" },
     { key: "startDate", label: "Start Date" },
   ];
 
@@ -1478,7 +1479,7 @@ export default function AdminCompanyDetailPage() {
                               const proposalId = String(p?.id ?? "").trim();
                               const internUser = internUsers[internId];
                               const internExtra = internUser?.extraData ?? {};
-                              const findternScore = Number(internExtra?.findternScore ?? 0);
+                              const findternScore = Number(p?.findternScore ?? internExtra?.findternScore ?? 0);
                               const monthlyHours = 160;
                               const isBelowSix = findternScore > 0 && findternScore < 6;
                               let displayAmount = 0;
@@ -2046,11 +2047,12 @@ export default function AdminCompanyDetailPage() {
                               const internId = String(p?.internId ?? p?.intern_id ?? p?.intern?.id ?? "").trim();
                               const findternScore = Number(p?.findternScore ?? 0);
                               const paidAmountMinor = Number(p?.paidAmountMinor ?? 0);
+                              const isLowScore = findternScore > 0 && findternScore < 6;
                               const displayAmount = hasFullTimeOffer && annualCtc > 0 
                                 ? annualCtcDisplay 
-                                : (findternScore > 0 && findternScore < 6 && paidAmountMinor > 0 ? (currency === "USD" ? 50 : 5000) : monthly);
+                                : (isLowScore && paidAmountMinor > 0 ? (currency === "USD" ? 50 : 5000) : monthly);
                               const displayCurrency = currency;
-                              const amountLabel = hasFullTimeOffer ? "Annual CTC" : "Monthly stipend";
+                              const amountLabel = hasFullTimeOffer ? "Annual CTC" : (isLowScore ? "One-time fee" : "Monthly stipend");
                               return (
                                 <TableRow key={String(p?.id ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
                                   <TableCell className="font-medium">{String(p?.internName ?? "—")}</TableCell>

@@ -819,12 +819,22 @@ export default function AdminProposalTrackerPage() {
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-sm font-semibold text-slate-700">Recent Proposals</h3>
               <div className="flex gap-2">
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="w-[140px] h-8 text-xs bg-white">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types ({proposals.length})</SelectItem>
+                    <SelectItem value="full_time">Full Time ({proposalTypeCounts.full_time})</SelectItem>
+                    <SelectItem value="internship">Internship ({proposalTypeCounts.internship})</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-[150px] h-8 text-xs bg-white">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Status ({proposals.length})</SelectItem>
+                    <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="sent">Sent ({proposalStatusCounts["sent"] || 0})</SelectItem>
                     <SelectItem value="accepted">Accepted ({proposalStatusCounts["accepted"] || 0})</SelectItem>
                     <SelectItem value="rejected">Rejected ({proposalStatusCounts["rejected"] || 0})</SelectItem>
