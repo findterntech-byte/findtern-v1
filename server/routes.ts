@@ -3180,8 +3180,8 @@ export async function registerRoutes(
             firstName: normalizeName(givenName, email.split("@")[0] || "User"),
             lastName: normalizeName(familyName, "User"),
             email,
-            countryCode: "+91",
-            phoneNumber: "0000000000",
+            countryCode: null,
+            phoneNumber: null,
             password,
             agreedToTerms: true,
           };
@@ -3242,14 +3242,12 @@ export async function registerRoutes(
         };
 
         const password = `${crypto.randomBytes(18).toString("base64url")}Aa1!`;
-        const countryCode = "+91";
-        const phoneNumber = await generateUniquePhone(countryCode);
         const candidate = {
           name: givenName || email.split("@")[0] || "Employer",
           companyName: "Company",
           companyEmail: email,
-          countryCode,
-          phoneNumber,
+          countryCode: null,
+          phoneNumber: null,
           password,
           agreedToTerms: true,
         };
