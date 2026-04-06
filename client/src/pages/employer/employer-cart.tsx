@@ -343,7 +343,6 @@ export default function EmployerCartPage() {
   const [selectedHireProposalIds, setSelectedHireProposalIds] = useState<string[]>([]);
   const [hasInitializedHireSelection, setHasInitializedHireSelection] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
-  const [processingProposalIds, setProcessingProposalIds] = useState<Set<string>>(new Set());
 
   const [pendingProposalCandidateId, setPendingProposalCandidateId] = useState<string>("");
 
@@ -2402,11 +2401,6 @@ export default function EmployerCartPage() {
       let navigated = false;
       try {
         setIsPaying(true);
-        setProcessingProposalIds((prev) => {
-          const next = new Set(prev);
-          ids.forEach((id) => next.add(id));
-          return next;
-        });
 
         const ok = await loadRazorpayScript();
         if (!ok) throw new Error("Failed to load payment gateway");
@@ -2489,11 +2483,6 @@ export default function EmployerCartPage() {
                 if (updatedProposalIds.length > 0) {
                   setAcceptedProposals((prev) => prev.filter((p) => !updatedProposalIds.includes(String(p?.id ?? ""))));
                   setSelectedHireProposalIds((prev) => prev.filter((id) => !updatedProposalIds.includes(String(id ?? ""))));
-                  setProcessingProposalIds((prev) => {
-                    const next = new Set(prev);
-                    updatedProposalIds.forEach((id: string) => next.delete(id));
-                    return next;
-                  });
                 }
 
                 window.dispatchEvent(new Event("employerCartUpdated"));
@@ -2547,14 +2536,7 @@ export default function EmployerCartPage() {
           variant: "destructive",
         });
       } finally {
-        if (!navigated) {
-          setIsPaying(false);
-          setProcessingProposalIds((prev) => {
-            const next = new Set(prev);
-            ids.forEach((id) => next.delete(id));
-            return next;
-          });
-        }
+        if (!navigated) setIsPaying(false);
       }
     })();
   };
@@ -3295,15 +3277,9 @@ export default function EmployerCartPage() {
                                       <p className="text-base font-semibold text-slate-900 truncate">
                                         {getShortNameFromFullName(item.candidateName) || item.candidateName}
                                       </p>
-                                      {processingProposalIds.has(item.proposalId) ? (
-                                        <Badge className="bg-amber-500 text-white text-[10px] font-semibold rounded-full">
-                                          Processing
-                                        </Badge>
-                                      ) : (
-                                        <Badge className="bg-emerald-600 text-white text-[10px] font-semibold rounded-full">
-                                          Accepted
-                                        </Badge>
-                                      )}
+                                      <Badge className="bg-emerald-600 text-white text-[10px] font-semibold rounded-full">
+                                        Accepted
+                                      </Badge>
                                     </div>
                                     <p className="text-xs text-slate-600 mt-1">
                                       <span className="font-medium text-slate-700">Project:</span> {item.projectName}
@@ -3368,15 +3344,15 @@ export default function EmployerCartPage() {
                                     <Button
                                       type="button"
                                       className="h-9 rounded-xl text-xs bg-emerald-600 enabled:hover:bg-emerald-700"
-                                      disabled={isPaying || processingProposalIds.has(item.proposalId)}
+                                      disabled={isPaying}
                                       onClick={() => handlePaySelectedHire([item.proposalId])}
                                     >
-                                      {processingProposalIds.has(item.proposalId) ? (
+                                      {isPaying ? (
                                         <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
                                       ) : (
                                         <CreditCard className="w-3.5 h-3.5 mr-1" />
                                       )}
-                                      {processingProposalIds.has(item.proposalId) ? "Processing..." : "Proceed to Hire"}
+                                      {isPaying ? "Processing..." : "Proceed to Hire"}
                                     </Button>
                                   </div>
                                 </div>
