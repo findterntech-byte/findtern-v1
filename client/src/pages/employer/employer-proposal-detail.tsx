@@ -837,11 +837,12 @@ export default function EmployerProposalDetailPage() {
     statusLower === "accepted" ||
     statusLower === "rejected" ||
     statusLower === "hired" ||
-    statusLower === "expired";
+    statusLower === "expired" ||
+    statusLower === "withdrawn";
 
   const canProceedToHire = statusLower === "accepted";
 
-  const canWithdraw = statusLower !== "rejected" && statusLower !== "hired" && statusLower !== "expired";
+  const canWithdraw = statusLower !== "rejected" && statusLower !== "hired" && statusLower !== "expired" && statusLower !== "withdrawn";
 
   const statusLabel = (() => {
     if (statusLower === "expired") return "withdrawn";
@@ -1049,7 +1050,7 @@ export default function EmployerProposalDetailPage() {
                         headers: {
                           "Content-Type": "application/json",
                         },
-                        body: JSON.stringify({ status: "expired" }),
+                        body: JSON.stringify({ status: "withdrawn" }),
                       });
 
                       if (!res.ok) {

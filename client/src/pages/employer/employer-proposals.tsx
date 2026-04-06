@@ -64,6 +64,7 @@ interface EmployerProposal {
     overall: number;
   };
   skills: string[];
+  findternScore?: number;
 }
 
 function toTitleWord(value: string) {
@@ -169,6 +170,9 @@ function mapToEmployerProposal(p: any): EmployerProposal {
     }
   })();
 
+  const findternScoreRaw = Number(p?.findternScore ?? 0);
+  const findternScore = Number.isFinite(findternScoreRaw) ? findternScoreRaw : 0;
+
   return {
     id: p.id,
     internId: (() => {
@@ -239,6 +243,7 @@ function mapToEmployerProposal(p: any): EmployerProposal {
     })(),
     interviewRatings: p.aiRatings || {},
     skills: Array.isArray(p.skills) ? p.skills : [],
+    findternScore,
   };
 
 }
@@ -354,7 +359,8 @@ export default function EmployerProposalsPage() {
 
       const internId = String(p?.internId ?? "").trim();
       const isRestrictedIntern = internId ? internIdsToRestrict.has(internId) : false;
-      if (isRestrictedIntern && !p.isFullTimeOffer && p.status !== "hired" && p.status !== "rejected") {
+      const isTerminalState = p.status === "rejected" || p.status === "expired" || p.status === "withdrawn";
+      if (isRestrictedIntern && !p.isFullTimeOffer && p.status !== "hired" && !isTerminalState) {
         return false;
       }
 
@@ -555,6 +561,8 @@ export default function EmployerProposalsPage() {
                     const annualCtcCurrency: "INR" | "USD" =
                       (proposal.annualCtcCurrency ?? proposal.offerCurrency ?? expectedCurrency) as "INR" | "USD";
                     const annualCtc = formatMoney(Number(proposal.annualCtc ?? 0), annualCtcCurrency);
+                    const isLowScore = Number(proposal.findternScore ?? 0) > 0 && Number(proposal.findternScore ?? 0) < 6;
+                    const oneTimeFee = formatMoney(5000, "INR");
 
                     return (
                       <tr
@@ -641,6 +649,11 @@ export default function EmployerProposalsPage() {
                               <div className="text-xs text-slate-500">Annual CTC</div>
                               <div className="text-sm font-semibold text-slate-900">{annualCtc}</div>
                             </>
+                          ) : isLowScore ? (
+                            <>
+                              <div className="text-xs text-slate-500">One-time fee</div>
+                              <div className="text-sm font-semibold text-slate-900">{oneTimeFee}</div>
+                            </>
                           ) : (
                             <>
                               <div className="text-xs text-slate-500">Monthly stipend</div>
@@ -702,6 +715,7 @@ export default function EmployerProposalsPage() {
                                 proposal.status !== "rejected" &&
                                 proposal.status !== "hired" &&
                                 proposal.status !== "expired" &&
+                                proposal.status !== "withdrawn" &&
                                 !proposal.isFullTimeOffer ? (
                                   <DropdownMenuItem
                                     onClick={() =>
@@ -805,6 +819,8 @@ export default function EmployerProposalsPage() {
               const annualCtcCurrency: "INR" | "USD" =
                 (proposal.annualCtcCurrency ?? proposal.offerCurrency ?? expectedCurrency) as "INR" | "USD";
               const annualCtc = formatMoney(Number(proposal.annualCtc ?? 0), annualCtcCurrency);
+              const isLowScore = Number(proposal.findternScore ?? 0) > 0 && Number(proposal.findternScore ?? 0) < 6;
+              const oneTimeFee = formatMoney(5000, "INR");
 
               return (
                 <Card
@@ -885,6 +901,11 @@ export default function EmployerProposalsPage() {
                           <p className="text-slate-500 mb-0.5">Annual CTC</p>
                           <p className="text-sm font-semibold text-slate-900">{annualCtc}</p>
                         </>
+                      ) : isLowScore ? (
+                        <>
+                          <p className="text-slate-500 mb-0.5">One-time fee</p>
+                          <p className="text-sm font-semibold text-slate-900">{oneTimeFee}</p>
+                        </>
                       ) : (
                         <>
                           <p className="text-slate-500 mb-0.5">Monthly stipend</p>
@@ -931,7 +952,8 @@ export default function EmployerProposalsPage() {
                       {proposal.status !== "accepted" &&
                       proposal.status !== "rejected" &&
                       proposal.status !== "hired" &&
-                      proposal.status !== "expired" ? (
+                      proposal.status !== "expired" &&
+                      proposal.status !== "withdrawn" ? (
                         <Button
                           size="sm"
                           variant="outline"

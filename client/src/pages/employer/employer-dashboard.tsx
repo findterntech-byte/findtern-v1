@@ -1873,7 +1873,11 @@ export default function EmployerDashboardPage() {
           `/api/employer/${encodeURIComponent(String(effectiveEmployerId))}/interns${qs}`,
         );
         const json = await response.json();
-        const list = (json?.interns || []) as any[];
+        const list = ((json?.interns || []) as any[]).filter((item) => {
+          const user = item.user ?? {};
+          const isActive = user?.isActive;
+          return isActive !== false;
+        });
 
         const mapped: Candidate[] = list.map((item) => {
           const onboarding = item.onboarding ?? {};

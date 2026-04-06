@@ -12632,6 +12632,13 @@ export async function registerRoutes(
         }),
       );
 
+      const internOnboardings = await Promise.all(
+        internIds.map(async (id) => {
+          const onboarding = await storage.getInternOnboardingByUserId(id).catch(() => undefined);
+          return { id, onboarding };
+        }),
+      );
+
       const internById = internUsers.reduce<Record<string, any>>((acc, row) => {
         if (row?.id && row.user) acc[row.id] = row.user;
         return acc;
@@ -12642,10 +12649,19 @@ export async function registerRoutes(
         return acc;
       }, {});
 
+      const internOnboardingById = internOnboardings.reduce<Record<string, any>>((acc, row) => {
+        if (row?.id && row.onboarding) acc[row.id] = row.onboarding;
+        return acc;
+      }, {});
+
       const enriched = proposals.map((p: any) => {
         const internId = String((p as any)?.internId ?? (p as any)?.intern_id ?? "").trim();
         const intern = internId ? internById[internId] : undefined;
         const internDocs = internId ? internDocsById[internId] : null;
+        const onboarding = internId ? internOnboardingById[internId] : undefined;
+        const findternScoreRaw = (onboarding as any)?.extraData?.findternScore;
+        const findternScore = Number(findternScoreRaw ?? 0);
+        const safeFindternScore = Number.isFinite(findternScore) ? findternScore : 0;
         const fullName = intern
           ? `${String((intern as any).firstName ?? "").trim()} ${String((intern as any).lastName ?? "").trim()}`.trim()
           : "";
@@ -12664,6 +12680,7 @@ export async function registerRoutes(
           projectName,
           startDate: (p as any)?.startDate ?? (p as any)?.start_date ?? (p as any)?.offerDetails?.startDate ?? (p as any)?.offer_details?.start_date ?? null,
           internProfilePhotoName: String(internDocs?.profilePhotoName ?? "") || null,
+          findternScore: safeFindternScore,
           intern: intern
             ? {
                 id: internId,
@@ -14631,12 +14648,10 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         if (status !== "accepted") {
           return res.status(400).json({ message: "Only accepted proposals can be paid" });
         }
+      }
 
-        const proposalCurrency =
-          normalizeCurrency(p?.currency) || normalizeCurrency((p?.offerDetails ?? (p as any)?.offer_details ?? {})?.currency);
-        if (proposalCurrency && proposalCurrency !== currency) {
-          return res.status(400).json({ message: "Select same currency", expectedCurrency: currency });
-        }
+      for (const id of proposalIds) {
+        await storage.updateProposalStatus(String(id ?? "").trim(), "processing");
       }
 
       const internIds = Array.from(
@@ -15030,7 +15045,8 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         const rows = await storage.getProposalsByIds(proposalIds);
         for (const p of rows) {
           if (String((p as any)?.employerId ?? "") !== employerId) continue;
-          if (String((p as any)?.status ?? "").toLowerCase() !== "accepted") continue;
+          const currentStatus = String((p as any)?.status ?? "").toLowerCase();
+          if (currentStatus !== "accepted" && currentStatus !== "processing") continue;
 
           const internId = String((p as any)?.internId ?? "").trim();
           if (internId) paidInternIds.add(internId);
