@@ -342,24 +342,22 @@ export default function AdminOrdersPage() {
     const totalMinor = Number(payment?.amountMinor ?? payment?.amount_minor ?? rawSubtotalMinor);
 
     const gstRate = 18;
-    const gstApplicable = !isFullTimeInvoice && currencyCode === "INR" && Number.isFinite(totalMinor) && totalMinor > 0;
+    const gstApplicable = currencyCode === "INR" && Number.isFinite(totalMinor) && totalMinor > 0;
 
     const subtotalFromTotalMinor = gstApplicable ? Math.round((Math.max(0, totalMinor) * 100) / 118) : 0;
     const gstMinor = gstApplicable ? Math.max(0, Math.max(0, totalMinor) - subtotalFromTotalMinor) : 0;
-    const totalWithTaxMinor = Math.max(0, totalMinor);
+    const totalWithTaxMinor = gstApplicable ? subtotalFromTotalMinor + gstMinor : subtotalMinor;
 
     const useGstAdjustedPrices = gstApplicable && subtotalFromTotalMinor > 0 && rawSubtotalMinor > 0 && rawSubtotalMinor !== subtotalFromTotalMinor;
 
-    const discountMinorRaw = Math.max(0, rawSubtotalMinor - totalWithTaxMinor);
+    const discountMinorRaw = Math.max(0, rawSubtotalMinor - subtotalFromTotalMinor);
     const discountRatio = rawSubtotalMinor > 0 ? discountMinorRaw / rawSubtotalMinor : 0;
-    const showTenPercentDiscount = discountMinorRaw > 0 && Math.abs(discountRatio - 0.1) <= 0.02;
+    const showTenPercentDiscount = discountMinorRaw > 0 && Math.abs(discountRatio - 0.1) <= 0.02 && !isFullTimeInvoice;
     const discountMinor = showTenPercentDiscount ? discountMinorRaw : 0;
 
-    const subtotalDisplayMinor = isFullTimeInvoice
-      ? totalWithTaxMinor
-      : gstApplicable
-        ? subtotalFromTotalMinor
-        : rawSubtotalMinor;
+    const subtotalDisplayMinor = gstApplicable
+      ? subtotalFromTotalMinor
+      : rawSubtotalMinor;
 
     return (
       <div ref={invoicePrintRef} className="invoice-print-root mx-auto w-full max-w-[980px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -489,26 +487,23 @@ export default function AdminOrdersPage() {
                   </tr>
                 ) : null}
 
-                {isFullTimeInvoice ? (
-                  <tr>
-                  </tr>
-                ) : (
-                  <>
-                    <tr>
-                      <td className="px-3 py-2 text-sm font-semibold text-slate-900">Subtotal</td>
-                      <td className="px-3 py-2 text-right text-sm text-slate-900">
-                        {formatAmount(subtotalDisplayMinor, currencyCode)}
-                      </td>
-                    </tr>
+                <tr>
+                  <td className="px-3 py-2 text-sm font-semibold text-slate-900">
+                    {isFullTimeInvoice ? "Full time consulting fee" : "Subtotal"}
+                  </td>
+                  <td className="px-3 py-2 text-right text-sm text-slate-900">
+                    {formatAmount(subtotalDisplayMinor, currencyCode)}
+                  </td>
+                </tr>
 
-                    <tr className="bg-slate-50">
-                      <td className="px-3 py-2 text-sm font-semibold text-slate-900">GST</td>
-                      <td className="px-3 py-2 text-right text-sm text-slate-900">
-                        {gstApplicable ? `${gstRate}% (${formatAmount(gstMinor, currencyCode)})` : "—" }
-                      </td>
-                    </tr>
-                  </>
-                )}
+                {gstApplicable ? (
+                  <tr className="bg-slate-50">
+                    <td className="px-3 py-2 text-sm font-semibold text-slate-900">GST {gstRate}%</td>
+                    <td className="px-3 py-2 text-right text-sm text-slate-900">
+                      {formatAmount(gstMinor, currencyCode)}
+                    </td>
+                  </tr>
+                ) : null}
                 <tr>
                   <td className="px-3 py-2 text-sm font-semibold text-slate-900">Total</td>
                   <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">

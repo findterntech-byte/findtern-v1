@@ -451,15 +451,12 @@ export default function TimesheetsPage() {
       return;
     }
 
-    const start = dateFromIsoLocal(effectiveCreatePeriod.periodStartIso);
-    const end = dateFromIsoLocal(effectiveCreatePeriod.periodEndIso);
-
     try {
       setSaving(true);
       const res = await apiRequest("POST", `/api/intern/${encodeURIComponent(storedUserId)}/timesheets`, {
         proposalId: activeProposal.id,
-        periodStart: start.toISOString(),
-        periodEnd: end.toISOString(),
+        periodStart: effectiveCreatePeriod.periodStartIso,
+        periodEnd: effectiveCreatePeriod.periodEndIso,
       });
       const json = await res.json().catch(() => null);
       const t = (json?.timesheet ?? null) as Timesheet | null;
