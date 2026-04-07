@@ -5923,7 +5923,7 @@ export async function registerRoutes(
           month: formatMonth(start),
           users: usersCount,
           companies: companiesCount,
-          internships: internshipsCount,
+          hired: internshipsCount,
           revenue: revenueMajor,
           _k: monthKey(start),
         });
@@ -16100,6 +16100,8 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           paidAt: payment.paidAt,
           createdAt: payment.createdAt,
           raw: payment.raw,
+          invoiceNumber: notes?.invoiceNumber ?? notes?.invoice_number ?? null,
+          invoiceDate: payment.paidAt ?? null,
           employer: employer ? {
             id: employer.id,
             companyName: employer.companyName ?? employer.name ?? "-",

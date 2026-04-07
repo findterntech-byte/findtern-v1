@@ -78,7 +78,7 @@ type AdminReportsTransactionsResponse = {
 const trendsConfig: ChartConfig = {
   users: { label: "Interns", color: "hsl(152, 61%, 40%)" },
   companies: { label: "Companies", color: "hsl(217, 91%, 60%)" },
-  internships: { label: "Internships", color: "hsl(43, 96%, 56%)" },
+  hired: { label: "Total Hired", color: "hsl(43, 96%, 56%)" },
 };
 
 const skillConfig: ChartConfig = { demand: { label: "Demand %", color: "hsl(152, 61%, 40%)" } };
@@ -379,7 +379,7 @@ export default function AdminReportsPage() {
                             <ChartLegend content={<ChartLegendContent />} />
                             <Line type="monotone" dataKey="users" stroke="var(--color-users)" strokeWidth={2} dot={false} />
                             <Line type="monotone" dataKey="companies" stroke="var(--color-companies)" strokeWidth={2} dot={false} />
-                            <Line type="monotone" dataKey="internships" stroke="var(--color-internships)" strokeWidth={2} dot={false} />
+                            <Line type="monotone" dataKey="hired" stroke="var(--color-hired)" strokeWidth={2} dot={false} />
                           </LineChart>
                         </ResponsiveContainer>
                       </ChartContainer>
@@ -435,7 +435,7 @@ export default function AdminReportsPage() {
                           {[
                             { label: "Signup → Paid", value: conversionAnalytics.signupToPaid, count: conversionAnalytics.signupCount, color: "bg-emerald-500" },
                             { label: "Paid → Interview", value: conversionAnalytics.paidToInterview, count: conversionAnalytics.paidCount, color: "bg-blue-500" },
-                            { label: "Interview → Hire", value: conversionAnalytics.interviewToHire, count: conversionAnalytics.interviewCount, color: "bg-purple-500" },
+                            { label: "AI Interview → Hire", value: conversionAnalytics.interviewToHire, count: conversionAnalytics.interviewCount, color: "bg-purple-500" },
                           ].map((item) => (
                             <div key={item.label} className="space-y-2">
                               <div className="flex items-center justify-between text-sm">

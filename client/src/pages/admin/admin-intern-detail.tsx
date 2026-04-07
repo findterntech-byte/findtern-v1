@@ -1128,16 +1128,12 @@ export default function AdminInternDetailPage() {
   const resolveInterviewStatus = (interview: any) => {
     const raw = String(interview?.status ?? "").trim().toLowerCase();
     const selectedSlot = Number(interview?.selectedSlot ?? interview?.selected_slot ?? 0);
-
-    const score = (intern?.onboarding as any)?.extraData?.findternScore;
     const meetLink = interview?.meet_link ?? interview?.meetingLink;
 
-    if (score !== undefined && score !== null && !meetLink && raw !== "completed") {
-      return "completed";
-    }
-
+    if (raw === "completed") return "completed";
+    if (selectedSlot > 0) return "scheduled";
+    if (meetLink) return "scheduled";
     if (raw) return raw;
-    if (selectedSlot) return "scheduled";
     return "sent";
   };
 

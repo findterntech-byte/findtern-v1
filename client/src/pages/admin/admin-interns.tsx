@@ -274,7 +274,7 @@ export default function AdminInternsPage() {
         { key: "profileStatus" as const, label: "Profile Status" },
         { key: "onboardingStatus" as const, label: "Onboarding status", filterKey: "onboardingStatus" as const },
         // { key: "pendingProposals" as const, label: "Pending Interviews", sortKey: "pendingInterviewCount" as const },
-        { key: "toPay" as const, label: "Intern payout (50%)", sortKey: "toPay" as const },
+        { key: "toPay" as const, label: "Pending Payout", sortKey: "toPay" as const },
         { key: "upcomingPaymentDate" as const, label: "Upcoming payment date" },
         { key: "totalToPay" as const, label: "Total to pay" },
         { key: "paidTillNow" as const, label: "Paid till now" },

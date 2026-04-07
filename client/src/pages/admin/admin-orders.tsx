@@ -77,6 +77,8 @@ type Order = {
   raw: any;
   employer: Employer | null;
   internName: string;
+  invoiceNumber?: string | null;
+  invoiceDate?: string | null;
 };
 
 type AdminOrdersResponse = {
@@ -570,15 +572,12 @@ export default function AdminOrdersPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           <Card className="p-4 border-l-4 border-l-blue-500">
             <p className="text-xs text-muted-foreground uppercase">Total Orders</p>
             <p className="text-2xl font-bold">{isLoading ? "..." : totals.totalOrders}</p>
           </Card>
-          <Card className="p-4 border-l-4 border-l-purple-500">
-            <p className="text-xs text-muted-foreground uppercase">Total Amount</p>
-            <p className="text-2xl font-bold">{isLoading ? "..." : formatCurrency(totals.totalAmount, "INR")}</p>
-          </Card>
+      
           <Card className="p-4 border-l-4 border-l-emerald-500">
             <p className="text-xs text-muted-foreground uppercase">Paid</p>
             <p className="text-2xl font-bold text-emerald-600">{isLoading ? "..." : formatCurrency(totals.paidAmount, "INR")}</p>
@@ -691,16 +690,23 @@ export default function AdminOrdersPage() {
                     <TableRow className="bg-muted/30 hover:bg-muted/30">
                       <TableHead className="text-xs font-semibold">#</TableHead>
                       <TableHead className="text-xs font-semibold">Order ID</TableHead>
-                      <TableHead className="text-xs font-semibold">Employer</TableHead>
-                      <TableHead className="text-xs font-semibold hidden md:table-cell">Intern</TableHead>
+                      <TableHead className="text-xs font-semibold hidden md:table-cell">Employer</TableHead>
+                      <TableHead className="text-xs font-semibold hidden lg:table-cell">Intern</TableHead>
                       <TableHead className="text-xs font-semibold">Amount</TableHead>
+                      <TableHead className="text-xs font-semibold">GST 18%</TableHead>
                       <TableHead className="text-xs font-semibold">Status</TableHead>
                       <TableHead className="text-xs font-semibold">Date</TableHead>
                       <TableHead className="text-xs font-semibold text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredOrders.map((order, index) => (
+                    {filteredOrders.map((order, index) => {
+                      const amountMajor = order.amount || 0;
+                      const amountMinor = Math.round(amountMajor * 100);
+                      const gstApplicable = order.currency === "INR" && amountMinor > 0;
+                      const gstAmount = gstApplicable ? Math.round(amountMinor * 18 / 118) : 0;
+                      
+                      return (
                       <TableRow key={order.id} className="hover:bg-muted/20 transition-colors">
                         <TableCell className="text-xs py-3 font-medium text-muted-foreground">
                           {String(index + 1).padStart(2, "0")}
@@ -710,16 +716,25 @@ export default function AdminOrdersPage() {
                             {order.orderId?.slice(0, 12)}...
                           </span>
                         </TableCell>
-                        <TableCell className="py-3">
+                        <TableCell className="py-3 hidden md:table-cell">
                           <span className="font-medium text-sm">{order.employer?.companyName || "-"}</span>
                         </TableCell>
-                        <TableCell className="py-3 text-xs hidden md:table-cell">
+                        <TableCell className="py-3 text-xs hidden lg:table-cell">
                           {order.internName || "-"}
                         </TableCell>
                         <TableCell className="py-3">
                           <span className="font-semibold text-sm">
                             {formatCurrency(order.amount || 0, order.currency || "INR")}
                           </span>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          {gstApplicable ? (
+                            <span className="font-semibold text-sm text-emerald-600">
+                              {formatCurrency(gstAmount / 100, order.currency || "INR")}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="py-3">
                           {getStatusBadge(order.status || "pending")}
@@ -749,7 +764,8 @@ export default function AdminOrdersPage() {
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
