@@ -138,7 +138,7 @@ type AdminDashboardAnalytics = {
 
 export default function AdminInternsPage() {
   const [search, setSearch] = useState("");
-  const [interviewStatusFilter, setInterviewStatusFilter] = useState<"" | "Waiting" | "Applied" | "Interview" | "Completed">("");
+  const [interviewStatusFilter, setInterviewStatusFilter] = useState<"" | "Waiting" | "Applied" | "Interview" | "Completed" | "Awaiting">("");
   const [liveHiddenFilter, setLiveHiddenFilter] = useState<"" | "Live" | "Hidden" | "Deactivated">("");
   const [internshipStatusFilter, setInternshipStatusFilter] = useState<"" | "Ongoing" | "Completed" | "-">("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<"" | "Paid" | "Unpaid">("");
@@ -769,8 +769,12 @@ export default function AdminInternsPage() {
 
   const filtered = interns.filter((intern) => {
     if (interviewStatusFilter) {
-      const expected = interviewStatusFilter;
-      if (String(intern.interview ?? "") !== expected) return false;
+      if (interviewStatusFilter === "Awaiting") {
+        if (intern.interview !== "Waiting") return false;
+      } else {
+        const expected = interviewStatusFilter;
+        if (String(intern.interview ?? "") !== expected) return false;
+      }
     }
 
     if (liveHiddenFilter) {
@@ -1517,6 +1521,7 @@ export default function AdminInternsPage() {
                         <SelectItem value="Waiting">Not applied</SelectItem>
                         <SelectItem value="Applied">Applied / Pending</SelectItem>
                         <SelectItem value="Interview">Scheduled</SelectItem>
+                        <SelectItem value="Awaiting">Waiting</SelectItem>
                         <SelectItem value="Completed">Completed</SelectItem>
                       </SelectContent>
                     </Select>

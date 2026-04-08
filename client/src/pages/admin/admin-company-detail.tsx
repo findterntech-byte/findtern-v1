@@ -1404,6 +1404,7 @@ export default function AdminCompanyDetailPage() {
                     <div className="rounded-lg border overflow-hidden">
                       <Table>
                         <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
+                          <TableHead className="w-12">Sr #</TableHead>
                           <TableHead><ColumnHeader col={projectColumns[0]} tab="projects" /></TableHead>
                           <TableHead><ColumnHeader col={projectColumns[1]} tab="projects" /></TableHead>
                           <TableHead><ColumnHeader col={projectColumns[2]} tab="projects" /></TableHead>
@@ -1416,7 +1417,7 @@ export default function AdminCompanyDetailPage() {
                           <TableHead><ColumnHeader col={projectColumns[9]} tab="projects" /></TableHead>
                         </TableRow></TableHeader>
                         <TableBody>
-                          {tabData.projectList.length === 0 ? <TableRow><TableCell colSpan={10}><EmptyState icon={Briefcase} title="No projects" description="This company hasn't created any projects yet." /></TableCell></TableRow> :
+                          {tabData.projectList.length === 0 ? <TableRow><TableCell colSpan={11}><EmptyState icon={Briefcase} title="No projects" description="This company hasn't created any projects yet." /></TableCell></TableRow> :
                             tabData.projectList.map((p: any, idx: number) => {
                               const createdAtRaw = p?.createdAt ?? p?.created_at ?? null;
                               const createdAt = createdAtRaw ? (() => { const d = new Date(createdAtRaw); return Number.isNaN(d.getTime()) ? String(createdAtRaw) : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); })() : "—";
@@ -1427,8 +1428,10 @@ export default function AdminCompanyDetailPage() {
                               const status = String(p?.status ?? "—") || "—";
                               const fullTimePossible = Boolean((p?.fullTimeOffer ?? p?.full_time_offer ?? p?.full_time_offer ?? false));
                               const projectTimezone = String(p?.timezone ?? "—") || "—";
+                              const srNo = (tabPage.projects - 1) * pageSize + idx + 1;
                               return (
                                 <TableRow key={String(p?.id ?? p?.projectName ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
+                                  <TableCell className="text-muted-foreground text-sm">{srNo}</TableCell>
                                   <TableCell className="font-medium">{String(p?.projectName ?? p?.title ?? "—")}</TableCell>
                                   <TableCell className="max-w-[200px]"><div className="flex flex-wrap gap-1">{skills.length === 0 ? <span className="text-xs text-muted-foreground">—</span> : skills.map((s: any) => <Badge key={String(s)} variant="outline" className="text-[10px] rounded-full">{String(s)}</Badge>)}</div></TableCell>
                                   <TableCell><Badge variant="outline">{String(p?.scopeOfWork ?? p?.scope_of_work ?? "—")}</Badge></TableCell>
@@ -1453,6 +1456,7 @@ export default function AdminCompanyDetailPage() {
                     <div className="rounded-lg border overflow-hidden">
                       <Table>
                         <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
+                          <TableHead className="w-12">Sr #</TableHead>
                           <TableHead><ColumnHeader col={proposalColumns[0]} tab="proposals" /></TableHead>
                           <TableHead><ColumnHeader col={proposalColumns[1]} tab="proposals" /></TableHead>
                           <TableHead><ColumnHeader col={proposalColumns[2]} tab="proposals" /></TableHead>
@@ -1463,7 +1467,7 @@ export default function AdminCompanyDetailPage() {
                           <TableHead className="text-right">Action</TableHead>
                         </TableRow></TableHeader>
                         <TableBody>
-                          {tabData.proposalList.length === 0 ? <TableRow><TableCell colSpan={8}><EmptyState icon={FileCheck} title="No proposals" description="No proposals found for this company." /></TableCell></TableRow> :
+                          {tabData.proposalList.length === 0 ? <TableRow><TableCell colSpan={9}><EmptyState icon={FileCheck} title="No proposals" description="No proposals found for this company." /></TableCell></TableRow> :
                             tabData.proposalList.map((p: any, idx: number) => {
                               const offer = p?.offerDetails ?? {};
                               const fullTimeOffer = (offer as any)?.fullTimeOffer ?? null;
@@ -1503,8 +1507,10 @@ export default function AdminCompanyDetailPage() {
                                 }
                               }
                               const durationDisplay = hasFullTimeOffer ? "Full-time" : (duration || "—");
+                              const srNo = (tabPage.proposals - 1) * pageSize + idx + 1;
                               return (
                                 <TableRow key={String(p?.id ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
+                                  <TableCell className="text-muted-foreground text-sm">{srNo}</TableCell>
                                   <TableCell className="font-medium">
                                     {internId ? (
                                       <button 
@@ -1559,6 +1565,7 @@ export default function AdminCompanyDetailPage() {
                             const slots = [slot1, slot2, slot3].filter(Boolean);
                             const rawStatus = String(i?.status ?? "").toLowerCase();
                             const displayStatus = (rawStatus === "pending" || rawStatus === "created") ? "sent" : rawStatus;
+                            const srNo = (tabPage.interviews - 1) * pageSize + idx + 1;
                             
                             return (
                               <Card key={String(i?.id ?? idx)} className="overflow-hidden hover:shadow-lg transition-all duration-300 border-l-4">
@@ -1570,6 +1577,10 @@ export default function AdminCompanyDetailPage() {
                                   displayStatus === "expired" ? "border-l-red-500 bg-red-50/50" :
                                   "border-l-amber-500 bg-amber-50/50"
                                 )}>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs text-muted-foreground font-medium">Sr # {srNo}</span>
+                                    <StatusBadge status={displayStatus} />
+                                  </div>
                                   <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
                                       <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-sm">
@@ -1660,6 +1671,7 @@ export default function AdminCompanyDetailPage() {
                       <div className="rounded-lg border overflow-hidden">
                         <Table>
                           <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
+                            <TableHead className="w-12">Sr #</TableHead>
                             <TableHead><ColumnHeader col={paymentColumns[0]} tab="payments" /></TableHead>
                             <TableHead><ColumnHeader col={paymentColumns[1]} tab="payments" /></TableHead>
                             <TableHead><ColumnHeader col={paymentColumns[2]} tab="payments" /></TableHead>
@@ -1672,7 +1684,7 @@ export default function AdminCompanyDetailPage() {
                             <TableHead className="text-right">Action</TableHead>
                           </TableRow></TableHeader>
                           <TableBody>
-                            {tabData.paymentList.length === 0 ? <TableRow><TableCell colSpan={9}><EmptyState icon={CreditCard} title="No payments" description="No payment records found for this company." /></TableCell></TableRow> :
+                            {tabData.paymentList.length === 0 ? <TableRow><TableCell colSpan={11}><EmptyState icon={CreditCard} title="No payments" description="No payment records found for this company." /></TableCell></TableRow> :
                               tabData.paymentList.map((o: any, idx: number) => {
                                 const orderId = String(o?.orderId ?? o?.order_id ?? "").trim();
                                 const candidateName = String(o?.internName ?? "").trim();
@@ -1683,8 +1695,10 @@ export default function AdminCompanyDetailPage() {
                                 const paidAtRaw = o?.paidAt ?? o?.paid_at ?? null;
                                 const createdAtRaw = o?.createdAt ?? o?.created_at ?? null;
                                 const paymentType = o?.type === "fulltime" || o?.type === "full_time" ? "Full-time" : "Internship";
+                                const srNo = (tabPage.payments - 1) * pageSize + idx + 1;
                                 return (
                                   <TableRow key={String(o?.id ?? orderId ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-muted-foreground text-sm">{srNo}</TableCell>
                                     <TableCell className="font-mono text-xs">{orderId || "—"}</TableCell>
                                     <TableCell className="font-medium">{candidateName || "—"}</TableCell>
                                     <TableCell>{projectName || "—"}</TableCell>
@@ -1892,6 +1906,7 @@ export default function AdminCompanyDetailPage() {
                                 const totalMonths = Number(d?.totalMonths ?? d?.duration ?? 1);
                                 const progress = totalMonths > 0 ? Math.min(100, Math.round((paidMonths / totalMonths) * 100)) : 100;
                                 
+                                const srNo = (tabPage.upcomingPayments - 1) * pageSize + idx + 1;
                                 return (
                                   <div 
                                     key={String(d?.proposalId ?? idx)} 
@@ -1906,6 +1921,7 @@ export default function AdminCompanyDetailPage() {
                                       isCompleted ? "bg-emerald-100/50" : "bg-slate-50/50"
                                     )}>
                                       <div className="flex items-center gap-3">
+                                        <span className="text-xs text-muted-foreground font-medium bg-muted px-2 py-1 rounded">Sr # {srNo}</span>
                                         <div className={cn(
                                           "h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold",
                                           isCompleted ? "bg-emerald-200 text-emerald-700" : "bg-[#0E6049]/10 text-[#0E6049]"
@@ -2025,6 +2041,7 @@ export default function AdminCompanyDetailPage() {
                     <div className="rounded-lg border overflow-hidden">
                       <Table>
                         <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
+                          <TableHead className="w-12">Sr #</TableHead>
                           <TableHead><ColumnHeader col={hiredColumns[0]} tab="hired" /></TableHead>
                           <TableHead><ColumnHeader col={hiredColumns[1]} tab="hired" /></TableHead>
                           <TableHead><ColumnHeader col={hiredColumns[2]} tab="hired" /></TableHead>
@@ -2034,7 +2051,7 @@ export default function AdminCompanyDetailPage() {
                           <TableHead className="text-right">Action</TableHead>
                         </TableRow></TableHeader>
                         <TableBody>
-                          {tabData.hiredList.length === 0 ? <TableRow><TableCell colSpan={7}><EmptyState icon={Users} title="No hires" description="No resources have been hired yet." /></TableCell></TableRow> :
+                          {tabData.hiredList.length === 0 ? <TableRow><TableCell colSpan={8}><EmptyState icon={Users} title="No hires" description="No resources have been hired yet." /></TableCell></TableRow> :
                             tabData.hiredList.map((p: any, idx: number) => {
                               const offer = p?.offerDetails ?? {};
                               const fullTimeOffer = (offer as any)?.fullTimeOffer ?? null;
@@ -2053,8 +2070,10 @@ export default function AdminCompanyDetailPage() {
                                 : (isLowScore && paidAmountMinor > 0 ? (currency === "USD" ? 50 : 5000) : monthly);
                               const displayCurrency = currency;
                               const amountLabel = hasFullTimeOffer ? "Annual CTC" : (isLowScore ? "One-time fee" : "Monthly stipend");
+                              const srNo = (tabPage.hired - 1) * pageSize + idx + 1;
                               return (
                                 <TableRow key={String(p?.id ?? Math.random())} className="group hover:bg-muted/30 transition-colors">
+                                  <TableCell className="text-muted-foreground text-sm">{srNo}</TableCell>
                                   <TableCell className="font-medium">{String(p?.internName ?? "—")}</TableCell>
                                   <TableCell>{String(p?.projectName ?? "—")}</TableCell>
                                   <TableCell>{hasFullTimeOffer ? <Badge className="bg-emerald-100 text-emerald-700">Full-time</Badge> : <Badge variant="outline">Internship</Badge>}</TableCell>

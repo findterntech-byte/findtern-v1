@@ -2654,8 +2654,7 @@ export default function EmployerDashboardPage() {
   const filteredCandidates = useMemo(() => {
     let list = [...candidates]
       .filter((c) => c.openToWork === true)
-      .filter((c) => Number(c.findternScore ?? 0) > 0)
-      .filter((c) => !(fullTimeOfferInternIdSet ?? new Set()).has(String(c.id ?? "").trim()));
+      .filter((c) => Number(c.findternScore ?? 0) > 0);
 
     if (resultsSearch.trim()) {
       const q = resultsSearch.trim().toLowerCase();

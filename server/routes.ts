@@ -15798,7 +15798,24 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           .filter((p: any) => String(p?.status ?? "").trim().toLowerCase() === "paid")
           .reduce((sum: number, p: any) => sum + (Number(p?.amountMinor ?? 0) || 0), 0);
         
-        const remainingAmountMinor = Math.max(0, totalAmountMinor - paidAmountMinor);
+        const checkoutPaymentForProposal = proposalPayments.find((p: any) => {
+          if (String(p?.status ?? "").trim().toLowerCase() !== "paid") return false;
+          const raw = p?.raw ?? {};
+          const notes = raw?.notes ?? raw?.order?.notes ?? {};
+          const purpose = notes?.purpose ?? notes?.orderPurpose ?? "";
+          if (purpose !== "employer_checkout") return false;
+          const paymentMode = notes?.paymentMode ?? notes?.orderPaymentMode ?? "";
+          if (paymentMode !== "total") return false;
+          const pids = notes?.proposalIds ?? notes?.proposal_ids ?? [];
+          return pids.length === 1 && pids[0] === proposal?.id;
+        });
+        
+        const discountEligible = !!checkoutPaymentForProposal && months > 1 && monthlyAmount > 0;
+        const finalTotalAmountMinor = discountEligible
+          ? Math.max(0, Math.round(totalAmountMinor * 0.9))
+          : totalAmountMinor;
+        
+        const remainingAmountMinor = Math.max(0, finalTotalAmountMinor - paidAmountMinor);
         const paidMonths = monthlyAmount > 0 ? Math.floor(paidAmountMinor / (monthlyAmount * 100)) : 0;
         const remainingMonthsCalc = Math.max(0, months - paidMonths);
         
@@ -15811,8 +15828,8 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           currency,
           monthlyAmount: monthlyAmount,
           monthlyAmountMinor: monthlyAmount * 100,
-          totalAmount: monthlyAmount * months,
-          totalAmountMinor: totalAmountMinor,
+          totalAmount: finalTotalAmountMinor / 100,
+          totalAmountMinor: finalTotalAmountMinor,
           paidAmount: paidAmountMinor / 100,
           paidAmountMinor,
           dueAmount: remainingAmountMinor / 100,
@@ -15826,6 +15843,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           findternScore: safeFindternScore,
           isFullTime: hasFullTimeOffer,
           annualCtc: hasFullTimeOffer ? annualCtc : 0,
+          discountApplied: discountEligible,
         });
       }
 

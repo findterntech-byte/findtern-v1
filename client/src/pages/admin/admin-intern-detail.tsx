@@ -226,6 +226,34 @@ export default function AdminInternDetailPage() {
   const [loadingEmployerDues, setLoadingEmployerDues] = useState(false);
   const [employerDuesError, setEmployerDuesError] = useState<string>("");
   const [employerDuesRefreshKey, setEmployerDuesRefreshKey] = useState(0);
+  const [employerDuesUpcomingFrom, setEmployerDuesUpcomingFrom] = useState<string>("");
+
+  const filteredEmployerDues = useMemo(() => {
+    if (!employerDuesUpcomingFrom) return employerDues;
+    const filterDate = employerDuesUpcomingFrom.trim();
+    if (!filterDate || filterDate.length !== 10) return employerDues;
+    
+    return employerDues.filter((r) => {
+      const internMonthlyMinor = Number(r.internMonthlyAmountMinor ?? 0) || 0;
+      const monthlyAmountMinor = Number(r.monthlyAmountMinor ?? 0) || 0;
+      const isLowScoringIntern = (Number(r.internDueAmountMinor ?? 0) || 0) === 0 && monthlyAmountMinor > 0;
+      if (isLowScoringIntern) return false;
+      
+      const rawStartDate = String(r.startDate ?? "").trim();
+      if (!rawStartDate || rawStartDate.length !== 10) return false;
+      
+      const startParts = rawStartDate.split("-");
+      if (startParts.length !== 3) return false;
+      const startDateObj = new Date(`${startParts[0]}-${startParts[1]}-${startParts[2]}T00:00:00`);
+      if (Number.isNaN(startDateObj.getTime())) return false;
+      
+      const targetDate = new Date(startDateObj);
+      targetDate.setMonth(targetDate.getMonth() + 1);
+      const upcomingDateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(targetDate.getDate()).padStart(2, "0")}`;
+      
+      return upcomingDateStr === filterDate;
+    });
+  }, [employerDues, employerDuesUpcomingFrom]);
 
   const [openCreatePayout, setOpenCreatePayout] = useState(false);
   const [creatingPayout, setCreatingPayout] = useState(false);
@@ -838,7 +866,11 @@ export default function AdminInternDetailPage() {
   };
 
   const formatMoneyInInrIfUsd = (amountMinor: number, currency: string) => {
-    // Backend now returns all amounts in INR paise for consistency in admin views.
+    const cur = String(currency || "INR").toUpperCase();
+    if (cur === "USD") {
+      const amountInrMinor = Math.round(amountMinor * 100);
+      return formatMoney(amountInrMinor, "INR");
+    }
     return formatMoney(amountMinor, "INR");
   };
 
@@ -2086,6 +2118,30 @@ export default function AdminInternDetailPage() {
                     </Button>
                   </div>
 
+                  <div className="mt-3 flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-1.5 bg-muted/30 rounded-lg px-3 py-1.5">
+                      <span className="text-[11px] text-muted-foreground font-medium">Upcoming payment date:</span>
+                      <Input
+                        type="date"
+                        value={employerDuesUpcomingFrom}
+                        onChange={(e) => setEmployerDuesUpcomingFrom(e.target.value)}
+                        className="h-7 w-[130px] text-xs border-0 bg-transparent p-0 focus:ring-0"
+                      />
+                    </div>
+                    {employerDuesUpcomingFrom && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          setEmployerDuesUpcomingFrom("");
+                        }}
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+
                   <div className="mt-3 relative w-full overflow-x-auto rounded-lg border custom-scrollbar-horizontal pb-4">
                     <table className="w-full min-w-[1400px] border-collapse text-sm">
                       <thead className="sticky top-0 z-30 bg-white">
@@ -2121,13 +2177,23 @@ export default function AdminInternDetailPage() {
                             return (
                               <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
                                 <td colSpan={13} className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-sm text-muted-foreground text-center">
-                                  No dues found.
+                                  {employerDuesUpcomingFrom ? "No dues found for selected date." : "No dues found."}
                                 </td>
                               </tr>
                             );
                           }
 
-                          return employerDues
+                          if (filteredEmployerDues.length === 0) {
+                            return (
+                              <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                                <td colSpan={13} className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-sm text-muted-foreground text-center">
+                                  No dues found for selected date range.
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return filteredEmployerDues
                             .slice()
                             .sort((a, b) => {
                               const dateA = String(a.upcomingPaymentDate ?? "").trim();
@@ -2368,7 +2434,7 @@ export default function AdminInternDetailPage() {
                                 <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{companyLabel}</td>
                                 <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{projectLabel}</td>
                                 <td className="p-4 align-middle whitespace-nowrap font-medium min-w-[120px]">
-                                  {formatMoney(p.amountMinor ?? 0, p.currency)}
+                                  {formatMoneyInInrIfUsd(p.amountMinor ?? 0, p.currency)}
                                 </td>
                                 <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">{String(p.method ?? "-")}</td>
                                 <td className="p-4 align-middle whitespace-nowrap font-mono text-xs min-w-[150px]">
