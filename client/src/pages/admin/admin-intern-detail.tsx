@@ -866,11 +866,7 @@ export default function AdminInternDetailPage() {
   };
 
   const formatMoneyInInrIfUsd = (amountMinor: number, currency: string) => {
-    const cur = String(currency || "INR").toUpperCase();
-    if (cur === "USD") {
-      const amountInrMinor = Math.round(amountMinor * 100);
-      return formatMoney(amountInrMinor, "INR");
-    }
+    // Backend now returns all amounts in INR paise for consistency in admin views.
     return formatMoney(amountMinor, "INR");
   };
 
@@ -2434,7 +2430,7 @@ export default function AdminInternDetailPage() {
                                 <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{companyLabel}</td>
                                 <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{projectLabel}</td>
                                 <td className="p-4 align-middle whitespace-nowrap font-medium min-w-[120px]">
-                                  {formatMoneyInInrIfUsd(p.amountMinor ?? 0, p.currency)}
+                                  {formatMoney(p.amountMinor ?? 0, p.currency)}
                                 </td>
                                 <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">{String(p.method ?? "-")}</td>
                                 <td className="p-4 align-middle whitespace-nowrap font-mono text-xs min-w-[150px]">

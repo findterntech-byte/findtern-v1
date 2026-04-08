@@ -1961,18 +1961,13 @@ export default function EmployerOrdersPage() {
                 const gstRate = 18;
                 const gstApplicable = currencyCode === "INR" && Number.isFinite(totalMinor) && totalMinor > 0;
 
-                const subtotalFromTotalMinor = gstApplicable ? Math.round((Math.max(0, totalMinor) * 100) / 118) : 0;
-                const gstMinor = gstApplicable ? Math.max(0, Math.max(0, totalMinor) - subtotalFromTotalMinor) : 0;
-                const totalWithTaxMinor = gstApplicable ? subtotalFromTotalMinor + gstMinor : subtotalMinor;
+                const subtotalFromTotalMinor = gstApplicable ? Math.round((Math.max(0, totalMinor) * 100) / 118) : totalMinor;
+                const gstMinor = gstApplicable ? Math.round(subtotalFromTotalMinor * gstRate / 100) : 0;
 
                 const discountMinorRaw = Math.max(0, subtotalMinor - subtotalFromTotalMinor);
                 const discountRatio = subtotalMinor > 0 ? discountMinorRaw / subtotalMinor : 0;
                 const showTenPercentDiscount = discountMinorRaw > 0 && Math.abs(discountRatio - 0.1) <= 0.02 && !isFullTimeInvoice;
                 const discountMinor = showTenPercentDiscount ? discountMinorRaw : 0;
-
-                const subtotalDisplayMinor = gstApplicable
-                  ? subtotalFromTotalMinor
-                  : subtotalMinor;
 
                 return (
                   <div
@@ -2086,7 +2081,7 @@ export default function EmployerOrdersPage() {
                                       {detail ? <p className="text-xs text-slate-600 mt-1">{detail}</p> : null}
                                     </td>
                                     <td className="px-3 py-3 text-right">
-                                      <p className="text-sm font-semibold text-slate-900">{formatAmount(subtotalDisplayMinor, currencyCode)}</p>
+                                      <p className="text-sm font-semibold text-slate-900">{formatAmount(displayPriceMinor, currencyCode)}</p>
                                     </td>
                                   </tr>
                                 );
@@ -2106,15 +2101,15 @@ export default function EmployerOrdersPage() {
                               <td className="px-3 py-2 text-sm font-semibold text-slate-900">
                                 {isFullTimeInvoice ? "Full time consulting fee" : "Subtotal"}
                               </td>
-                              <td className="px-3 py-2 text-right text-sm text-slate-900">
-                                {formatAmount(subtotalDisplayMinor, currencyCode)}
+                              <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
+                                {formatAmount(subtotalFromTotalMinor, currencyCode)}
                               </td>
                             </tr>
 
-                            {gstApplicable ? (
+                            {gstApplicable && gstMinor > 0 ? (
                               <tr className="bg-slate-50">
                                 <td className="px-3 py-2 text-sm font-semibold text-slate-900">GST {gstRate}%</td>
-                                <td className="px-3 py-2 text-right text-sm text-slate-900">
+                                <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
                                   {formatAmount(gstMinor, currencyCode)}
                                 </td>
                               </tr>
@@ -2122,7 +2117,7 @@ export default function EmployerOrdersPage() {
                             <tr>
                               <td className="px-3 py-2 text-sm font-semibold text-slate-900">Total</td>
                               <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
-                                {formatAmount(totalWithTaxMinor, currencyCode)}
+                                {formatAmount(totalMinor, currencyCode)}
                               </td>
                             </tr>
                           </tbody>
