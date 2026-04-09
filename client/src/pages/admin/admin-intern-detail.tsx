@@ -1,3 +1,4 @@
+
 import { AdminLayout } from "@/pages/admin/admin-layout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -311,7 +312,6 @@ export default function AdminInternDetailPage() {
 
   const [proposalStatusFilter, setProposalStatusFilter] = useState<string>("all");
   const [proposalSearch, setProposalSearch] = useState<string>("");
-  const [proposalTypeFilter, setProposalTypeFilter] = useState<string>("all");
   const [openProposalDetails, setOpenProposalDetails] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<any | null>(null);
   const [activeTab, setActiveTab] = useState<string>("documents");
@@ -817,13 +817,16 @@ export default function AdminInternDetailPage() {
   }, [payouts]);
 
   const kpis = useMemo(() => {
-    const totalPaidMinor = payouts
+    const currency = payouts[0]?.currency ? String(payouts[0].currency).toUpperCase() : "INR";
+    const totalPaid = payouts
       .filter(p => String(p.status ?? "").toLowerCase() === "paid")
-      .reduce((sum, p) => sum + (Number(p.amountMinor ?? 0) || 0), 0);
+      .reduce((sum, p) => sum + (Number(p.amountMinor ?? 0) || 0), 0) / 100;
+    const totalPaidRounded = Math.round(totalPaid * 100) / 100;
     
-    const totalPendingMinor = payouts
+    const totalPending = payouts
       .filter(p => String(p.status ?? "").toLowerCase() === "pending")
-      .reduce((sum, p) => sum + (Number(p.amountMinor ?? 0) || 0), 0);
+      .reduce((sum, p) => sum + (Number(p.amountMinor ?? 0) || 0), 0) / 100;
+    const totalPendingRounded = Math.round(totalPending * 100) / 100;
 
     const comm = Number((summary as any)?.ratings?.communication);
     const coding = Number((summary as any)?.ratings?.coding);
@@ -835,9 +838,10 @@ export default function AdminInternDetailPage() {
       : null;
 
     return {
-      totalPaidMinor,
-      totalPendingMinor,
-      hasPaidPayouts: totalPaidMinor > 0,
+      currency,
+      totalPaid: totalPaidRounded,
+      totalPending: totalPendingRounded,
+      hasPaidPayouts: totalPaidRounded > 0,
       interviews: interviews.length,
       proposals: proposals.length,
       skills: skillsForDisplay.length,
@@ -854,7 +858,7 @@ export default function AdminInternDetailPage() {
   const formatMoney = (amountMinor: number, currency: string) => {
     const cur = String(currency || "INR").toUpperCase();
     const locale = cur === "INR" ? "en-IN" : "en-US";
-    const major = Number.isFinite(amountMinor) ? amountMinor : 0;
+    const major = Number.isFinite(amountMinor) ? amountMinor / 100 : 0;
     return new Intl.NumberFormat(locale, {
       style: "currency",
       currency: cur,
@@ -863,11 +867,7 @@ export default function AdminInternDetailPage() {
   };
 
   const formatMoneyInInrIfUsd = (amountMinor: number, currency: string) => {
-    const cur = String(currency || "INR").toUpperCase();
-    if (cur === "USD") {
-      const amountInrMinor = amountMinor * 100;
-      return formatMoney(amountInrMinor, "INR");
-    }
+    // Backend now returns all amounts in INR paise for consistency in admin views.
     return formatMoney(amountMinor, "INR");
   };
 
@@ -1292,16 +1292,8 @@ export default function AdminInternDetailPage() {
         const status = String(p?.status ?? "").trim().toLowerCase();
         if (proposalStatusFilter !== "all" && status !== String(proposalStatusFilter).toLowerCase()) return false;
 
-        const offer = (p?.offerDetails || p?.offer_details || {}) as any;
-        const fullTimeOffer = offer?.fullTimeOffer ?? offer?.full_time_offer ?? p?.fullTimeOffer ?? p?.full_time_offer ?? null;
-        const isFullTime = !!fullTimeOffer && typeof fullTimeOffer === "object";
-        
-        if (proposalTypeFilter !== "all") {
-          if (proposalTypeFilter === "fulltime" && !isFullTime) return false;
-          if (proposalTypeFilter === "internship" && isFullTime) return false;
-        }
-
         if (q) {
+          const offer = (p?.offerDetails || p?.offer_details || {}) as any;
           const projectName = String(getProjectMeta(p).name ?? "").trim().toLowerCase();
           const role = String(offer?.roleTitle ?? offer?.role_title ?? "").trim().toLowerCase();
           const mode = String(offer?.mode ?? "").trim().toLowerCase();
@@ -1319,7 +1311,7 @@ export default function AdminInternDetailPage() {
         const tb = new Date(b?.updatedAt ?? b?.updated_at ?? b?.createdAt ?? b?.created_at ?? 0).getTime();
         return tb - ta;
       });
-  }, [proposals, proposalSearch, proposalStatusFilter, proposalTypeFilter, projectsById]);
+  }, [proposals, proposalSearch, proposalStatusFilter, projectsById]);
 
   const proposalsById = useMemo(() => {
     const map: Record<string, any> = {};
@@ -1732,15 +1724,13 @@ export default function AdminInternDetailPage() {
             <div className="flex items-start justify-between">
               <div className="space-y-1">
                 <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                  {kpis.totalPendingMinor > 0 ? "Pending Payouts" : "Total Payouts"}
+                  {kpis.totalPending > 0 ? "Pending Payouts" : "Total Payouts"}
                 </p>
                 <p className="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight text-emerald-600">
-                  {kpis.totalPendingMinor > 0 
-                    ? formatMoneyInInrIfUsd(kpis.totalPendingMinor, "INR")
-                    : formatMoneyInInrIfUsd(kpis.totalPaidMinor, "INR")}
+                  {kpis.currency} {kpis.totalPending > 0 ? kpis.totalPending.toLocaleString() : kpis.totalPaid.toLocaleString()}
                 </p>
                 <p className="text-[10px] sm:text-xs text-muted-foreground">
-                  {kpis.totalPendingMinor > 0 ? "Pending" : "Paid"}
+                  {kpis.totalPending > 0 ? "Pending" : "Paid"}
                 </p>
               </div>
               <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-emerald-100 flex items-center justify-center shadow-sm">
@@ -4150,24 +4140,12 @@ export default function AdminInternDetailPage() {
                   </SelectContent>
                 </Select>
 
-                <Select value={proposalTypeFilter} onValueChange={(v) => setProposalTypeFilter(v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="fulltime">Full-time</SelectItem>
-                    <SelectItem value="internship">Internship</SelectItem>
-                  </SelectContent>
-                </Select>
-
                 <div className="flex items-center justify-end">
                   <Button
                     variant="outline"
                     onClick={() => {
                       setProposalSearch("");
                       setProposalStatusFilter("all");
-                      setProposalTypeFilter("all");
                     }}
                   >
                     Reset
@@ -4623,5 +4601,3 @@ export default function AdminInternDetailPage() {
     </AdminLayout>
   );
 }
-
-

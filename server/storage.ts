@@ -67,6 +67,10 @@ import {
   type InsertEmployerSavedSearch,
   type EmployerCartItem,
   type InsertEmployerCartItem,
+  type PromoCode,
+  type InsertPromoCode,
+  type PromoCodeUsage,
+  type InsertPromoCodeUsage,
   users,
   passwordResetTokens,
   emailOtps,
@@ -100,6 +104,8 @@ import {
   profileViews,
   employerSavedSearches,
   employerCartItems,
+  promoCodes,
+  promoCodeUsages,
 } from "@shared/schema";
 import { eq, desc, and, or, isNull, asc, sql, inArray } from "drizzle-orm";
 
@@ -484,6 +490,19 @@ export interface IStorage {
       limit?: number;
     },
   ): Promise<EmployerCartItem[]>;
+
+  // Promo Codes
+  validatePromoCode(code: string, userId: string, orderAmountMinor: number): Promise<{
+    valid: boolean;
+    promoCode?: PromoCode;
+    discountAmountMinor?: number;
+    message?: string;
+  }>;
+  applyPromoCode(promoCodeId: string, userId: string, orderId: string, discountAppliedMinor: number): Promise<PromoCodeUsage>;
+  listPromoCodes(): Promise<PromoCode[]>;
+  createPromoCode(data: InsertPromoCode): Promise<PromoCode>;
+  updatePromoCode(id: string, data: Partial<InsertPromoCode>): Promise<PromoCode | undefined>;
+  deletePromoCode(id: string): Promise<boolean>;
 }
 
 export class PostgresStorage implements IStorage {
@@ -2650,6 +2669,105 @@ export class PostgresStorage implements IStorage {
       .from(interviews)
       .orderBy(desc(interviews.createdAt));
     return rows;
+  }
+
+  // Promo Codes
+  async validatePromoCode(code: string, userId: string, orderAmountMinor: number): Promise<{
+    valid: boolean;
+    promoCode?: PromoCode;
+    discountAmountMinor?: number;
+    message?: string;
+  }> {
+    const codeValue = String(code ?? "").trim().toUpperCase();
+    if (!codeValue) return { valid: false, message: "Promo code is required" };
+
+    const [promo] = await db
+      .select()
+      .from(promoCodes)
+      .where(eq(promoCodes.code, codeValue))
+      .limit(1);
+
+    if (!promo) return { valid: false, message: "Invalid promo code" };
+    if (!promo.isActive) return { valid: false, message: "This promo code is no longer active" };
+
+    const now = new Date();
+    if (promo.validFrom && new Date(promo.validFrom) > now) {
+      return { valid: false, message: "This promo code is not yet valid" };
+    }
+    if (promo.validUntil && new Date(promo.validUntil) < now) {
+      return { valid: false, message: "This promo code has expired" };
+    }
+    if (promo.maxUsages !== null && promo.usedCount >= promo.maxUsages) {
+      return { valid: false, message: "This promo code has reached its usage limit" };
+    }
+    if (promo.minOrderAmountMinor && orderAmountMinor < promo.minOrderAmountMinor) {
+      const minAmount = (promo.minOrderAmountMinor / 100).toFixed(2);
+      return { valid: false, message: `Minimum order amount of ₹${minAmount} required` };
+    }
+
+    let discountAmountMinor = 0;
+    if (promo.discountType === "percentage") {
+      discountAmountMinor = Math.floor((orderAmountMinor * promo.discountValue) / 100);
+    } else {
+      discountAmountMinor = Math.min(promo.discountValue, orderAmountMinor);
+    }
+
+    return {
+      valid: true,
+      promoCode: promo as PromoCode,
+      discountAmountMinor,
+    };
+  }
+
+  async applyPromoCode(
+    promoCodeId: string,
+    userId: string,
+    orderId: string,
+    discountAppliedMinor: number,
+  ): Promise<PromoCodeUsage> {
+    const pid = String(promoCodeId ?? "").trim();
+    const uid = String(userId ?? "").trim();
+    const oid = String(orderId ?? "").trim();
+
+    const [usage] = await db
+      .insert(promoCodeUsages)
+      .values({
+        promoCodeId: pid,
+        userId: uid,
+        orderId: oid,
+        discountAppliedMinor,
+      })
+      .returning();
+    return usage as PromoCodeUsage;
+  }
+
+  async listPromoCodes(): Promise<PromoCode[]> {
+    return db.select().from(promoCodes).orderBy(desc(promoCodes.createdAt)) as Promise<PromoCode[]>;
+  }
+
+  async createPromoCode(data: InsertPromoCode): Promise<PromoCode> {
+    const [row] = await db.insert(promoCodes).values(data).returning();
+    return row as PromoCode;
+  }
+
+  async updatePromoCode(id: string, data: Partial<InsertPromoCode>): Promise<PromoCode | undefined> {
+    const tid = String(id ?? "").trim();
+    if (!tid) return undefined;
+
+    const [row] = await db
+      .update(promoCodes)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(eq(promoCodes.id, tid))
+      .returning();
+    return row as PromoCode | undefined;
+  }
+
+  async deletePromoCode(id: string): Promise<boolean> {
+    const tid = String(id ?? "").trim();
+    if (!tid) return false;
+
+    const rows = await db.delete(promoCodes).where(eq(promoCodes.id, tid)).returning({ id: promoCodes.id } as any);
+    return Array.isArray(rows) && rows.length > 0;
   }
 }
 

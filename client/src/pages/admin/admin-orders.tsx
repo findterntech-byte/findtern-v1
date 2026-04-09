@@ -1,3 +1,4 @@
+
 import { useMemo, useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import newlogo from "@assets/logo-remove.png";
@@ -103,11 +104,16 @@ export default function AdminOrdersPage() {
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const invoicePrintRef = useRef<HTMLDivElement>(null);
 
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+    if (currencyFilter && currencyFilter !== "all") params.set("currency", currencyFilter);
+    if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
+    if (searchQuery) params.set("q", searchQuery);
+    return params.toString() ? `?${params.toString()}` : "";
+  }, [currencyFilter, statusFilter, searchQuery]);
+
   const { data, isLoading, error } = useQuery<AdminOrdersResponse>({
-    queryKey: [
-      "/api/admin/orders",
-      `?currency=${encodeURIComponent(currencyFilter)}&status=${encodeURIComponent(statusFilter)}&q=${encodeURIComponent(searchQuery)}`,
-    ],
+    queryKey: ["/api/admin/orders", queryString],
   });
 
   const orders = data?.items ?? [];
@@ -575,11 +581,15 @@ export default function AdminOrdersPage() {
       
           <Card className="p-4 border-l-4 border-l-emerald-500">
             <p className="text-xs text-muted-foreground uppercase">Paid</p>
-            <p className="text-2xl font-bold text-emerald-600">{isLoading ? "..." : formatCurrency(totals.paidAmount, "INR")}</p>
+            <p className="text-2xl font-bold text-emerald-600">
+              {isLoading ? "..." : formatCurrency(totals.paidAmount, currencyFilter === "USD" ? "USD" : "INR")}
+            </p>
           </Card>
           <Card className="p-4 border-l-4 border-l-yellow-500">
             <p className="text-xs text-muted-foreground uppercase">Pending</p>
-            <p className="text-2xl font-bold text-yellow-600">{isLoading ? "..." : formatCurrency(totals.pendingAmount, "INR")}</p>
+            <p className="text-2xl font-bold text-yellow-600">
+              {isLoading ? "..." : formatCurrency(totals.pendingAmount, currencyFilter === "USD" ? "USD" : "INR")}
+            </p>
           </Card>
         </div>
 

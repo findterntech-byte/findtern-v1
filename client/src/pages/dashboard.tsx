@@ -140,7 +140,7 @@ export default function DashboardPage() {
       const orderRes = await apiRequest(
         "POST",
         `/api/intern/${encodeURIComponent(storedUserId)}/payment/razorpay/order`,
-        {},
+        promoSuccess ? { promoCode: promoSuccess.code } : {},
       );
       const orderJson = await orderRes.json();
       const keyId = String(orderJson?.keyId ?? "");
@@ -198,6 +198,8 @@ export default function DashboardPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: paymentStatusQueryKey });
+      setPromoSuccess(null);
+      setPromoCode("");
       toast({
         title: "Payment successful",
         description: "Your account is now live.",
@@ -222,6 +224,13 @@ export default function DashboardPage() {
   const [supportFiles, setSupportFiles] = useState<File[]>([]);
   const [supportSubmitting, setSupportSubmitting] = useState(false);
   const supportAttachmentsInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [promoCodeOpen, setPromoCodeOpen] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError] = useState("");
+  const [promoSuccess, setPromoSuccess] = useState<{ discountAmountMinor: number; code: string; finalAmountMinor: number } | null>(null);
+  const [orderResponse, setOrderResponse] = useState<{ finalAmountMinor: number } | null>(null);
 
   useEffect(() => {
     const search = String(location ?? "").includes("?") ? String(location ?? "").split("?").slice(1).join("?") : "";
@@ -860,21 +869,32 @@ export default function DashboardPage() {
                   : "Your profile is not live yet. please apply for AI interview to complete your vetting process."}
               </p>
               {!isPaid && (
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-7 rounded-full bg-destructive px-3 text-xs text-destructive-foreground hover:bg-destructive/90 md:h-8 md:px-4 md:text-sm"
-                  disabled={payNowMutation.isPending}
-                  onClick={async () => {
-                    try {
-                      await payNowMutation.mutateAsync();
-                    } catch (e) {
-                      console.error("Pay now error:", e);
-                    }
-                  }}
-                >
-                  Pay Now
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className="text-xs text-emerald-700 underline hover:text-emerald-800"
+                    onClick={() => setPromoCodeOpen(true)}
+                  >
+                    Have a promo code?
+                  </button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-7 rounded-full bg-destructive px-3 text-xs text-destructive-foreground hover:bg-destructive/90 md:h-8 md:px-4 md:text-sm"
+                    disabled={payNowMutation.isPending}
+                    onClick={async () => {
+                      try {
+                        await payNowMutation.mutateAsync();
+                      } catch (e) {
+                        console.error("Pay now error:", e);
+                      }
+                    }}
+                  >
+                    {promoSuccess
+                      ? `Pay ₹${(promoSuccess.finalAmountMinor / 100).toFixed(0)}`
+                      : "Pay Now"}
+                  </Button>
+                </div>
               )}
             </div>
           </div>
@@ -1873,6 +1893,113 @@ export default function DashboardPage() {
               <Button type="button" onClick={submitSupport} disabled={supportSubmitting}>
                 {supportSubmitting ? "Submitting..." : "Submit"}
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={promoCodeOpen} onOpenChange={(open) => {
+          setPromoCodeOpen(open);
+          if (!open) {
+            setPromoCode("");
+            setPromoError("");
+            // Don't clear promoSuccess - keep discount applied
+          }
+        }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Apply Promo Code</DialogTitle>
+              <DialogDescription>
+                Enter your promo code to get a discount on the ₹2,499 account activation fee.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="promo-code">Promo Code</Label>
+                <input
+                  id="promo-code"
+                  type="text"
+                  value={promoCode}
+                  onChange={(e) => {
+                    setPromoCode(e.target.value.toUpperCase());
+                    setPromoError("");
+                  }}
+                  placeholder="e.g. SAVE20"
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+              {promoError && (
+                <p className="text-xs text-red-500">{promoError}</p>
+              )}
+              {promoSuccess && (
+                <div className="rounded-md bg-green-50 p-3 text-xs text-green-800">
+                  <p className="font-medium">Code applied!</p>
+                  <p>You save ₹{(promoSuccess.discountAmountMinor / 100).toFixed(0)}</p>
+                  <p className="mt-1">New amount: ₹{(promoSuccess.finalAmountMinor / 100).toFixed(0)}</p>
+                  <button
+                    type="button"
+                    className="mt-2 text-xs text-red-600 underline hover:text-red-700"
+                    onClick={() => {
+                      setPromoSuccess(null);
+                      setPromoCode("");
+                    }}
+                  >
+                    Remove code
+                  </button>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setPromoCodeOpen(false);
+                  // Don't clear promoSuccess - keep discount applied
+                }}
+              >
+                {promoSuccess ? "Close" : "Cancel"}
+              </Button>
+              {!promoSuccess && (
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    if (!storedUserId) {
+                      setPromoError("Please log in first");
+                      return;
+                    }
+                    if (!promoCode.trim()) {
+                      setPromoError("Please enter a promo code");
+                      return;
+                    }
+                    setPromoLoading(true);
+                    setPromoError("");
+                    try {
+                      const res = await apiRequest(
+                        "POST",
+                        `/api/intern/${encodeURIComponent(storedUserId)}/payment/validate-promo`,
+                        { code: promoCode.trim() },
+                      );
+                      const json = await res.json();
+                      if (!res.ok || !json.valid) {
+                        setPromoError(json.message || "Invalid promo code");
+                        return;
+                      }
+                      setPromoSuccess({
+                        discountAmountMinor: json.discountAmountMinor,
+                        code: promoCode.trim().toUpperCase(),
+                        finalAmountMinor: json.discountAmountMinor ? 249900 - json.discountAmountMinor : 249900,
+                      });
+                    } catch (e) {
+                      setPromoError("Failed to validate promo code");
+                    } finally {
+                      setPromoLoading(false);
+                    }
+                  }}
+                  disabled={promoLoading}
+                >
+                  {promoLoading ? "Validating..." : "Apply Code"}
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>

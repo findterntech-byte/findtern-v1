@@ -505,13 +505,15 @@ export default function AdminTransactionsPage() {
   }, [transactions, typeFilter, searchQuery, companyFilter, sortBy, sortDir]);
 
   const formatCurrency = (amount: number, currency: string) => {
-    const c = String(currency ?? "INR").toUpperCase();
+    const filterC = String(currencyFilter ?? "INR").toUpperCase();
+    const c = filterC === "USD" ? "USD" : "INR";
+    const convertedAmount = c === "USD" && currency === "INR" ? amount / 100 : amount;
     return new Intl.NumberFormat(c === "INR" ? "en-IN" : "en-US", {
       style: "currency",
       currency: c,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(amount);
+    }).format(c === "USD" ? convertedAmount : amount);
   };
 
   const getStatusBadge = (status: string) => {
@@ -825,7 +827,6 @@ export default function AdminTransactionsPage() {
                     <SelectValue placeholder="Currency" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
                     <SelectItem value="INR">INR</SelectItem>
                     <SelectItem value="USD">USD</SelectItem>
                   </SelectContent>

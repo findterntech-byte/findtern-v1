@@ -945,3 +945,40 @@ export const insertEmployerSavedSearchSchema = createInsertSchema(employerSavedS
 
 export type InsertEmployerSavedSearch = z.infer<typeof insertEmployerSavedSearchSchema>;
 export type EmployerSavedSearch = typeof employerSavedSearches.$inferSelect;
+
+// --------------------------------------------------
+// Promo Codes (Admin managed, usage tracking)
+// --------------------------------------------------
+export const promoCodes = pgTable("promo_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  description: text("description"),
+  discountType: text("discount_type").notNull(), // "percentage" | "fixed"
+  discountValue: integer("discount_value").notNull(), // percentage (e.g., 10 for 10%) or fixed amount in minor units
+  maxUsages: integer("max_usages"), // null = unlimited
+  usedCount: integer("used_count").notNull().default(0),
+  minOrderAmountMinor: integer("min_order_amount_minor"), // minimum order amount to apply
+  validFrom: timestamp("valid_from"),
+  validUntil: timestamp("valid_until"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type PromoCode = typeof promoCodes.$inferSelect;
+export type InsertPromoCode = typeof promoCodes.$inferInsert;
+
+// Promo code usage tracking (to prevent reuse)
+export const promoCodeUsages = pgTable("promo_code_usages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  promoCodeId: varchar("promo_code_id").notNull(),
+  userId: varchar("user_id").notNull(), // intern who used the code
+  orderId: varchar("order_id"), // payment/order that used this code
+  discountAppliedMinor: integer("discount_applied_minor").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  promoCodeUsagesUnique: uniqueIndex("promo_code_usages_unique").on(t.promoCodeId, t.userId),
+}));
+
+export type PromoCodeUsage = typeof promoCodeUsages.$inferSelect;
+export type InsertPromoCodeUsage = typeof promoCodeUsages.$inferInsert;

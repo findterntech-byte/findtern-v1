@@ -70,6 +70,8 @@ import AdminInternTermsPage from "@/pages/admin/admin-intern-terms";
 import AdminCompanyTermsPage from "@/pages/admin/admin-company-terms";
 import AdminInternNonDisclosureClausesPage from "@/pages/admin/admin-intern-non-disclosure-clauses";
 import AdminRolesPage from "@/pages/admin/admin-roles";
+import AdminPromoCodesPage from "@/pages/admin/admin-promo-codes";
+import AdminInternInvoicesPage from "@/pages/admin/admin-intern-invoices";
 
 // Employer pages
 import EmployerSignupPage from "@/pages/employer/employer-signup";
@@ -816,6 +818,16 @@ function Router() {
           <Route path="/admin/roles">
             <AdminRouteGuard>
               <AdminRolesPage />
+            </AdminRouteGuard>
+          </Route>
+          <Route path="/admin/promo-codes">
+            <AdminRouteGuard>
+              <AdminPromoCodesPage />
+            </AdminRouteGuard>
+          </Route>
+          <Route path="/admin/intern-invoices">
+            <AdminRouteGuard>
+              <AdminInternInvoicesPage />
             </AdminRouteGuard>
           </Route>
 

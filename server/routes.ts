@@ -5421,8 +5421,8 @@ export async function registerRoutes(
       };
 
       return res.json({
-        receivables,
-        payables,
+        receivables: receivables.filter((r: any) => Number(r.amountMajor ?? 0) > 0),
+        payables: payables.filter((p: any) => Number(p.amountMajor ?? 0) > 0),
         totals: {
           receivables: totalByCurrency(receivables),
           payables: totalByCurrency(payables),
@@ -6968,6 +6968,79 @@ export async function registerRoutes(
     }
   });
 
+  const promoCodeSchema = z.object({
+    code: z.string().min(1).max(50),
+    description: z.string().optional(),
+    discountType: z.enum(["percentage", "fixed"]),
+    discountValue: z.number().int().positive(),
+    maxUsages: z.number().int().positive().nullable(),
+    minOrderAmountMinor: z.number().int().nonnegative().nullable(),
+    validFrom: z.string().datetime().nullable(),
+    validUntil: z.string().datetime().nullable(),
+    isActive: z.boolean().default(true),
+  });
+
+  app.get("/api/admin/promo-codes", requirePermission("cms:read"), async (_req, res) => {
+    try {
+      const items = await storage.listPromoCodes();
+      return res.json({ items: items ?? [] });
+    } catch (error) {
+      console.error("Admin promo codes list error:", error);
+      return res.status(500).json({ message: "An error occurred while fetching promo codes" });
+    }
+  });
+
+  app.post("/api/admin/promo-codes", requirePermission("cms:write"), async (req, res) => {
+    try {
+      const payload = promoCodeSchema.parse(req.body);
+      const item = await storage.createPromoCode({
+        ...payload,
+        code: String(payload.code).toUpperCase(),
+        maxUsages: payload.maxUsages ?? null,
+        minOrderAmountMinor: payload.minOrderAmountMinor ?? null,
+        validFrom: payload.validFrom ? new Date(payload.validFrom) : null,
+        validUntil: payload.validUntil ? new Date(payload.validUntil) : null,
+      } as any);
+      return res.status(201).json({ item });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      console.error("Admin promo code create error:", error);
+      return res.status(500).json({ message: "An error occurred while creating promo code" });
+    }
+  });
+
+  app.put("/api/admin/promo-codes/:id", requirePermission("cms:write"), async (req, res) => {
+    try {
+      const payload = promoCodeSchema.partial().parse(req.body);
+      const updateData: any = { ...payload };
+      if (payload.code) updateData.code = String(payload.code).toUpperCase();
+      if (payload.validFrom) updateData.validFrom = new Date(payload.validFrom);
+      if (payload.validUntil) updateData.validUntil = new Date(payload.validUntil);
+      const item = await storage.updatePromoCode(req.params.id, updateData);
+      if (!item) return res.status(404).json({ message: "Promo code not found" });
+      return res.json({ item });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      console.error("Admin promo code update error:", error);
+      return res.status(500).json({ message: "An error occurred while updating promo code" });
+    }
+  });
+
+  app.delete("/api/admin/promo-codes/:id", requirePermission("cms:write"), async (req, res) => {
+    try {
+      const deleted = await storage.deletePromoCode(req.params.id);
+      if (!deleted) return res.status(404).json({ message: "Promo code not found" });
+      return res.status(204).send();
+    } catch (error) {
+      console.error("Admin promo code delete error:", error);
+      return res.status(500).json({ message: "An error occurred while deleting promo code" });
+    }
+  });
+
   app.get("/api/admin/website/terms", requirePermission("cms:read"), async (_req, res) => {
     try {
       const terms = await storage.getWebsiteTerms();
@@ -8047,6 +8120,142 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Admin list intern payouts error:", error);
       return res.status(500).json({ message: "An error occurred while fetching payout history" });
+    }
+  });
+
+  // Admin: List all intern payments (activation fees)
+  app.get("/api/admin/interns/payments", requirePermission("reports:read"), async (req, res) => {
+    try {
+      const statusFilter = String((req.query as any)?.status ?? "all").trim().toLowerCase();
+      const fromRaw = String((req.query as any)?.from ?? "").trim();
+      const toRaw = String((req.query as any)?.to ?? "").trim();
+
+      const parseDate = (value: string) => {
+        if (!value) return undefined;
+        const dt = new Date(value);
+        if (Number.isNaN(dt.getTime())) return undefined;
+        return dt;
+      };
+
+      const from = parseDate(fromRaw);
+      const to = (() => {
+        const dt = parseDate(toRaw);
+        if (!dt) return undefined;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(toRaw)) {
+          dt.setHours(23, 59, 59, 999);
+        }
+        return dt;
+      })();
+
+      const within = (d: any) => {
+        const dt = d instanceof Date ? d : d ? new Date(d) : null;
+        const t = dt ? dt.getTime() : NaN;
+        if (!Number.isFinite(t)) return false;
+        if (from && t < from.getTime()) return false;
+        if (to && t > to.getTime()) return false;
+        return true;
+      };
+
+      const [users, onboarding, allInternPayments] = await Promise.all([
+        storage.getUsers(),
+        storage.getAllInternOnboarding(),
+        storage.listAllInternPayments({ limit: 1000 }).catch(() => []),
+      ]);
+
+      const { amountMinor } = getRazorpayConfig();
+
+      const internUsers = (users ?? []).filter((u: any) => String((u as any)?.role ?? "").trim().toLowerCase() === "intern");
+      const onboardingByUserId = new Map<string, any>();
+      for (const o of (onboarding ?? [])) {
+        const uid = String((o as any)?.userId ?? (o as any)?.user_id ?? "").trim();
+        if (uid) onboardingByUserId.set(uid, o);
+      }
+
+      const internPaymentsByUserId = new Map<string, any>();
+      for (const p of (allInternPayments as any[])) {
+        const uid = String(p.internId ?? "").trim();
+        if (uid) internPaymentsByUserId.set(uid, p);
+      }
+
+      const items: any[] = [];
+      let totalPayments = 0;
+      let totalAmount = 0;
+      let paidAmount = 0;
+      let pendingAmount = 0;
+
+      for (const u of internUsers) {
+        const internId = String((u as any)?.id ?? "").trim();
+        if (!internId) continue;
+
+        const o = onboardingByUserId.get(internId);
+        if (!o) continue;
+
+        const internPayment = internPaymentsByUserId.get(internId);
+        
+        const extraData = (o as any)?.extraData ?? {};
+        const paymentData = extraData?.payment ?? {};
+        
+        const isPaid = Boolean(paymentData?.isPaid) || (internPayment?.status === "paid");
+        const paidAt = internPayment?.paidAt ?? paymentData?.paidAt ?? paymentData?.paid_at;
+        
+        const originalAmountMinor = amountMinor;
+        const discountAmountMinor = Number(paymentData?.discountAmountMinor ?? 0);
+        
+        // Use actual payment from intern_payments table if available
+        const paidFromTable = internPayment ? Number(internPayment.amountMinor ?? 0) : 0;
+        const finalAmountMinor = paidFromTable > 0 ? paidFromTable : Number(paymentData?.finalAmountMinor ?? amountMinor);
+        
+        const created = (o as any)?.createdAt instanceof Date ? (o as any).createdAt : new Date((o as any)?.createdAt ?? Date.now());
+        
+        if (!within(created)) continue;
+
+        const status = isPaid ? "paid" : "pending";
+        if (statusFilter !== "all" && status !== statusFilter) continue;
+
+        const firstName = String((u as any)?.firstName ?? "");
+        const lastName = String((u as any)?.lastName ?? "");
+        const internName = `${firstName} ${lastName}`.trim() || "Intern";
+        const email = String((u as any)?.email ?? "");
+
+        const actualAmount = isPaid ? finalAmountMinor : originalAmountMinor;
+        
+        totalPayments++;
+        totalAmount += actualAmount;
+        if (isPaid) {
+          paidAmount += actualAmount;
+        } else {
+          pendingAmount += actualAmount;
+        }
+
+        items.push({
+          id: `intern_activation:${internId}`,
+          internId,
+          internName,
+          email,
+          amountMinor: actualAmount,
+          originalAmountMinor,
+          discountAmountMinor,
+          finalAmountMinor,
+          currency: "INR",
+          status,
+          paidAt: isPaid ? (paidAt || created.toISOString()) : null,
+          createdAt: created.toISOString(),
+          invoiceNumber: isPaid ? `INT-${Date.now()}-${internId.slice(0, 8)}` : null,
+        });
+      }
+
+      return res.json({
+        items,
+        totals: {
+          totalPayments,
+          totalAmount: Math.round(totalAmount / 100),
+          paidAmount: Math.round(paidAmount / 100),
+          pendingAmount: Math.round(pendingAmount / 100),
+        },
+      });
+    } catch (error) {
+      console.error("Admin intern payments list error:", error);
+      return res.status(500).json({ message: "An error occurred while fetching intern payments" });
     }
   });
 
@@ -14407,14 +14616,29 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
 
       const { keyId, currency, amountMinor } = getRazorpayConfig();
 
+      const promoCode = String(req.body?.promoCode ?? "").trim();
+      let discountAmountMinor = 0;
+
+      if (promoCode) {
+        const promoResult = await storage.validatePromoCode(promoCode, internId, amountMinor);
+        if (promoResult.valid && promoResult.discountAmountMinor) {
+          discountAmountMinor = promoResult.discountAmountMinor;
+        }
+      }
+
+      const finalAmountMinor = Math.max(0, amountMinor - discountAmountMinor);
+
       const receipt = `intern_${internId.slice(0, 8)}_${Date.now().toString(36)}`;
       const order = await createRazorpayOrder({
-        amountMinor,
+        amountMinor: finalAmountMinor,
         currency,
         receipt,
         notes: {
           internId,
           purpose: "intern_account_activation",
+          promoCode: promoCode || undefined,
+          originalAmountMinor: amountMinor,
+          discountAmountMinor,
         },
       });
 
@@ -14423,10 +14647,34 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         orderId: order?.id,
         amountMinor: order?.amount,
         currency: order?.currency,
+        originalAmountMinor: amountMinor,
+        discountAmountMinor,
+        finalAmountMinor,
       });
     } catch (error) {
       console.error("Create intern Razorpay order error:", error);
       return res.status(500).json({ message: error instanceof Error ? error.message : "Failed to create order" });
+    }
+  });
+
+  app.post("/api/intern/:internId/payment/validate-promo", async (req, res) => {
+    try {
+      const internId = String(req.params.internId ?? "").trim();
+      if (!internId) return res.status(400).json({ message: "internId is required" });
+
+      const { code } = (req.body ?? {}) as any;
+      const promoCode = String(code ?? "").trim();
+      if (!promoCode) {
+        return res.status(400).json({ message: "Promo code is required" });
+      }
+
+      const { amountMinor } = getRazorpayConfig();
+      const result = await storage.validatePromoCode(promoCode, internId, amountMinor);
+
+      return res.json(result);
+    } catch (error) {
+      console.error("Validate promo code error:", error);
+      return res.status(500).json({ message: error instanceof Error ? error.message : "Failed to validate promo code" });
     }
   });
 
@@ -14512,10 +14760,30 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           gateway: "razorpay",
           orderId,
           paymentId,
+          promoCode: promoCodeUsed || null,
+          originalAmountMinor: amountMinorDb,
+          discountAmountMinor: Number((notes as any)?.discountAmountMinor ?? 0),
+          finalAmountMinor: amountMinorDb,
         },
       };
 
       await storage.updateInternOnboarding(internId, { extraData: nextExtra } as any);
+
+      const promoCodeUsed = String((notes as any)?.promoCode ?? "").trim();
+      if (promoCodeUsed) {
+        try {
+          const discountApplied = Number((notes as any)?.discountAmountMinor ?? 0);
+          const promoResult = await storage.validatePromoCode(promoCodeUsed, internId, amountMinorDb);
+          if (promoResult.valid && promoResult.promoCode) {
+            await storage.applyPromoCode(promoResult.promoCode.id, internId, orderId, discountApplied);
+            await storage.updatePromoCode(promoResult.promoCode.id, {
+              usedCount: (promoResult.promoCode.usedCount ?? 0) + 1,
+            } as any);
+          }
+        } catch (promoErr) {
+          console.error("Failed to record promo code usage:", promoErr);
+        }
+      }
 
       try {
         const user = await storage.getUser(internId).catch(() => undefined);
@@ -16120,12 +16388,47 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
       });
 
       const totalOrders = items.length;
-      const totalAmount = items.reduce((sum: number, i: any) => sum + (Number(i.amount) || 0), 0);
-      const paidAmount = items.filter((i: any) => i.status === "paid").reduce((sum: number, i: any) => sum + (Number(i.amount) || 0), 0);
-      const pendingAmount = items.filter((i: any) => i.status === "pending").reduce((sum: number, i: any) => sum + (Number(i.amount) || 0), 0);
+      const USD_TO_INR_RATE = 100;
+      const toINR = (amount: number, currency: string) => {
+        const curr = String(currency ?? "INR").toUpperCase();
+        if (curr === "USD") return amount * USD_TO_INR_RATE;
+        return amount;
+      };
+
+      // Only convert to INR when showing "all" or INR filter
+      const shouldConvertToINR = !currencyFilter || currencyFilter === "INR" || currencyFilter === "ALL";
+      
+      const totalAmount = items.reduce((sum: number, i: any) => {
+        const amt = Number(i.amount) || 0;
+        if (shouldConvertToINR) return sum + toINR(amt, i.currency || "INR");
+        return sum + amt;
+      }, 0);
+      
+      const paidAmount = items.filter((i: any) => i.status === "paid").reduce((sum: number, i: any) => {
+        const amt = Number(i.amount) || 0;
+        if (shouldConvertToINR) return sum + toINR(amt, i.currency || "INR");
+        return sum + amt;
+      }, 0);
+      
+      const pendingAmount = items.filter((i: any) => i.status === "pending").reduce((sum: number, i: any) => {
+        const amt = Number(i.amount) || 0;
+        if (shouldConvertToINR) return sum + toINR(amt, i.currency || "INR");
+        return sum + amt;
+      }, 0);
+
+      // Convert items to INR only when showing all/inr filter
+      const convertedItems = shouldConvertToINR 
+        ? items.map((item: any) => {
+            const curr = String(item.currency ?? "INR").toUpperCase();
+            if (curr === "USD") {
+              return { ...item, amount: item.amount * USD_TO_INR_RATE, currency: "INR" };
+            }
+            return item;
+          })
+        : items; // Keep original amounts and currency when USD filter is selected
 
       return res.json({
-        items,
+        items: convertedItems,
         totals: {
           totalOrders,
           totalAmount,
@@ -16148,6 +16451,71 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
 
       const orderId = String(req.params.orderId ?? "").trim();
       if (!orderId) return res.status(400).json({ message: "orderId is required" });
+
+      // Check if it's an intern payment
+      if (orderId.startsWith("intern_") || orderId.includes("intern_activation")) {
+        // Intern payment invoice
+        const internId = orderId.replace("intern_activation:", "").replace("intern_", "");
+        const user = await storage.getUser(internId);
+        if (!user) return res.status(404).json({ message: "Intern not found" });
+
+        const onboarding = await storage.getInternOnboardingByUserId(internId);
+        
+        // Get actual payment from intern_payments table
+        const allPayments = await storage.listAllInternPayments({ limit: 1000 }).catch(() => []);
+        const internPayment = (allPayments as any[]).find(p => String(p.internId ?? "").trim() === internId);
+        
+        const { currency, amountMinor: defaultAmountMinor } = getRazorpayConfig();
+        
+        // Use payment from intern_payments if available, otherwise use onboarding data
+        const paidAmountMinor = internPayment ? Number(internPayment.amountMinor ?? 0) : 0;
+        
+        const extraData = (onboarding as any)?.extraData ?? {};
+        const paymentData = extraData?.payment ?? {};
+        
+        const promoCode = String(paymentData?.promoCode ?? "").trim() || null;
+        const discountAmountMinor = Number(paymentData?.discountAmountMinor ?? 0) || 0;
+        
+        // If we have paidAmountMinor, use it, otherwise use finalAmountMinor from onboarding
+        const finalAmountMinor = paidAmountMinor > 0 ? paidAmountMinor : Number(paymentData?.finalAmountMinor ?? defaultAmountMinor);
+        const originalAmountMinor = Number(paymentData?.originalAmountMinor ?? defaultAmountMinor);
+        
+        const paidAt = internPayment?.paidAt 
+          ? new Date(internPayment.paidAt).toISOString() 
+          : paymentData?.paidAt ?? (onboarding as any)?.createdAt ?? new Date().toISOString();
+        const isPaid = Boolean(paymentData?.isPaid) || (internPayment?.status === "paid");
+
+        const invoiceNumber = `INT-${Date.now()}-${internId.slice(0, 8)}`;
+
+        return res.json({
+          invoiceNumber,
+          invoiceDate: paidAt,
+          payment: {
+            amountMinor: finalAmountMinor,
+            originalAmountMinor,
+            discountAmountMinor,
+            finalAmountMinor,
+            currency,
+            status: isPaid ? "paid" : "pending",
+            promoCode,
+          },
+          employer: null,
+          intern: {
+            id: user.id,
+            name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Intern",
+            email: user.email,
+          },
+          items: [
+            {
+              description: "Intern Account Activation Fee",
+              amountMinor: finalAmountMinor,
+            },
+          ],
+          isInternPayment: true,
+        });
+      }
+
+      // Employer payment invoice (existing logic)
 
       const payment = await storage.getEmployerPaymentByOrderId(orderId);
       if (!payment) return res.status(404).json({ message: "Order not found" });

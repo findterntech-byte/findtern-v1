@@ -164,6 +164,18 @@ export default function AdminReportsPage() {
   const [dateRange, setDateRange] = useState("last-18-months");
   const [activeTab, setActiveTab] = useState("overview");
   const [currencyFilter] = useState<"INR" | "USD">("INR");
+
+  const INR_CONVERSION_RATE = 100; // 1 USD = 100 INR
+
+  // Helper to convert USD to INR for display
+  const convertToINR = (amount: number, currency?: string) => {
+    if (!amount) return 0;
+    const curr = String(currency ?? "INR").toUpperCase();
+    if (curr === "USD") {
+      return amount * INR_CONVERSION_RATE;
+    }
+    return amount;
+  };
   const [receivablesFilter, setReceivablesFilter] = useState<"candidate" | "company" | "both">("both");
   const payablesFilter: "candidate" = "candidate";
   const [customFrom, setCustomFrom] = useState<string>("");
@@ -270,9 +282,10 @@ export default function AdminReportsPage() {
 
   const weeklyActivityChartData = useMemo(() => weeklyActivityData.map((d) => ({ ...d, proposals: (d as any).proposals ?? (d as any).applications ?? 0 })), [weeklyActivityData]);
 
-  const formatCurrency = (amount: number) => {
-    const locale = currencyFilter === "INR" ? "en-IN" : "en-US";
-    return new Intl.NumberFormat(locale, { style: "currency", currency: currencyFilter, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+  const formatCurrency = (amount: number, originalCurrency?: string) => {
+    // Convert to INR for display (1 USD = 100 INR)
+    const inrAmount = convertToINR(amount, originalCurrency);
+    return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(inrAmount);
   };
 
   const exportPayload = useMemo(() => {
@@ -318,6 +331,13 @@ export default function AdminReportsPage() {
                 <SelectItem value="last-6-months">Last 6 Months</SelectItem>
                 <SelectItem value="last-18-months">Last 18 Months</SelectItem>
                 <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={currencyFilter} onValueChange={(v) => setCurrencyFilter(v as "INR" | "USD")}>
+              <SelectTrigger className="h-10 w-[120px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="INR">INR</SelectItem>
+                <SelectItem value="USD">USD</SelectItem>
               </SelectContent>
             </Select>
             {dateRange === "custom" && (
@@ -501,7 +521,7 @@ export default function AdminReportsPage() {
                             <ChartTooltip content={({ active, payload, label }) => {
                               if (!active || !payload?.length) return null;
                               const p = payload[0]?.payload ?? {};
-                              return <div className="rounded-lg border bg-background p-2 shadow-sm"><p className="text-xs font-medium">{String(p?.skill ?? label)}</p><p className="text-xs text-muted-foreground">Avg: {formatCurrency(p?.avgPay ?? 0)}</p></div>;
+                              return <div className="rounded-lg border bg-background p-2 shadow-sm"><p className="text-xs font-medium">{String(p?.skill ?? label)}</p><p className="text-xs text-muted-foreground">Avg: {formatCurrency(p?.avgPay ?? 0, "USD")}</p></div>;
                             }} />
                             <Bar dataKey="avgPay" radius={[0, 4, 4, 0]} fill="var(--color-avgPay)" />
                           </BarChart>
@@ -795,6 +815,36 @@ Clear
                   </Card>
                 )}
 
+                {/* Summary Cards */}
+                {txData?.totals && (
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <Card className="p-4 border-l-4 border-l-emerald-500">
+                      <p className="text-xs text-muted-foreground uppercase">Paid Receivables</p>
+                      <p className="text-2xl font-bold text-emerald-600">
+                        {isTxLoading ? "..." : formatCurrency(txData.totals.receivables?.paidAmount ?? 0, "INR")}
+                      </p>
+                    </Card>
+                    <Card className="p-4 border-l-4 border-l-amber-500">
+                      <p className="text-xs text-muted-foreground uppercase">Pending Receivables</p>
+                      <p className="text-2xl font-bold text-amber-600">
+                        {isTxLoading ? "..." : formatCurrency(txData.totals.receivables?.pendingAmount ?? 0, "INR")}
+                      </p>
+                    </Card>
+                    <Card className="p-4 border-l-4 border-l-emerald-500">
+                      <p className="text-xs text-muted-foreground uppercase">Paid Payables</p>
+                      <p className="text-2xl font-bold text-emerald-600">
+                        {isTxLoading ? "..." : formatCurrency(txData.totals.payables?.paidAmount ?? 0, "INR")}
+                      </p>
+                    </Card>
+                    <Card className="p-4 border-l-4 border-l-amber-500">
+                      <p className="text-xs text-muted-foreground uppercase">Pending Payables</p>
+                      <p className="text-2xl font-bold text-amber-600">
+                        {isTxLoading ? "..." : formatCurrency(txData.totals.payables?.pendingAmount ?? 0, "INR")}
+                      </p>
+                    </Card>
+                  </div>
+                )}
+
                 <Card className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div><h3 className="font-semibold">Receivables</h3><p className="text-xs text-muted-foreground">Employer billing & candidate activation</p></div>
@@ -807,10 +857,10 @@ Clear
                     </div>
                   </div>
                   <Table>
-                    <TableHeader><TableRow className="bg-muted/40"><TableHead className="text-xs">Date</TableHead><TableHead className="text-xs">Source</TableHead><TableHead className="text-xs">Description</TableHead><TableHead className="text-xs">Candidate</TableHead><TableHead className="text-xs">Company</TableHead><TableHead className="text-xs text-right">Amount</TableHead><TableHead className="text-xs">Status</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow className="bg-muted/40"><TableHead className="text-xs">Date</TableHead><TableHead className="text-xs">Source</TableHead><TableHead className="text-xs">Description</TableHead><TableHead className="text-xs">Candidate</TableHead><TableHead className="text-xs">Company</TableHead><TableHead className="text-xs text-right">Amount</TableHead><TableHead className="text-xs">Status</TableHead><TableHead className="text-xs">Action</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {(txData?.receivables ?? []).length === 0 && !isTxLoading ? (
-                        <TableRow><TableCell colSpan={7}><EmptyState icon={DollarSign} title="No receivables" description="Receivables will appear here" /></TableCell></TableRow>
+                        <TableRow><TableCell colSpan={8}><EmptyState icon={DollarSign} title="No receivables" description="Receivables will appear here" /></TableCell></TableRow>
                       ) : (txData?.receivables ?? []).map((r) => (
                         <TableRow key={r.id} className="hover:bg-muted/30 transition-colors">
                           <TableCell className="text-sm whitespace-nowrap">{r.date}</TableCell>
@@ -818,8 +868,23 @@ Clear
                           <TableCell className="text-sm max-w-[200px] truncate">{r.description}</TableCell>
                           <TableCell className="text-sm max-w-[120px] truncate">{r.candidateName ?? "—"}</TableCell>
                           <TableCell className="text-sm max-w-[120px] truncate">{r.companyName ?? "—"}</TableCell>
-                          <TableCell className="text-sm text-right font-medium">{new Intl.NumberFormat("en-IN", { style: "currency", currency: r.currency || "INR", minimumFractionDigits: 0 }).format(r.amountMajor)}</TableCell>
+                          <TableCell className="text-sm text-right font-medium">{formatCurrency(r.amountMajor, r.currency)}</TableCell>
                           <TableCell><Badge className={r.status?.toLowerCase() === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}>{r.status}</Badge></TableCell>
+                          <TableCell>
+                            {r.status?.toLowerCase() === "paid" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => {
+                                  const orderId = r.id;
+                                  window.open(`/api/admin/orders/${encodeURIComponent(orderId)}/invoice`, "_blank");
+                                }}
+                              >
+                                Invoice
+                              </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -840,7 +905,7 @@ Clear
                           <TableCell className="text-sm whitespace-nowrap">{r.date}</TableCell>
                           <TableCell className="text-sm max-w-[180px] truncate">{r.candidateName ?? "—"}</TableCell>
                           <TableCell className="text-sm max-w-[150px] truncate">{r.referenceId ?? "—"}</TableCell>
-                          <TableCell className="text-sm text-right font-medium">{new Intl.NumberFormat("en-IN", { style: "currency", currency: r.currency || "INR", minimumFractionDigits: 0 }).format(r.amountMajor)}</TableCell>
+                          <TableCell className="text-sm text-right font-medium">{formatCurrency(r.amountMajor, r.currency)}</TableCell>
                           <TableCell><Badge className={r.status?.toLowerCase() === "paid" ? "bg-emerald-100 text-emerald-700" : r.status?.toLowerCase() === "failed" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}>{r.status}</Badge></TableCell>
                         </TableRow>
                       ))}

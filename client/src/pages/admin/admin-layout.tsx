@@ -49,6 +49,8 @@ import {
   AlertCircle,
   X,
   History,
+  Tag,
+  FileText,
 } from "lucide-react";
 import findternLogo from "/logo-1.jpg";
 import React, { ReactNode, useState, useCallback } from "react";
@@ -105,6 +107,8 @@ const reportsItems: NavItem[] = [
   { label: "Reports", icon: Newspaper, href: "/admin/reports", required: "reports:read" },
   { label: "Transactions", icon: Receipt, href: "/admin/transactions", required: "transactions:read" },
   { label: "Orders", icon: ShoppingCart, href: "/admin/orders", required: "transactions:read" },
+  { label: "Promo Codes", icon: Tag, href: "/admin/promo-codes", required: "cms:read" },
+  { label: "Intern Invoices", icon: FileText, href: "/admin/intern-invoices", required: "reports:read" },
 ];
 
 const cmsItems: NavItem[] = [
@@ -146,7 +150,7 @@ export function AdminLayout({ title, description, children }: AdminLayoutProps) 
 
   const isInternRoute = location.startsWith("/admin/interns");
   const isCompanyRoute = location.startsWith("/admin/companies") || location.startsWith("/admin/projects");
-  const isReportsRoute = location.startsWith("/admin/reports") || location.startsWith("/admin/transactions") || location.startsWith("/admin/orders");
+  const isReportsRoute = location.startsWith("/admin/reports") || location.startsWith("/admin/transactions") || location.startsWith("/admin/orders") || location.startsWith("/admin/promo-codes") || location.startsWith("/admin/intern-invoices");
   const isCmsRoute = location.startsWith("/admin/website");
   const [internOpen, setInternOpen] = React.useState<boolean>(isInternRoute);
   const [companyOpen, setCompanyOpen] = React.useState<boolean>(isCompanyRoute);
