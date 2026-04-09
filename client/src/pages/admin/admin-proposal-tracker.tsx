@@ -1130,6 +1130,29 @@ export default function AdminProposalTrackerPage() {
                       <div className="divide-y divide-muted/50">
                         {Object.entries(selectedProposal.offerDetails).map(([key, value]) => {
                           const formattedKey = formatKey(key);
+
+                          if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+                            const nestedEntries = Object.entries(value as Record<string, any>);
+                            if (nestedEntries.length === 0) return null;
+                            return (
+                              <div key={key} className="p-4">
+                                <div className="grid grid-cols-[160px,1fr] items-start gap-4 mb-2">
+                                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                    {formattedKey}
+                                  </span>
+                                  <div className="text-xs text-muted-foreground">
+                                    {nestedEntries.map(([k, v]) => (
+                                      <div key={k} className="flex gap-2 py-0.5">
+                                        <span className="font-medium text-slate-700">{formatKey(k)}:</span>
+                                        <span className="font-normal">{v !== null && typeof v === "object" ? JSON.stringify(v) : String(v ?? "-")}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+
                           const valStr = String(value);
                           const isValueHTML = isHTML(valStr);
 

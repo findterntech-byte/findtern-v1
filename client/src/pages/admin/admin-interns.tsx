@@ -1767,12 +1767,24 @@ export default function AdminInternsPage() {
 
             <div className="relative w-full overflow-hidden rounded-xl border bg-card shadow-sm">
               <div className="overflow-x-auto">
-                <Table className="min-w-[1700px]">
+                <Table className="min-w-[1200px]">
                   <TableHeader className="bg-muted/50">
                     <TableRow className="hover:bg-transparent">
                   {visibleColumns.map((col) => (
-                    <TableHead key={col.key} className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                      <ColumnHeader col={col} alignRight={col.key === "actions"} />
+                    <TableHead 
+                      key={col.key} 
+                      className={cn(
+                        "whitespace-nowrap text-xs font-semibold text-muted-foreground",
+                        col.key === "sno" && "sticky left-0 bg-background z-20 w-14",
+                        col.key === "name" && "sticky left-14 bg-background z-20",
+                        col.key === "email" && "sticky left-[180px] bg-background z-20"
+                      )}
+                    >
+                      {col.key === "sno" ? (
+                        <span className="truncate">{col.label}</span>
+                      ) : (
+                        <ColumnHeader col={col} alignRight={col.key === "actions"} />
+                      )}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -1816,12 +1828,12 @@ export default function AdminInternsPage() {
                     className="group border-b transition-colors hover:bg-muted/30"
                   >
                     {columnVisibility.sno && (
-                      <TableCell className="py-4 text-xs text-muted-foreground font-medium">
+                      <TableCell className="py-4 text-xs text-muted-foreground font-medium sticky left-0 bg-background z-20 w-14 border-r">
                         {startIndex + index + 1}
                       </TableCell>
                     )}
                     {columnVisibility.name && (
-                      <TableCell className="py-4">
+                      <TableCell className="py-4 sticky left-14 bg-background z-20 border-r">
                         <div className="flex flex-col gap-0.5">
                           <button
                             onClick={() => setLocation(`/admin/interns/${encodeURIComponent(intern.id)}`)}
@@ -1838,7 +1850,7 @@ export default function AdminInternsPage() {
                       </TableCell>
                     )}
                     {columnVisibility.email && (
-                      <TableCell className="py-4 whitespace-nowrap text-sm text-muted-foreground">
+                      <TableCell className="py-4 whitespace-nowrap text-sm text-muted-foreground sticky left-[180px] bg-background z-20 border-r">
                         {intern.email}
                       </TableCell>
                     )}
