@@ -57,6 +57,7 @@ import {
   CheckCircle2,
   Clock,
   Activity,
+  Calendar,
   UserCheck,
   LayoutGrid,
   ListFilter,
@@ -138,7 +139,7 @@ type AdminDashboardAnalytics = {
 
 export default function AdminInternsPage() {
   const [search, setSearch] = useState("");
-  const [interviewStatusFilter, setInterviewStatusFilter] = useState<"" | "Waiting" | "Applied" | "Interview" | "Completed" | "Awaiting">("");
+  const [interviewStatusFilter, setInterviewStatusFilter] = useState<"" | "Waiting" | "Applied" | "Scheduled" | "Completed" | "Awaiting">("");
   const [liveHiddenFilter, setLiveHiddenFilter] = useState<"" | "Live" | "Hidden" | "Deactivated">("");
   const [internshipStatusFilter, setInternshipStatusFilter] = useState<"" | "Ongoing" | "Completed" | "-">("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<"" | "Paid" | "Unpaid">("");
@@ -146,6 +147,8 @@ export default function AdminInternsPage() {
   const [profileStatusFilter, setProfileStatusFilter] = useState<"" | "Complete" | "Incomplete">("");
   const [internPayoutFilter, setInternPayoutFilter] = useState<"" | "Not started" | "Pending" | "Completed">("");
   const [offerStatusFilter, setOfferStatusFilter] = useState<"" | "Rejected">("");
+  const [offerTypeFilter, setOfferTypeFilter] = useState<"" | "Full-time" | "Internship">("");
+  const [upcomingPaymentDueFilter, setUpcomingPaymentDueFilter] = useState<"" | "This week" | "This month" | "Overdue" | "Has date" | "No date">("");
   const [minFindternScore, setMinFindternScore] = useState<string>("");
   const [sortBy, setSortBy] = useState<"createdAt" | "name" | "email" | "phone" | "toPay" | "pendingInterviewCount">("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -187,6 +190,8 @@ export default function AdminInternsPage() {
     setProfileStatusFilter("");
     setInternPayoutFilter("");
     setOfferStatusFilter("");
+    setOfferTypeFilter("");
+    setUpcomingPaymentDueFilter("");
     setMinFindternScore("");
     setSortBy("createdAt");
     setSortDir("desc");
@@ -204,6 +209,8 @@ export default function AdminInternsPage() {
       profileStatusFilter !== "" ||
       internPayoutFilter !== "" ||
       offerStatusFilter !== "" ||
+      offerTypeFilter !== "" ||
+      upcomingPaymentDueFilter !== "" ||
       minFindternScore !== ""
     );
   }, [
@@ -216,6 +223,8 @@ export default function AdminInternsPage() {
     profileStatusFilter,
     internPayoutFilter,
     offerStatusFilter,
+    offerTypeFilter,
+    upcomingPaymentDueFilter,
     minFindternScore,
   ]);
 
@@ -332,7 +341,7 @@ export default function AdminInternsPage() {
       { key: "Rejected", value: rejected, fill: "hsl(var(--destructive))" },
     ].filter((x) => x.value > 0);
 
-    const interviewSeries = ["Waiting", "Applied", "Interview", "Completed"].map(
+    const interviewSeries = ["Waiting", "Applied", "Interview", "Completed", "Expired"].map(
       (k) => ({
         key: k,
         value: Number(interviewCounts[k] ?? 0),
@@ -344,6 +353,7 @@ export default function AdminInternsPage() {
       Applied: "hsl(var(--warning))",
       Interview: "hsl(var(--primary))",
       Completed: "hsl(var(--success, 142 76% 36%))",
+      Expired: "hsl(var(--destructive))",
     };
 
     const interviewSeriesWithFill = interviewSeries
@@ -361,6 +371,7 @@ export default function AdminInternsPage() {
       Applied: { label: "Applied", color: "hsl(var(--warning))" },
       Interview: { label: "Interview", color: "hsl(var(--primary))" },
       Completed: { label: "Completed", color: "hsl(var(--success, 142 76% 36%))" },
+      Expired: { label: "Expired", color: "hsl(var(--destructive))" },
     } as const;
 
     return {
@@ -633,6 +644,7 @@ export default function AdminInternsPage() {
         // if (c.key === "interviewSent") row[c.label] = intern.interviewSentCount ?? 0;
         if (c.key === "interviewScheduled") row[c.label] = intern.interviewScheduledCount ?? 0;
         if (c.key === "interviewCompleted") row[c.label] = intern.interviewCompletedCount ?? 0;
+        if (c.key === "interviewExpired") row[c.label] = intern.interviewExpiredCount ?? 0;
         if (c.key === "findternScore") row[c.label] = typeof intern.findternScore === "number" ? intern.findternScore : "-";
         if (c.key === "profileStatus") row[c.label] = intern.isProfileComplete ? "Complete" : "Incomplete";
         if (c.key === "onboardingStatus") row[c.label] = intern.onboardingStatus ?? "Not onboarded";
@@ -769,11 +781,11 @@ export default function AdminInternsPage() {
 
   const filtered = interns.filter((intern) => {
     if (interviewStatusFilter) {
-      if (interviewStatusFilter === "Awaiting") {
+      const filterVal = interviewStatusFilter;
+      if (filterVal === "Awaiting") {
         if (intern.interview !== "Waiting") return false;
       } else {
-        const expected = interviewStatusFilter;
-        if (String(intern.interview ?? "") !== expected) return false;
+        if (String(intern.interview ?? "") !== filterVal) return false;
       }
     }
 
@@ -820,6 +832,33 @@ export default function AdminInternsPage() {
     if (offerStatusFilter) {
       const v = String(intern.offerStatus ?? "-");
       if (v !== offerStatusFilter) return false;
+    }
+
+    if (offerTypeFilter) {
+      const v = intern.offerType ?? null;
+      if (v !== offerTypeFilter) return false;
+    }
+
+    if (upcomingPaymentDueFilter) {
+      const dueAt = intern.upcomingPaymentDueAt ? new Date(intern.upcomingPaymentDueAt) : null;
+      const hasDate = dueAt !== null && !Number.isNaN(dueAt.getTime());
+      const now = new Date();
+      const weekEnd = new Date(now);
+      weekEnd.setDate(weekEnd.getDate() + 7);
+      const monthEnd = new Date(now);
+      monthEnd.setMonth(monthEnd.getMonth() + 1);
+
+      if (upcomingPaymentDueFilter === "No date") {
+        if (hasDate) return false;
+      } else if (upcomingPaymentDueFilter === "Has date") {
+        if (!hasDate) return false;
+      } else if (upcomingPaymentDueFilter === "Overdue") {
+        if (!hasDate || dueAt >= now) return false;
+      } else if (upcomingPaymentDueFilter === "This week") {
+        if (!hasDate || dueAt < now || dueAt > weekEnd) return false;
+      } else if (upcomingPaymentDueFilter === "This month") {
+        if (!hasDate || dueAt < now || dueAt > monthEnd) return false;
+      }
     }
 
     const minScore = Number(String(minFindternScore ?? "").trim());
@@ -900,6 +939,8 @@ export default function AdminInternsPage() {
     profileStatusFilter,
     internPayoutFilter,
     offerStatusFilter,
+    offerTypeFilter,
+    upcomingPaymentDueFilter,
     minFindternScore,
     pageSize,
     sortBy,
@@ -1520,7 +1561,7 @@ export default function AdminInternsPage() {
                         <SelectItem value="__clear__">All Status</SelectItem>
                         <SelectItem value="Waiting">Not applied</SelectItem>
                         <SelectItem value="Applied">Applied / Pending</SelectItem>
-                        <SelectItem value="Interview">Scheduled</SelectItem>
+                        <SelectItem value="Scheduled">Scheduled</SelectItem>
                         <SelectItem value="Awaiting">Waiting</SelectItem>
                         <SelectItem value="Completed">Completed</SelectItem>
                       </SelectContent>
@@ -1681,6 +1722,43 @@ export default function AdminInternsPage() {
                                     <SelectItem value="__clear__">All Profile Status</SelectItem>
                                     <SelectItem value="Complete">Profile Complete</SelectItem>
                                     <SelectItem value="Incomplete">Incomplete Profile</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-2.5">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-2 px-1">
+                                  <Receipt className="h-3.5 w-3.5" />
+                                  Offer Type
+                                </label>
+                                <Select value={offerTypeFilter} onValueChange={(v) => setOfferTypeFilter(v === "__clear__" ? "" : (v as any))}>
+                                  <SelectTrigger className="h-10 bg-background border-muted-foreground/20 shadow-sm rounded-lg">
+                                    <SelectValue placeholder="All Offer Types" />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-lg">
+                                    <SelectItem value="__clear__">All Offer Types</SelectItem>
+                                    <SelectItem value="Full-time">Full-time</SelectItem>
+                                    <SelectItem value="Internship">Internship</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-2.5">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-2 px-1">
+                                  <Calendar className="h-3.5 w-3.5" />
+                                  Upcoming Payment
+                                </label>
+                                <Select value={upcomingPaymentDueFilter} onValueChange={(v) => setUpcomingPaymentDueFilter(v === "__clear__" ? "" : (v as any))}>
+                                  <SelectTrigger className="h-10 bg-background border-muted-foreground/20 shadow-sm rounded-lg">
+                                    <SelectValue placeholder="All Due Dates" />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-lg">
+                                    <SelectItem value="__clear__">All Due Dates</SelectItem>
+                                    <SelectItem value="This week">This week</SelectItem>
+                                    <SelectItem value="This month">This month</SelectItem>
+                                    <SelectItem value="Overdue">Overdue</SelectItem>
+                                    <SelectItem value="Has date">Has date</SelectItem>
+                                    <SelectItem value="No date">No date</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -1929,13 +2007,17 @@ export default function AdminInternsPage() {
 
                     {columnVisibility.interviewExpired && (
                       <TableCell className="py-4 text-center">
-                        {Number(intern.interviewExpiredCount ?? 0) > 0 ? (
-                          <Badge className="bg-red-50/50 text-red-700 border-red-200/50 font-bold" variant="outline">
-                            {intern.interviewExpiredCount}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground/40">-</span>
-                        )}
+                        {(() => {
+                          const count = Number(intern.interviewExpiredCount ?? 0);
+                          if (count > 0) {
+                            return (
+                              <Badge className="bg-red-50/50 text-red-700 border-red-200/50 font-bold" variant="outline">
+                                {count}
+                              </Badge>
+                            );
+                          }
+                          return <span className="text-muted-foreground/40 text-xs">{count}</span>;
+                        })()}
                       </TableCell>
                     )}
 

@@ -127,7 +127,7 @@ export default function AdminPromoCodesPage() {
         discountType: payload.discountType,
         discountValue: Number(payload.discountValue),
         maxUsages: payload.maxUsages ? Number(payload.maxUsages) : null,
-        minOrderAmountMinor: payload.minOrderAmountMinor ? Math.round(Number(payload.minOrderAmountMinor) * 100) : null,
+        minOrderAmountMinor: 249900,
         validFrom: payload.validFrom ? new Date(payload.validFrom).toISOString() : null,
         validUntil: payload.validUntil ? new Date(payload.validUntil).toISOString() : null,
         isActive: payload.isActive,
@@ -149,7 +149,7 @@ export default function AdminPromoCodesPage() {
         discountType: payload.discountType,
         discountValue: Number(payload.discountValue),
         maxUsages: payload.maxUsages ? Number(payload.maxUsages) : null,
-        minOrderAmountMinor: payload.minOrderAmountMinor ? Math.round(Number(payload.minOrderAmountMinor) * 100) : null,
+        minOrderAmountMinor: 249900,
         validFrom: payload.validFrom ? new Date(payload.validFrom).toISOString() : null,
         validUntil: payload.validUntil ? new Date(payload.validUntil).toISOString() : null,
         isActive: payload.isActive,
@@ -280,7 +280,7 @@ export default function AdminPromoCodesPage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <div className="text-sm font-medium">Description (optional)</div>
+                  <div className="text-sm font-medium">Description *</div>
                   <Input
                     value={form.description}
                     onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
@@ -327,9 +327,9 @@ export default function AdminPromoCodesPage() {
                     <Input
                       type="number"
                       min={0}
-                      value={String(form.minOrderAmountMinor)}
-                      onChange={(e) => setForm((p) => ({ ...p, minOrderAmountMinor: e.target.value }))}
-                      placeholder="Leave empty for any"
+                      value={2499}
+                      disabled
+                      placeholder="2499"
                     />
                   </div>
                 </div>
@@ -445,7 +445,7 @@ export default function AdminPromoCodesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {item.minOrderAmountMinor ? `₹${(item.minOrderAmountMinor ).toFixed(0)}` : "-"}
+                        ₹2499
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 text-xs">

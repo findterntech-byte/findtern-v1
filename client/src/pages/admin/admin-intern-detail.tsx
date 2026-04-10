@@ -68,6 +68,7 @@ import {
 import findternLogo from "/logo.png";
 import DOMPurify from "dompurify";
 import { cn } from "@/lib/utils";
+import { DEFAULT_USD_TO_INR_RATE } from "@/lib/currency";
 
 const scrollbarStyles = `
   .custom-scrollbar-horizontal::-webkit-scrollbar {
@@ -817,15 +818,24 @@ export default function AdminInternDetailPage() {
   }, [payouts]);
 
   const kpis = useMemo(() => {
-    const currency = payouts[0]?.currency ? String(payouts[0].currency).toUpperCase() : "INR";
     const totalPaid = payouts
       .filter(p => String(p.status ?? "").toLowerCase() === "paid")
-      .reduce((sum, p) => sum + (Number(p.amountMinor ?? 0) || 0), 0) / 100;
+      .reduce((sum, p) => {
+        const cur = String(p.currency ?? "INR").toUpperCase();
+        const minor = Number(p.amountMinor ?? 0) || 0;
+        const inrMinor = cur === "USD" ? minor * DEFAULT_USD_TO_INR_RATE : minor;
+        return sum + inrMinor;
+      }, 0) / 100;
     const totalPaidRounded = Math.round(totalPaid * 100) / 100;
     
     const totalPending = payouts
       .filter(p => String(p.status ?? "").toLowerCase() === "pending")
-      .reduce((sum, p) => sum + (Number(p.amountMinor ?? 0) || 0), 0) / 100;
+      .reduce((sum, p) => {
+        const cur = String(p.currency ?? "INR").toUpperCase();
+        const minor = Number(p.amountMinor ?? 0) || 0;
+        const inrMinor = cur === "USD" ? minor * DEFAULT_USD_TO_INR_RATE : minor;
+        return sum + inrMinor;
+      }, 0) / 100;
     const totalPendingRounded = Math.round(totalPending * 100) / 100;
 
     const comm = Number((summary as any)?.ratings?.communication);
@@ -838,7 +848,6 @@ export default function AdminInternDetailPage() {
       : null;
 
     return {
-      currency,
       totalPaid: totalPaidRounded,
       totalPending: totalPendingRounded,
       hasPaidPayouts: totalPaidRounded > 0,
@@ -867,8 +876,9 @@ export default function AdminInternDetailPage() {
   };
 
   const formatMoneyInInrIfUsd = (amountMinor: number, currency: string) => {
-    // Backend now returns all amounts in INR paise for consistency in admin views.
-    return formatMoney(amountMinor, "INR");
+    const cur = String(currency || "INR").toUpperCase();
+    const inrMinor = cur === "USD" ? amountMinor * DEFAULT_USD_TO_INR_RATE : amountMinor;
+    return formatMoney(inrMinor, "INR");
   };
 
   const handleCreatePayout = async () => {
@@ -1727,7 +1737,7 @@ export default function AdminInternDetailPage() {
                   {kpis.totalPending > 0 ? "Pending Payouts" : "Total Payouts"}
                 </p>
                 <p className="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight text-emerald-600">
-                  {kpis.currency} {kpis.totalPending > 0 ? kpis.totalPending.toLocaleString() : kpis.totalPaid.toLocaleString()}
+                  ₹ {kpis.totalPending > 0 ? kpis.totalPending.toLocaleString("en-IN") : kpis.totalPaid.toLocaleString("en-IN")}
                 </p>
                 <p className="text-[10px] sm:text-xs text-muted-foreground">
                   {kpis.totalPending > 0 ? "Pending" : "Paid"}
@@ -2431,7 +2441,7 @@ export default function AdminInternDetailPage() {
                                 <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{companyLabel}</td>
                                 <td className="p-4 align-middle whitespace-nowrap min-w-[150px]">{projectLabel}</td>
                                 <td className="p-4 align-middle whitespace-nowrap font-medium min-w-[120px]">
-                                  {formatMoney(p.amountMinor ?? 0, p.currency)}
+                                  {formatMoneyInInrIfUsd(p.amountMinor ?? 0, p.currency)}
                                 </td>
                                 <td className="p-4 align-middle whitespace-nowrap min-w-[100px]">{String(p.method ?? "-")}</td>
                                 <td className="p-4 align-middle whitespace-nowrap font-mono text-xs min-w-[150px]">

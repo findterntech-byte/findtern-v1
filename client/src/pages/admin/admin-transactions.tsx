@@ -579,7 +579,7 @@ export default function AdminTransactionsPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-2">
           <StatCard
             icon={IndianRupee}
             label="Total Revenue"
@@ -590,26 +590,8 @@ export default function AdminTransactionsPage() {
             iconBg="bg-emerald-100"
             iconColor="text-emerald-600"
           />
-          <StatCard
-            icon={CreditCard}
-            label="Total Expenses"
-            value={isLoading ? "..." : formatCurrency(totalExpenses, currencyForTotals)}
-            trend={isLoading ? "..." : "Payouts"}
-            trendType="down"
-            gradient="bg-red-500"
-            iconBg="bg-red-100"
-            iconColor="text-red-600"
-          />
-          <StatCard
-            icon={RefreshCw}
-            label="Pending Amount"
-            value={isLoading ? "..." : formatCurrency(pendingAmount, currencyForTotals)}
-            trend={isLoading ? "..." : "Awaiting"}
-            trendType="neutral"
-            gradient="bg-yellow-500"
-            iconBg="bg-yellow-100"
-            iconColor="text-yellow-600"
-          />
+          
+        
           <StatCard
             icon={Wallet}
             label="Total Transactions"
