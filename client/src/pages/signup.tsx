@@ -344,6 +344,7 @@ export default function SignupPage() {
             alt="Findtern - Internship Simplified"
             className="h-28  w-auto"
             data-testid="img-logo"
+            style={{marginLeft:"75px"}}
           />
         </div>
 

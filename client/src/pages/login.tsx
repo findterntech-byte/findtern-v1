@@ -241,6 +241,7 @@ export default function LoginPage() {
             src={findternLogo} 
             alt="Findtern - Internship Simplified" 
             className="h-28  w-auto"
+            style={{marginLeft:"75px"}}
             data-testid="img-logo"
           />
         </div>

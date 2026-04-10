@@ -363,6 +363,7 @@ export default function EmployerSignupPage() {
                 src={findternLogo} 
                 alt="Findtern" 
                 className="inner_logo__img"
+                style={{marginLeft:"70px"}}
               />
             </div>
           </div>
