@@ -150,7 +150,7 @@ export default function AdminInternsPage() {
   const [offerTypeFilter, setOfferTypeFilter] = useState<"" | "Full-time" | "Internship">("");
   const [upcomingPaymentDueFilter, setUpcomingPaymentDueFilter] = useState<"" | "This week" | "This month" | "Overdue" | "Has date" | "No date">("");
   const [minFindternScore, setMinFindternScore] = useState<string>("");
-  const [sortBy, setSortBy] = useState<"createdAt" | "name" | "email" | "phone" | "toPay" | "pendingInterviewCount">("createdAt");
+  const [sortBy, setSortBy] = useState<"createdAt" | "name" | "email" | "phone" | "toPay" | "pendingInterviewCount" | "findternScore" | "upcomingPaymentDate">("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<5 | 10 | 25 | 50>(10);
@@ -239,11 +239,6 @@ export default function AdminInternsPage() {
     | "onboardingStatus"
     | "profileStatus"
     // | "interviewSent"
-    | "interviewScheduled"
-    | "interviewCompleted"
-    | "interviewExpired"
-    | "interviewPending"
-    | "totalInterview"
     // | "pendingProposals"
     | "toPay"
     | "upcomingPaymentDate"
@@ -274,17 +269,12 @@ export default function AdminInternsPage() {
         { key: "createdAt" as const, label: "Created On", sortKey: "createdAt" as const },
         { key: "interview" as const, label: "AI Interview" },
         // { key: "interviewSent" as const, label: "Sent" },
-        { key: "interviewScheduled" as const, label: "Scheduled" },
-        { key: "interviewCompleted" as const, label: "Completed" },
-        { key: "interviewExpired" as const, label: "Expired" },
-        { key: "interviewPending" as const, label: "Pending" },
-        { key: "totalInterview" as const, label: "Total" },
-        { key: "findternScore" as const, label: "Findtern Score" },
+        { key: "findternScore" as const, label: "Findtern Score", sortKey: "findternScore" as const },
         { key: "profileStatus" as const, label: "Profile Status" },
         { key: "onboardingStatus" as const, label: "Onboarding status", filterKey: "onboardingStatus" as const },
         // { key: "pendingProposals" as const, label: "Pending Interviews", sortKey: "pendingInterviewCount" as const },
         { key: "toPay" as const, label: "Pending Payout", sortKey: "toPay" as const },
-        { key: "upcomingPaymentDate" as const, label: "Upcoming payment date" },
+        { key: "upcomingPaymentDate" as const, label: "Upcoming payment date", sortKey: "upcomingPaymentDate" as const },
         { key: "totalToPay" as const, label: "Total to pay" },
         { key: "paidTillNow" as const, label: "Paid till now" },
         { key: "leftToPay" as const, label: "Left to pay" },
@@ -642,9 +632,6 @@ export default function AdminInternsPage() {
         if (c.key === "createdAt") row[c.label] = intern.createdAt;
         if (c.key === "interview") row[c.label] = intern.interview;
         // if (c.key === "interviewSent") row[c.label] = intern.interviewSentCount ?? 0;
-        if (c.key === "interviewScheduled") row[c.label] = intern.interviewScheduledCount ?? 0;
-        if (c.key === "interviewCompleted") row[c.label] = intern.interviewCompletedCount ?? 0;
-        if (c.key === "interviewExpired") row[c.label] = intern.interviewExpiredCount ?? 0;
         if (c.key === "findternScore") row[c.label] = typeof intern.findternScore === "number" ? intern.findternScore : "-";
         if (c.key === "profileStatus") row[c.label] = intern.isProfileComplete ? "Complete" : "Incomplete";
         if (c.key === "onboardingStatus") row[c.label] = intern.onboardingStatus ?? "Not onboarded";
@@ -905,6 +892,22 @@ export default function AdminInternsPage() {
       const bv = Number(b.pendingInterviewCount ?? 0);
       const aSafe = Number.isFinite(av) ? av : 0;
       const bSafe = Number.isFinite(bv) ? bv : 0;
+      return (aSafe - bSafe) * dir;
+    }
+
+    if (sortBy === "findternScore") {
+      const av = Number(a.findternScore ?? 0);
+      const bv = Number(b.findternScore ?? 0);
+      const aSafe = Number.isFinite(av) ? av : 0;
+      const bSafe = Number.isFinite(bv) ? bv : 0;
+      return (aSafe - bSafe) * dir;
+    }
+
+    if (sortBy === "upcomingPaymentDate") {
+      const aDue = a.upcomingPaymentDueAt ? new Date(a.upcomingPaymentDueAt).getTime() : NaN;
+      const bDue = b.upcomingPaymentDueAt ? new Date(b.upcomingPaymentDueAt).getTime() : NaN;
+      const aSafe = Number.isFinite(aDue) ? aDue : Number.POSITIVE_INFINITY;
+      const bSafe = Number.isFinite(bDue) ? bDue : Number.POSITIVE_INFINITY;
       return (aSafe - bSafe) * dir;
     }
 
@@ -1793,6 +1796,10 @@ export default function AdminInternsPage() {
                                     <SelectItem value="createdAt">Created On</SelectItem>
                                     <SelectItem value="name">Name</SelectItem>
                                     <SelectItem value="email">Email</SelectItem>
+                                    <SelectItem value="findternScore">Findtern Score</SelectItem>
+                                    <SelectItem value="upcomingPaymentDate">Upcoming payment date</SelectItem>
+                                    <SelectItem value="toPay">Pending Payout</SelectItem>
+                                    <SelectItem value="pendingInterviewCount">Pending Interviews</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -1980,77 +1987,6 @@ export default function AdminInternsPage() {
                         )}
                       </TableCell>
                     )} */}
-
-                    {columnVisibility.interviewScheduled && (
-                      <TableCell className="py-4 text-center">
-                        {Number(intern.interviewScheduledCount ?? 0) > 0 ? (
-                          <Badge className="bg-emerald-50/50 text-emerald-700 border-emerald-200/50 font-bold" variant="outline">
-                            {intern.interviewScheduledCount}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground/40">-</span>
-                        )}
-                      </TableCell>
-                    )}
-
-                    {columnVisibility.interviewCompleted && (
-                      <TableCell className="py-4 text-center">
-                        {Number(intern.interviewCompletedCount ?? 0) > 0 ? (
-                          <Badge className="bg-sky-50/50 text-sky-700 border-sky-200/50 font-bold" variant="outline">
-                            {intern.interviewCompletedCount}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground/40">-</span>
-                        )}
-                      </TableCell>
-                    )}
-
-                    {columnVisibility.interviewExpired && (
-                      <TableCell className="py-4 text-center">
-                        {(() => {
-                          const count = Number(intern.interviewExpiredCount ?? 0);
-                          if (count > 0) {
-                            return (
-                              <Badge className="bg-red-50/50 text-red-700 border-red-200/50 font-bold" variant="outline">
-                                {count}
-                              </Badge>
-                            );
-                          }
-                          return <span className="text-muted-foreground/40 text-xs">{count}</span>;
-                        })()}
-                      </TableCell>
-                    )}
-
-                    {columnVisibility.interviewPending && (
-                      <TableCell className="py-4 text-center">
-                        {Number(intern.pendingInterviewCount ?? 0) > 0 ? (
-                          <Badge className="bg-amber-50/50 text-amber-700 border-amber-200/50 font-bold" variant="outline">
-                            {intern.pendingInterviewCount}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground/40">-</span>
-                        )}
-                      </TableCell>
-                    )}
-
-                    {columnVisibility.totalInterview && (
-                      <TableCell className="py-4 text-center">
-                        {(() => {
-                          const total =  
-                                       (intern.interviewScheduledCount ?? 0) + 
-                                       (intern.interviewCompletedCount ?? 0) + 
-                                       (intern.interviewExpiredCount ?? 0) +
-                                       (intern.pendingInterviewCount ?? 0);
-                          return total > 0 ? (
-                            <Badge className="bg-purple-50/50 text-purple-700 border-purple-200/50 font-bold" variant="outline">
-                              {total}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground/40">-</span>
-                          );
-                        })()}
-                      </TableCell>
-                    )}
 
                     {columnVisibility.findternScore && (
                       <TableCell className="py-4 whitespace-nowrap text-sm font-bold text-primary">
