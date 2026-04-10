@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -802,12 +803,12 @@ export default function TimesheetsPage() {
                                           ID: {String(t.id).slice(0, 8)}
                                         </div>
                                         {String((t as any)?.internNote ?? "").trim() && (
-                                          <div className="mt-2 text-xs text-slate-700 bg-slate-50 rounded-lg border p-2">
+                                          <div className="mt-2 text-xs text-slate-700 bg-slate-50 rounded-lg border p-2 whitespace-pre-wrap">
                                             Your note: {String((t as any).internNote)}
                                           </div>
                                         )}
                                         {String(t.managerNote ?? "").trim() && (
-                                          <div className="mt-2 text-xs text-slate-700 bg-slate-50 rounded-lg border p-2">
+                                          <div className="mt-2 text-xs text-slate-700 bg-slate-50 rounded-lg border p-2 whitespace-pre-wrap">
                                             Manager note: {String(t.managerNote)}
                                           </div>
                                         )}
@@ -996,11 +997,12 @@ export default function TimesheetsPage() {
 
                 <div className="mt-4">
                   <div className="text-xs text-slate-600 mb-1">Note for hiring manager (optional)</div>
-                  <Input
+                  <Textarea
                     value={internNote}
                     onChange={(e) => setInternNote(e.target.value)}
                     placeholder="Add a note"
                     disabled={editorIsReadOnly}
+                    rows={3}
                   />
                 </div>
 

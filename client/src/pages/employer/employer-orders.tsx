@@ -1961,13 +1961,13 @@ export default function EmployerOrdersPage() {
                 const gstRate = 18;
                 const gstApplicable = currencyCode === "INR" && Number.isFinite(totalMinor) && totalMinor > 0;
 
-                const subtotalFromTotalMinor = gstApplicable ? Math.round((Math.max(0, totalMinor) * 100) / 118) : totalMinor;
-                const gstMinor = gstApplicable ? Math.round(subtotalFromTotalMinor * gstRate / 100) : 0;
-
-                const discountMinorRaw = Math.max(0, subtotalMinor - subtotalFromTotalMinor);
-                const discountRatio = subtotalMinor > 0 ? discountMinorRaw / subtotalMinor : 0;
-                const showTenPercentDiscount = discountMinorRaw > 0 && Math.abs(discountRatio - 0.1) <= 0.02 && !isFullTimeInvoice;
-                const discountMinor = showTenPercentDiscount ? discountMinorRaw : 0;
+                const serverDiscountMinor = Number(invoiceData?.discountMinor ?? 0);
+                const hasDiscount = serverDiscountMinor > 0 || (!isFullTimeInvoice && totalMinor > 0 && subtotalMinor > 0 && Math.abs((totalMinor / subtotalMinor) - 0.9) <= 0.005);
+                const preDiscountMinor = hasDiscount && subtotalMinor > 0 ? subtotalMinor : totalMinor;
+                const discountMinor = hasDiscount ? Math.round(preDiscountMinor * 0.1) : 0;
+                const subtotalAfterDiscountMinor = Math.max(0, preDiscountMinor - discountMinor);
+                const subtotalFromTotalMinor = subtotalAfterDiscountMinor;
+                const gstMinor = gstApplicable ? Math.round(subtotalAfterDiscountMinor * gstRate / 100) : 0;
 
                 return (
                   <div
@@ -2088,7 +2088,7 @@ export default function EmployerOrdersPage() {
                               })
                             )}
 
-                            {showTenPercentDiscount ? (
+                            {discountMinor > 0 ? (
                               <tr>
                                 <td className="px-3 py-2 text-sm font-semibold text-slate-900">Discount (10%)</td>
                                 <td className="px-3 py-2 text-right text-sm text-slate-900">
@@ -2913,7 +2913,14 @@ export default function EmployerOrdersPage() {
                                 <TableCell className="text-xs">{upcomingDate || "—"}</TableCell>
                                 <TableCell className="text-xs">{completedAt || "—"}</TableCell>
                                 <TableCell className="text-xs">{formatAmount(upcomingAmountMinor, currencyCode)}</TableCell>
-                                <TableCell className="text-xs">{formatAmount(totalAmountMinor, currencyCode)}</TableCell>
+                                <TableCell className="text-xs">
+                                  {formatAmount(totalAmountMinor, currencyCode)}
+                                  {discountEligible && totalAmountMinor < totalAmountMinorRaw && (
+                                    <Badge variant="outline" className="ml-1 text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
+                                      10% off
+                                    </Badge>
+                                  )}
+                                </TableCell>
                                 <TableCell className="text-xs">{formatAmount(dueAmountMinor, currencyCode)}</TableCell>
                                 <TableCell className="text-right">
                                   <Button

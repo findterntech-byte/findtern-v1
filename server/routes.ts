@@ -14592,7 +14592,17 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
 
       const onboarding = await storage.getInternOnboardingByUserId(internId);
       const isPaid = Boolean((onboarding as any)?.extraData?.payment?.isPaid);
-      return res.json({ isPaid });
+      const paymentData = (onboarding as any)?.extraData?.payment;
+      const originalAmount = Number(paymentData?.originalAmountMinor ?? 0);
+      const discountAmount = Number(paymentData?.discountAmountMinor ?? 0);
+      const promoCode = String(paymentData?.promoCode ?? "").trim();
+
+      return res.json({ 
+        isPaid, 
+        originalAmountMinor: isPaid ? originalAmount : null,
+        discountAmountMinor: isPaid ? discountAmount : null,
+        promoCode: isPaid && promoCode ? promoCode : null
+      });
     } catch (error) {
       console.error("Get intern payment status error:", error);
       return res.status(500).json({ message: "An error occurred while fetching payment status" });
@@ -14751,6 +14761,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         return res.status(404).json({ message: "Onboarding data not found" });
       }
 
+      const promoCodeUsed = String((notes as any)?.promoCode ?? "").trim();
       const nextExtra = {
         ...((onboarding as any).extraData ?? {}),
         payment: {
@@ -14769,7 +14780,6 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
 
       await storage.updateInternOnboarding(internId, { extraData: nextExtra } as any);
 
-      const promoCodeUsed = String((notes as any)?.promoCode ?? "").trim();
       if (promoCodeUsed) {
         try {
           const discountApplied = Number((notes as any)?.discountAmountMinor ?? 0);
@@ -15008,6 +15018,27 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         return sum + computeDiscountedTotalMajor(offer, score);
       }, 0);
 
+      const proposalDiscountAmounts: Record<string, number> = {};
+      if (paymentMode !== "monthly") {
+        for (const id of proposalIds) {
+          const p = proposalById[String(id ?? "").trim()];
+          if (!p) continue;
+          const offer = (p?.offerDetails ?? (p as any)?.offer_details ?? {}) as any;
+          const internId = String(p?.internId ?? p?.intern_id ?? "").trim();
+          const score = Number(scoreByInternId[internId] ?? 0);
+          const fullTimeOffer = (offer as any)?.fullTimeOffer ?? null;
+          const hasFullTimeOffer = !!fullTimeOffer && typeof fullTimeOffer === "object";
+          if (hasFullTimeOffer) { proposalDiscountAmounts[id] = 0; continue; }
+          const months = monthsFromDuration(offer?.duration);
+          const monthly = Number(offer?.monthlyAmount ?? 0);
+          const totalFromOffer = Number(offer?.totalPrice ?? 0);
+          const perHire = perHireChargeAmount(score, currency as any);
+          const baseTotal = totalFromOffer > 0 ? totalFromOffer : monthly * months + perHire;
+          const discountedTotal = score >= 6 && months > 1 ? baseTotal * 0.9 : baseTotal;
+          proposalDiscountAmounts[id] = Math.max(0, Math.round((baseTotal - discountedTotal) * 100));
+        }
+      }
+
       const expectedAmountMinor = Math.round(expectedAmountMajor * 100);
       if (!Number.isFinite(expectedAmountMinor) || expectedAmountMinor <= 0) {
         return res.status(400).json({ message: "Invalid computed amount" });
@@ -15037,6 +15068,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           proposalIds,
           paymentMode,
           computedAmountMinor: expectedAmountMinor,
+          discountAmountMinor: Object.values(proposalDiscountAmounts).reduce((s, v) => s + v, 0),
         },
       });
 
@@ -16260,6 +16292,11 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         payment,
         items,
         invoiceNumber,
+        discountMinor: (() => {
+          const raw = (payment as any)?.raw ?? {};
+          const orderNotes = raw?.order?.notes ?? raw?.notes ?? {};
+          return Number((orderNotes as any)?.discountAmountMinor ?? (payment as any)?.discountAmountMinor ?? 0);
+        })(),
       });
     } catch (error) {
       console.error("Employer invoice fetch error:", error);

@@ -95,16 +95,16 @@ export default function DashboardPage() {
   const storedUserEmail = typeof window !== "undefined" ? localStorage.getItem("userEmail") : null;
 
   const paymentStatusQueryKey: [string, string | null] = ["/api/intern/payment-status", storedUserId];
-  const { data: paymentData } = useQuery<{ isPaid: boolean }>({
+  const { data: paymentData } = useQuery<{ isPaid: boolean; originalAmountMinor: number | null; discountAmountMinor: number | null; promoCode: string | null }>({
     queryKey: paymentStatusQueryKey,
     enabled: !!storedUserId,
     queryFn: async () => {
-      if (!storedUserId) return { isPaid: false };
+      if (!storedUserId) return { isPaid: false, originalAmountMinor: null, discountAmountMinor: null, promoCode: null };
 
       const res = await fetch(`/api/intern/${encodeURIComponent(storedUserId)}/payment-status`, {
         credentials: "include",
       });
-      if (!res.ok) return { isPaid: false };
+      if (!res.ok) return { isPaid: false, originalAmountMinor: null, discountAmountMinor: null, promoCode: null };
       return res.json();
     },
   });
