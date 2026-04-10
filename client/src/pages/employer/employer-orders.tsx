@@ -69,7 +69,7 @@ export default function EmployerOrdersPage() {
   const [hireFrom, setHireFrom] = useState<string>("");
   const [hireTo, setHireTo] = useState<string>("");
 
-  const [upcomingCurrency, setUpcomingCurrency] = useState<string>("");
+  const [upcomingCurrency, setUpcomingCurrency] = useState<string>("INR");
   const [upcomingPayStatus, setUpcomingPayStatus] = useState<"" | "partially_paid" | "fully_paid">("");
   const [upcomingFrom, setUpcomingFrom] = useState<string>("");
   const [upcomingTo, setUpcomingTo] = useState<string>("");
@@ -83,7 +83,7 @@ export default function EmployerOrdersPage() {
   const [decisionBusyId, setDecisionBusyId] = useState<string>("");
 
   const [status, setStatus] = useState<string>("");
-  const [currency, setCurrency] = useState<string>("");
+  const [currency, setCurrency] = useState<string>("INR");
   const [q, setQ] = useState<string>("");
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
@@ -1966,8 +1966,8 @@ export default function EmployerOrdersPage() {
                 const preDiscountMinor = hasDiscount && subtotalMinor > 0 ? subtotalMinor : totalMinor;
                 const discountMinor = hasDiscount ? Math.round(preDiscountMinor * 0.1) : 0;
                 const subtotalAfterDiscountMinor = Math.max(0, preDiscountMinor - discountMinor);
-                const subtotalFromTotalMinor = subtotalAfterDiscountMinor;
-                const gstMinor = gstApplicable ? Math.round(subtotalAfterDiscountMinor * gstRate / 100) : 0;
+                const subtotalFromTotalMinor = gstApplicable ? Math.round((Math.max(0, totalMinor) * 100) / 118) : subtotalAfterDiscountMinor;
+                const gstMinor = gstApplicable ? Math.round(subtotalFromTotalMinor * gstRate / 100) : 0;
 
                 return (
                   <div
@@ -2583,12 +2583,11 @@ export default function EmployerOrdersPage() {
 
                     <div className="w-full md:w-40">
                       <p className="text-xs text-slate-600 mb-1">Currency</p>
-                      <Select value={currency || "all"} onValueChange={(v) => setCurrency(v === "all" ? "" : v)}>
+                      <Select value={currency || "INR"} onValueChange={(v) => setCurrency(v)}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all">All</SelectItem>
                           <SelectItem value="INR">INR</SelectItem>
                           <SelectItem value="USD">USD</SelectItem>
                         </SelectContent>
@@ -2729,14 +2728,13 @@ export default function EmployerOrdersPage() {
                     <div className="w-full md:w-40">
                       <p className="text-xs text-slate-600 mb-1">Currency</p>
                       <Select
-                        value={upcomingCurrency || "all"}
-                        onValueChange={(v) => setUpcomingCurrency(v === "all" ? "" : String(v || "").toUpperCase())}
+                        value={upcomingCurrency || "INR"}
+                        onValueChange={(v) => setUpcomingCurrency(String(v || "INR").toUpperCase())}
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all">All</SelectItem>
                           <SelectItem value="INR">INR</SelectItem>
                           <SelectItem value="USD">USD</SelectItem>
                         </SelectContent>

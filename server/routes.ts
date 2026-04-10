@@ -4873,8 +4873,8 @@ export async function registerRoutes(
         return Number.isFinite(t) ? t : null;
       };
 
-      const fmtDate = (d: Date) => d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
-      const fmtTime = (d: Date) => d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true });
+      const fmtDate = (d: Date) => d.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", year: "numeric" });
+      const fmtTime = (d: Date) => d.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true });
 
       type Tx = {
         id: string;
@@ -16403,7 +16403,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           status: payment.status,
           paymentMethod: payment.gateway || "razorpay",
           paidAt: payment.paidAt,
-          createdAt: payment.createdAt,
+          createdAt: payment.createdAt ?? raw?.created_at ?? raw?.order?.created_at,
           raw: payment.raw,
           invoiceNumber: notes?.invoiceNumber ?? notes?.invoice_number ?? null,
           invoiceDate: payment.paidAt ?? null,
@@ -16663,6 +16663,12 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         };
       });
 
+      const discountMinorFromOrder = (() => {
+        const raw = (payment as any)?.raw ?? {};
+        const orderNotes = raw?.order?.notes ?? raw?.notes ?? {};
+        return Number((orderNotes as any)?.discountAmountMinor ?? 0);
+      })();
+
       return res.json({
         payment,
         employer: {
@@ -16676,6 +16682,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           gst: employer.gst ?? "",
         },
         invoiceNumber,
+        discountMinor: discountMinorFromOrder,
         items,
       });
     } catch (error) {

@@ -95,7 +95,7 @@ type AdminOrdersResponse = {
 export default function AdminOrdersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [currencyFilter, setCurrencyFilter] = useState("all");
+  const [currencyFilter, setCurrencyFilter] = useState("INR");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -142,6 +142,69 @@ export default function AdminOrdersPage() {
       return matchesSearch && matchesDate;
     });
   }, [orders, searchQuery, fromDate, toDate]);
+
+  const exportOrdersCSV = () => {
+    const headers = [
+      "Order ID",
+      "Employer Name",
+      "Employer Email",
+      "Intern Name",
+      "Amount",
+      "Currency",
+      "Status",
+      "Payment Method",
+      "Base Amount (Pre-GST)",
+      "GST Amount (18%)",
+      "Total (Incl. GST)",
+      "Order Date",
+      "Paid Date",
+    ];
+
+    const rows = filteredOrders.map((order) => {
+      const amountMinor = Math.round((order.amount || 0) * 100);
+      const currency = order.currency || "INR";
+      const gstApplicable = currency === "INR" && amountMinor > 0;
+      const gstAmountMinor = gstApplicable ? Math.max(0, amountMinor - Math.round((amountMinor * 100) / 118)) : 0;
+      const baseAmount = (amountMinor - gstAmountMinor) / 100;
+
+      return [
+        order.orderId || "",
+        order.employer?.companyName || "",
+        order.employer?.companyEmail || "",
+        order.internName || "",
+        (amountMinor / 100).toFixed(2),
+        currency,
+        order.status || "",
+        order.paymentMethod || "",
+        baseAmount.toFixed(2),
+        (gstAmountMinor / 100).toFixed(2),
+        (order.amount || 0).toFixed(2),
+        (order.createdAt ? new Date(order.createdAt).toLocaleDateString("en-IN") : order.raw?.created_at ? new Date(order.raw.created_at).toLocaleDateString("en-IN") : order.raw?.order?.created_at ? new Date(order.raw.order.created_at).toLocaleDateString("en-IN") : ""),
+        order.paidAt ? new Date(order.paidAt).toLocaleDateString("en-IN") : "",
+      ];
+    });
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers, ...rows]
+        .map((row) =>
+          row
+            .map((cell) =>
+              typeof cell === "string" && (cell.includes(",") || cell.includes('"') || cell.includes("\n"))
+                ? `"${cell.replace(/"/g, '""')}"`
+                : cell
+            )
+            .join(",")
+        )
+        .join("\n");
+
+    const link = document.createElement("a");
+    link.href = encodeURI(csvContent);
+    link.download = `orders-export-${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const formatCurrency = (amount: number, currency: string) => {
     const c = String(currency ?? "INR").toUpperCase();
@@ -344,26 +407,19 @@ export default function AdminOrdersPage() {
       return Math.round(feeMajor * 100);
     };
 
-    const rawSubtotalMinor = items.reduce((sum: number, it: any) => sum + invoiceItemBaseMinor(it), 0);
-    const totalMinor = Number(payment?.amountMinor ?? payment?.amount_minor ?? rawSubtotalMinor);
+    const subtotalMinor = items.reduce((sum: number, it: any) => sum + invoiceItemBaseMinor(it), 0);
+    const totalMinor = Number(payment?.amountMinor ?? payment?.amount_minor ?? subtotalMinor);
 
     const gstRate = 18;
     const gstApplicable = currencyCode === "INR" && Number.isFinite(totalMinor) && totalMinor > 0;
 
-    const subtotalFromTotalMinor = gstApplicable ? Math.round((Math.max(0, totalMinor) * 100) / 118) : 0;
-    const gstMinor = gstApplicable ? Math.max(0, Math.max(0, totalMinor) - subtotalFromTotalMinor) : 0;
-    const totalWithTaxMinor = gstApplicable ? subtotalFromTotalMinor + gstMinor : subtotalMinor;
-
-    const useGstAdjustedPrices = gstApplicable && subtotalFromTotalMinor > 0 && rawSubtotalMinor > 0 && rawSubtotalMinor !== subtotalFromTotalMinor;
-
-    const discountMinorRaw = Math.max(0, rawSubtotalMinor - subtotalFromTotalMinor);
-    const discountRatio = rawSubtotalMinor > 0 ? discountMinorRaw / rawSubtotalMinor : 0;
-    const showTenPercentDiscount = discountMinorRaw > 0 && Math.abs(discountRatio - 0.1) <= 0.02 && !isFullTimeInvoice;
-    const discountMinor = showTenPercentDiscount ? discountMinorRaw : 0;
-
-    const subtotalDisplayMinor = gstApplicable
-      ? subtotalFromTotalMinor
-      : rawSubtotalMinor;
+    const serverDiscountMinor = Number(invoiceData?.discountMinor ?? 0);
+    const hasDiscount = serverDiscountMinor > 0 || (!isFullTimeInvoice && totalMinor > 0 && subtotalMinor > 0 && Math.abs((totalMinor / subtotalMinor) - 0.9) <= 0.005);
+    const preDiscountMinor = hasDiscount && subtotalMinor > 0 ? subtotalMinor : totalMinor;
+    const discountMinor = hasDiscount ? Math.round(preDiscountMinor * 0.1) : 0;
+    const subtotalAfterDiscountMinor = Math.max(0, preDiscountMinor - discountMinor);
+    const subtotalDisplayMinor = gstApplicable ? Math.round((Math.max(0, totalMinor) * 100) / 118) : subtotalAfterDiscountMinor;
+    const gstMinor = gstApplicable ? Math.max(0, totalMinor - Math.round((Math.max(0, totalMinor) * 100) / 118)) : 0;
 
     return (
       <div ref={invoicePrintRef} className="invoice-print-root mx-auto w-full max-w-[980px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -459,10 +515,8 @@ export default function AdminOrdersPage() {
                     let displayPriceMinor: number;
                     if (isFullTimeOffer && Number.isFinite(annualCtc) && annualCtc > 0) {
                       displayPriceMinor = Math.round(annualCtc * 100);
-                    } else if (useGstAdjustedPrices && rawSubtotalMinor > 0 && subtotalFromTotalMinor > 0) {
-                      displayPriceMinor = Math.round(rowMinor * subtotalFromTotalMinor / rawSubtotalMinor);
                     } else {
-                      displayPriceMinor = rowMinor;
+                      displayPriceMinor = hasDiscount ? preDiscountMinor : rowMinor;
                     }
                     const rowKey = String(item?.proposalId ?? item?.id ?? item?.internId ?? idx);
 
@@ -484,10 +538,10 @@ export default function AdminOrdersPage() {
                   })
                 )}
 
-                {showTenPercentDiscount ? (
+                {discountMinor > 0 ? (
                   <tr>
                     <td className="px-3 py-2 text-sm font-semibold text-slate-900">Discount (10%)</td>
-                    <td className="px-3 py-2 text-right text-sm text-slate-900">
+                    <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
                       -{formatAmount(discountMinor, currencyCode)}
                     </td>
                   </tr>
@@ -513,7 +567,7 @@ export default function AdminOrdersPage() {
                 <tr>
                   <td className="px-3 py-2 text-sm font-semibold text-slate-900">Total</td>
                   <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
-                    {formatAmount(totalWithTaxMinor, currencyCode)}
+                    {formatAmount(totalMinor, currencyCode)}
                   </td>
                 </tr>
               </tbody>
@@ -608,6 +662,15 @@ export default function AdminOrdersPage() {
                   </p>
                 </div>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportOrdersCSV}
+                className="gap-2 text-xs"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Export CSV
+              </Button>
             </div>
           </div>
 
@@ -664,7 +727,6 @@ export default function AdminOrdersPage() {
                     <SelectValue placeholder="Currency" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
                     <SelectItem value="INR">INR</SelectItem>
                     <SelectItem value="USD">USD</SelectItem>
                   </SelectContent>
@@ -700,7 +762,8 @@ export default function AdminOrdersPage() {
                       <TableHead className="text-xs font-semibold">Amount</TableHead>
                       <TableHead className="text-xs font-semibold">GST 18%</TableHead>
                       <TableHead className="text-xs font-semibold">Status</TableHead>
-                      <TableHead className="text-xs font-semibold">Date</TableHead>
+                      <TableHead className="text-xs font-semibold">Order Date</TableHead>
+                      <TableHead className="text-xs font-semibold">Paid Date</TableHead>
                       <TableHead className="text-xs font-semibold text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -709,7 +772,7 @@ export default function AdminOrdersPage() {
                       const amountMajor = order.amount || 0;
                       const amountMinor = Math.round(amountMajor * 100);
                       const gstApplicable = order.currency === "INR" && amountMinor > 0;
-                      const gstAmount = gstApplicable ? Math.round(amountMinor * 18 / 118) : 0;
+                      const gstAmount = gstApplicable ? Math.max(0, amountMinor - Math.round((amountMinor * 100) / 118)) : 0;
                       
                       return (
                       <TableRow key={order.id} className="hover:bg-muted/20 transition-colors">
@@ -735,7 +798,7 @@ export default function AdminOrdersPage() {
                         <TableCell className="py-3">
                           {gstApplicable ? (
                             <span className="font-semibold text-sm text-emerald-600">
-                              {formatCurrency(gstAmount / 100, order.currency || "INR")}
+                              {formatAmount(gstAmount, order.currency || "INR")}
                             </span>
                           ) : (
                             <span className="text-xs text-muted-foreground">-</span>
@@ -744,10 +807,11 @@ export default function AdminOrdersPage() {
                         <TableCell className="py-3">
                           {getStatusBadge(order.status || "pending")}
                         </TableCell>
-                        <TableCell className="py-3">
-                          <div className="flex flex-col text-xs">
-                            <span>{order.createdAt ? new Date(order.createdAt).toLocaleDateString("en-IN") : "-"}</span>
-                          </div>
+                        <TableCell className="py-3 text-xs">
+                          {order.createdAt ? new Date(order.createdAt).toLocaleDateString("en-IN") : "-"}
+                        </TableCell>
+                        <TableCell className="py-3 text-xs">
+                          {order.paidAt ? new Date(order.paidAt).toLocaleDateString("en-IN") : <span className="text-muted-foreground">-</span>}
                         </TableCell>
                         <TableCell className="text-right py-3">
                           <DropdownMenu>
