@@ -3022,6 +3022,7 @@ export async function registerRoutes(
     }
   });
 
+
   app.get("/api/auth/google/start", async (req, res) => {
     try {
       const roleRaw = String(req.query.role ?? "").trim().toLowerCase();
@@ -3180,8 +3181,8 @@ export async function registerRoutes(
             firstName: normalizeName(givenName, email.split("@")[0] || "User"),
             lastName: normalizeName(familyName, "User"),
             email,
-            countryCode: null,
-            phoneNumber: null,
+            countryCode: "+91",
+            phoneNumber: "0000000000",
             password,
             agreedToTerms: true,
           };
@@ -3242,12 +3243,14 @@ export async function registerRoutes(
         };
 
         const password = `${crypto.randomBytes(18).toString("base64url")}Aa1!`;
+        const countryCode = "+91";
+        const phoneNumber = await generateUniquePhone(countryCode);
         const candidate = {
           name: givenName || email.split("@")[0] || "Employer",
           companyName: "Company",
           companyEmail: email,
-          countryCode: null,
-          phoneNumber: null,
+          countryCode,
+          phoneNumber,
           password,
           agreedToTerms: true,
         };
@@ -3330,6 +3333,7 @@ export async function registerRoutes(
   app.get("/api/google/oauth/callback", googleOAuthCallbackHandler);
   app.get("/api/auth/google/callback", googleOAuthCallbackHandler);
   app.get("/auth/google/callback", googleOAuthCallbackHandler);
+
 
   app.post("/api/calendar/meet", async (req, res) => {
     try {
@@ -3925,7 +3929,7 @@ export async function registerRoutes(
   });
 
   // Employer login endpoint - /api/auth/employer/login
-  app.post("/api/auth/employer/login", async (req, res) => {
+ app.post("/api/auth/employer/login", async (req, res) => {
     try {
       const validatedData = loginSchema.parse(req.body);
 
@@ -3959,6 +3963,7 @@ export async function registerRoutes(
         .json({ message: "An error occurred during employer login" });
     }
   });
+
 
   // Employer: get own profile (used by company setup/profile pages)
   app.get("/api/employer/:id", async (req, res) => {
@@ -4333,62 +4338,62 @@ export async function registerRoutes(
     });
   });
 
-  app.put("/api/admin/profile", async (req, res) => {
-    try {
-      const admin = req.session.admin;
-      if (!admin || !admin.id) {
-        return res.status(401).json({ message: "Admin login required" });
-      }
+  // app.put("/api/admin/profile", async (req, res) => {
+  //   try {
+  //     const admin = req.session.admin;
+  //     if (!admin || !admin.id) {
+  //       return res.status(401).json({ message: "Admin login required" });
+  //     }
 
-      const { firstName, lastName, email } = req.body as {
-        firstName?: string;
-        lastName?: string;
-        email?: string;
-      };
+  //     const { firstName, lastName, email } = req.body as {
+  //       firstName?: string;
+  //       lastName?: string;
+  //       email?: string;
+  //     };
 
-      if (!firstName || typeof firstName !== "string" || !firstName.trim()) {
-        return res.status(400).json({ message: "First name is required" });
-      }
-      if (!lastName || typeof lastName !== "string" || !lastName.trim()) {
-        return res.status(400).json({ message: "Last name is required" });
-      }
-      if (!email || typeof email !== "string" || !email.trim()) {
-        return res.status(400).json({ message: "Email is required" });
-      }
+  //     if (!firstName || typeof firstName !== "string" || !firstName.trim()) {
+  //       return res.status(400).json({ message: "First name is required" });
+  //     }
+  //     if (!lastName || typeof lastName !== "string" || !lastName.trim()) {
+  //       return res.status(400).json({ message: "Last name is required" });
+  //     }
+  //     if (!email || typeof email !== "string" || !email.trim()) {
+  //       return res.status(400).json({ message: "Email is required" });
+  //     }
 
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email.trim())) {
-        return res.status(400).json({ message: "Please enter a valid email address" });
-      }
+  //     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  //     if (!emailRegex.test(email.trim())) {
+  //       return res.status(400).json({ message: "Please enter a valid email address" });
+  //     }
 
-      const updated = await storage.updateAdmin(admin.id, {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email.trim().toLowerCase(),
-      });
+  //     const updated = await storage.updateAdmin(admin.id, {
+  //       firstName: firstName.trim(),
+  //       lastName: lastName.trim(),
+  //       email: email.trim().toLowerCase(),
+  //     });
 
-      if (updated) {
-        req.session.admin.firstName = updated.firstName;
-        req.session.admin.lastName = updated.lastName;
-        req.session.admin.email = updated.email;
-      }
+  //     if (updated) {
+  //       req.session.admin.firstName = updated.firstName;
+  //       req.session.admin.lastName = updated.lastName;
+  //       req.session.admin.email = updated.email;
+  //     }
 
-      return res.json({
-        message: "Profile updated successfully",
-        admin: {
-          id: req.session.admin.id,
-          firstName: req.session.admin.firstName,
-          lastName: req.session.admin.lastName,
-          email: req.session.admin.email,
-          role: req.session.admin.role,
-          permissions: req.session.admin.permissions,
-        },
-      });
-    } catch (error) {
-      console.error("Admin profile update error:", error);
-      return res.status(500).json({ message: "An error occurred while updating profile" });
-    }
-  });
+  //     return res.json({
+  //       message: "Profile updated successfully",
+  //       admin: {
+  //         id: req.session.admin.id,
+  //         firstName: req.session.admin.firstName,
+  //         lastName: req.session.admin.lastName,
+  //         email: req.session.admin.email,
+  //         role: req.session.admin.role,
+  //         permissions: req.session.admin.permissions,
+  //       },
+  //     });
+  //   } catch (error) {
+  //     console.error("Admin profile update error:", error);
+  //     return res.status(500).json({ message: "An error occurred while updating profile" });
+  //   }
+  // });
 
   app.post("/api/admin/change-password", async (req, res) => {
     try {
