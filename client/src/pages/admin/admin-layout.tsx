@@ -51,6 +51,7 @@ import {
   History,
   Tag,
   FileText,
+  Wallet,
 } from "lucide-react";
 import findternLogo from "/logo-1.jpg";
 import React, { ReactNode, useState, useCallback } from "react";
@@ -107,6 +108,7 @@ const reportsItems: NavItem[] = [
   { label: "Reports", icon: Newspaper, href: "/admin/reports", required: "reports:read" },
   { label: "Transactions", icon: Receipt, href: "/admin/transactions", required: "transactions:read" },
   { label: "Orders", icon: ShoppingCart, href: "/admin/orders", required: "transactions:read" },
+  { label: "Payouts", icon: Wallet, href: "/admin/payouts", required: "transactions:read" },
   { label: "Promo Codes", icon: Tag, href: "/admin/promo-codes", required: "cms:read" },
   { label: "Intern Invoices", icon: FileText, href: "/admin/intern-invoices", required: "reports:read" },
 ];

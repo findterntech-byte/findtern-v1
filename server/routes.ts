@@ -17841,6 +17841,304 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
       return res.status(500).json({ message: "An error occurred while deleting pricing" });
     }
   });
+  app.get("/api/admin/all-payouts", async (req, res) => {
+    try {
+      if (!(req as any)?.session?.admin) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const status = String((req.query as any)?.status ?? "all").trim().toLowerCase();
+      const currency = String((req.query as any)?.currency ?? "all").trim().toUpperCase();
+      const q = String((req.query as any)?.q ?? "").trim().toLowerCase();
+      const from = (req.query as any)?.from as string | undefined;
+      const to = (req.query as any)?.to as string | undefined;
+
+      const statusFilter = status && status !== "all" ? status : undefined;
+      const currencyFilter = currency && currency !== "ALL" ? currency : undefined;
+
+      const allPayouts = await storage.listAllInternPayouts({
+        status: statusFilter,
+        limit: 20000,
+      });
+
+      const internIds = Array.from(new Set(
+        allPayouts.map((p: any) => String(p?.internId ?? "")).filter(Boolean)
+      ));
+      const internUsers = internIds.length ? await Promise.all(
+        internIds.map((id: string) => storage.getUser(id).catch(() => null))
+      ) : [];
+      const internMap = new Map<string, any>();
+      internUsers.forEach((u: any) => { if (u) internMap.set(u.id, u); });
+
+      const employerIds = Array.from(new Set(
+        allPayouts
+          .map((p: any) => {
+            const raw = p?.raw ?? {};
+            return String(raw?.employerId ?? "").trim();
+          })
+          .filter(Boolean)
+      ));
+      const employers = employerIds.length ? await Promise.all(
+        employerIds.map((id: string) => storage.getEmployer(id).catch(() => null))
+      ) : [];
+      const employerMap = new Map<string, any>();
+      employers.forEach((e: any) => { if (e) employerMap.set(e.id, e); });
+
+      const items = allPayouts.map((p: any) => {
+        const raw = p?.raw ?? {};
+        const intern = internMap.get(p.internId);
+        const employer = raw?.employerId ? employerMap.get(raw.employerId) : null;
+        const internName = intern
+          ? `${String(intern.firstName ?? "")} ${String(intern.lastName ?? "")}`.trim() || "-"
+          : "-";
+        const employerName = employer?.companyName ?? employer?.name ?? "-";
+        const source = raw?.source ?? null;
+        const scheduledFor = raw?.scheduledFor ?? null;
+        const proposalId = raw?.proposalId ?? null;
+        const minor = Number(p?.amountMinor) || 0;
+        const curr = String(p?.currency ?? "INR").toUpperCase();
+        const major = curr === "INR" ? minor / 100 : minor / 100;
+
+        return {
+          id: p.id,
+          internId: p.internId,
+          internName,
+          employerId: raw?.employerId ?? null,
+          employerName,
+          source,
+          proposalId,
+          amount: major,
+          amountMinor: minor,
+          currency: curr,
+          status: p.status,
+          method: p.method || "bank",
+          referenceId: p.referenceId ?? null,
+          scheduledFor,
+          paidAt: p.paidAt,
+          createdAt: p.createdAt,
+        };
+      }).filter((item: any) => {
+        if (q) {
+          const hay = `${item.internName} ${item.employerName} ${item.referenceId ?? ""}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        if (currencyFilter && item.currency !== currencyFilter) return false;
+        if (from) {
+          const created = item.createdAt ? new Date(item.createdAt) : null;
+          if (created && created < new Date(from)) return false;
+        }
+        if (to) {
+          const created = item.createdAt ? new Date(item.createdAt) : null;
+          if (created && created > new Date(to)) return false;
+        }
+        return true;
+      });
+
+      const totalPaid = items.filter((i: any) => i.status === "paid").reduce((s: number, i: any) => {
+        const m = i.currency === "USD" ? i.amountMinor * 100 : i.amountMinor;
+        return s + m;
+      }, 0);
+      const totalPending = items.filter((i: any) => i.status === "pending").reduce((s: number, i: any) => {
+        const m = i.currency === "USD" ? i.amountMinor * 100 : i.amountMinor;
+        return s + m;
+      }, 0);
+
+      return res.json({
+        items,
+        totals: {
+          total: items.length,
+          paidCount: items.filter((i: any) => i.status === "paid").length,
+          pendingCount: items.filter((i: any) => i.status === "pending").length,
+          paidAmount: totalPaid / 100,
+          pendingAmount: totalPending / 100,
+        },
+      });
+    } catch (error) {
+      console.error("Admin all payouts error:", error);
+      return res.status(500).json({ message: "Failed to load payouts" });
+    }
+  });
+
+  const handleAdminAllEmployerDues = async (req, res) => {
+    try {
+      if (!(req as any)?.session?.admin) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const q = String((req.query as any)?.q ?? "").trim().toLowerCase();
+      const status = String((req.query as any)?.status ?? "has-upcoming").trim().toLowerCase();
+
+      const allInterns = await storage.getUsers().catch(() => []);
+      const internUsers = (allInterns as any[]).filter((u: any) =>
+        String(u?.role ?? "").trim().toLowerCase() === "intern"
+      );
+      const internMap = new Map<string, any>();
+      const internIds: string[] = [];
+      for (const u of internUsers) {
+        const id = String(u?.id ?? "").trim();
+        if (id) {
+          internMap.set(id, u);
+          internIds.push(id);
+        }
+      }
+
+      const allItems: any[] = [];
+      for (const internId of internIds) {
+        try {
+          const dues = await (async () => {
+            const onboarding = await storage.getInternOnboardingByUserId(internId).catch(() => undefined);
+            const proposals = await storage.getProposalsByInternId(internId).catch(() => []);
+            const internPayouts = await storage.listInternPayoutsByInternId(internId, { limit: 2000 }).catch(() => []);
+            const paidPayouts = (internPayouts as any[]).filter((row: any) => {
+              const s = String(row?.status ?? "").trim().toLowerCase();
+              return s === "paid";
+            });
+
+            const hired = (proposals as any[]).filter((p: any) => {
+              const off = p?.offerDetails ?? p?.offer_details ?? {};
+              const ft = off?.fullTimeOffer ?? off?.full_time_offer ?? null;
+              return !!ft || String(p?.status ?? "").toLowerCase() === "hired";
+            });
+
+            const monthMap: Record<string, number> = {
+              "1m": 1, "2m": 2, "3m": 3, "4m": 4, "5m": 5, "6m": 6,
+              "9m": 9, "12m": 12, "18m": 18,
+            };
+
+            const getMonths = (d: unknown) => {
+              const v = String(d ?? "").trim().toLowerCase();
+              const m = v.match(/^(\d+)m$/);
+              if (m) return parseInt(m[1], 10);
+              return monthMap[v] || 1;
+            };
+
+            const addMonths = (iso: string, months: number) => {
+              if (!iso) return null;
+              const d = new Date(iso);
+              if (isNaN(d.getTime())) return null;
+              d.setMonth(d.getMonth() + months);
+              return d.toISOString().slice(0, 10);
+            };
+
+            const employerIds = Array.from(new Set(
+              hired.map((p: any) => String(p?.employerId ?? "").trim()).filter(Boolean)
+            ));
+            const employers = employerIds.length ? await Promise.all(
+              employerIds.map((id: string) => storage.getEmployer(id).catch(() => null))
+            ) : [];
+            const employerMap = new Map<string, any>();
+            employers.forEach((e: any) => { if (e) employerMap.set(e.id, e); });
+
+            const allItemsForIntern: any[] = [];
+
+            for (const p of hired) {
+              const proposalId = String(p?.id ?? "");
+              const employerId = String(p?.employerId ?? "");
+              const employer = employerMap.get(employerId);
+              const employerName = employer?.companyName ?? employer?.name ?? "-";
+              const projectName = String(p?.projectName ?? p?.project?.projectName ?? "-");
+              const offer = p?.offerDetails ?? p?.offer_details ?? {};
+              const ft = offer?.fullTimeOffer ?? offer?.full_time_offer ?? null;
+              const hasFullTimeOffer = !!ft && typeof ft === "object";
+              const startDate = hasFullTimeOffer ? (ft?.startDate ?? ft?.start_date ?? null) : (offer?.startDate ?? offer?.start_date ?? null);
+              const duration = hasFullTimeOffer ? (ft?.duration ?? ft?.totalMonths ?? "12m") : (offer?.duration ?? offer?.totalMonths ?? "3m");
+              const totalMonths = getMonths(duration);
+              const curr = hasFullTimeOffer
+                ? String(ft?.ctcCurrency ?? ft?.currency ?? "INR").toUpperCase()
+                : String(offer?.currency ?? "INR").toUpperCase();
+
+              const monthlyAmountMinor = hasFullTimeOffer
+                ? Math.round(Number(ft?.monthlyAmountMinor ?? ft?.monthly_amount_minor ?? 0))
+                : Math.round(Number(offer?.monthlyAmountMinor ?? offer?.monthly_amount_minor ?? 0));
+              const totalAmountMinor = monthlyAmountMinor * totalMonths;
+
+              const internPaidMonths = paidPayouts.filter((row: any) => {
+                const rowPid = String(row?.raw?.proposalId ?? "").trim();
+                return rowPid === proposalId;
+              }).length;
+
+              const internMonthlyMinor = hasFullTimeOffer
+                ? Math.round(Number(ft?.internMonthlyAmountMinor ?? ft?.intern_monthly_amount_minor ?? 0))
+                : Math.round(Number(offer?.internMonthlyAmountMinor ?? offer?.intern_monthly_amount_minor ?? 0));
+              const internTotalMinor = internMonthlyMinor * totalMonths;
+              const internPaidMinor = internPaidMonths * internMonthlyMinor;
+              const internDueMinor = internTotalMinor - internPaidMinor;
+
+              const upcomingPaymentDate = addMonths(startDate, internPaidMonths + 1);
+
+              allItemsForIntern.push({
+                proposalId,
+                employerId,
+                employerName,
+                projectName,
+                startDate,
+                totalMonths,
+                internPaidMonths,
+                internRemainingMonths: Math.max(0, totalMonths - internPaidMonths),
+                currency: curr,
+                monthlyAmountMinor,
+                totalAmountMinor,
+                internMonthlyAmountMinor,
+                internTotalMinor,
+                internPaidMinor,
+                internDueMinor,
+                upcomingPaymentDate,
+                proposalStatus: p.status,
+                internshipStatus: p.internshipStatus ?? p.status,
+                internId,
+                internName: internMap.get(internId)
+                  ? `${String(internMap.get(internId)?.firstName ?? "")} ${String(internMap.get(internId)?.lastName ?? "")}`.trim()
+                  : "-",
+              });
+            }
+            return allItemsForIntern;
+          })();
+          if (dues && Array.isArray(dues)) {
+            allItems.push(...dues);
+          }
+        } catch {
+          // skip intern on error
+        }
+      }
+
+      const filtered = allItems.filter((item: any) => {
+        if (q) {
+          const hay = `${item.internName} ${item.employerName} ${item.projectName}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        if (status === "has-upcoming") {
+          if (!(item.internDueMinor > 0)) return false;
+        } else if (status === "completed") {
+          if (item.internRemainingMonths > 0) return false;
+        } else if (status === "active") {
+          if (item.internRemainingMonths <= 0) return false;
+        }
+        return true;
+      });
+
+      const totalDueINR = filtered.reduce((s: number, i: any) => {
+        const m = i.currency === "USD" ? i.internDueMinor * 100 : i.internDueMinor;
+        return s + m;
+      }, 0);
+
+      return res.json({
+        items: filtered,
+        totals: {
+          total: filtered.length,
+          active: filtered.filter((i: any) => i.internRemainingMonths > 0).length,
+          completed: filtered.filter((i: any) => i.internRemainingMonths <= 0).length,
+          totalDue: totalDueINR / 100,
+        },
+      });
+    } catch (error) {
+      console.error("Admin all employer dues error:", error);
+      return res.status(500).json({ message: "Failed to load employer dues" });
+    }
+  };
+
+  app.get("/api/admin/all/employer-dues", handleAdminAllEmployerDues);
+  app.get("/api/admin/all-employer-dues", handleAdminAllEmployerDues);
+
   return httpServer;
 }
 
