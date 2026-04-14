@@ -284,12 +284,9 @@ export default function AdminInternInvoicesPage() {
     const discountAmountMinor = Number(payment?.discountAmountMinor ?? 0);
     const finalAmountMinor = originalAmountMinor - discountAmountMinor;
     
-    const subtotalMinor = finalAmountMinor;
     const gstRate = 18;
-    const gstApplicable = subtotalMinor > 0;
-    const subtotalFromTotalMinor = gstApplicable ? Math.round((Math.max(0, finalAmountMinor) * 100) / 118) : subtotalMinor;
-    const gstMinor = gstApplicable ? Math.max(0, finalAmountMinor - subtotalFromTotalMinor) : 0;
-    const totalWithGstMinor = finalAmountMinor;
+    const gstMinor = Math.round(originalAmountMinor * gstRate / 100);
+    const totalWithGstMinor = finalAmountMinor + gstMinor;
 
     const hasDiscount = discountAmountMinor > 0;
     const promoCode = payment?.promoCode ?? invoiceData.promoCode;
@@ -340,64 +337,41 @@ export default function AdminInternInvoicesPage() {
                 </tr>
               </thead>
               <tbody>
-                {hasDiscount && (
-                  <tr className="border-b border-slate-200">
-                    <td className="px-3 py-3">
-                      <p className="text-sm font-medium text-slate-900">Intern Account Activation Fee</p>
-                      <p className="text-xs text-slate-500">Original Amount</p>
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <p className="text-sm font-semibold text-slate-900">
-                        ₹{((originalAmountMinor - discountAmountMinor) / 100).toFixed(2)}
-                      </p>
-                    </td>
-                  </tr>
-                )}
-                {hasDiscount && (
-                  <tr className="border-b border-slate-200">
-                    <td className="px-3 py-3">
-                      <p className="text-sm font-medium text-emerald-600">Promo Code Discount ({promoCode})</p>
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <p className="text-sm font-semibold text-emerald-600">
-                        -₹{(discountAmountMinor / 100).toFixed(2)}
-                      </p>
-                    </td>
-                  </tr>
-                )}
-                {!hasDiscount && (
-                  <tr className="border-b border-slate-200">
-                    <td className="px-3 py-3">
-                      <p className="text-sm font-medium text-slate-900">Intern Account Activation Fee</p>
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <p className="text-sm font-semibold text-slate-900">
-                        ₹{(finalAmountMinor / 100).toFixed(2)}
-                      </p>
-                    </td>
-                  </tr>
-                )}
-                <tr>
-                  <td className="px-3 py-2 text-sm font-semibold text-slate-900">Subtotal</td>
-                  <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
-                    ₹{(subtotalFromTotalMinor / 100).toFixed(2)}
-                  </td>
-                </tr>
-                {gstApplicable && (
-                  <tr className="bg-slate-50">
-                    <td className="px-3 py-2 text-sm font-semibold text-slate-900">GST {gstRate}%</td>
-                    <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
-                      ₹{(gstMinor / 100).toFixed(2)}
-                    </td>
-                  </tr>
-                )}
-                <tr>
-                  <td className="px-3 py-2 text-sm font-bold text-slate-900">Total</td>
-                  <td className="px-3 py-2 text-right text-sm font-bold text-slate-900">
-                    ₹{(finalAmountMinor / 100).toFixed(2)}
-                  </td>
-                </tr>
-              </tbody>
+              <tr className="border-b border-slate-200">
+                <td className="px-3 py-3">
+                  <p className="text-sm font-medium text-slate-900">Intern Account Activation Fee</p>
+                </td>
+                <td className="px-3 py-3 text-right">
+                  <p className="text-sm font-semibold text-slate-900">
+                    ₹2499.00
+                  </p>
+                </td>
+              </tr>
+              <tr className="border-b border-slate-200">
+                <td className="px-3 py-2 text-sm font-semibold text-slate-900">GST {gstRate}%</td>
+                <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
+                  ₹{(gstMinor / 100).toFixed(2)}
+                </td>
+              </tr>
+              {hasDiscount && (
+              <tr className="border-b border-slate-200">
+                <td className="px-3 py-3">
+                  <p className="text-sm font-medium text-emerald-600">Promo Code Discount ({promoCode})</p>
+                </td>
+                <td className="px-3 py-3 text-right">
+                  <p className="text-sm font-semibold text-emerald-600">
+                    -₹{(discountAmountMinor / 100).toFixed(2)}
+                  </p>
+                </td>
+              </tr>
+              )}
+              <tr>
+                <td className="px-3 py-2 text-sm font-bold text-slate-900">Total</td>
+                <td className="px-3 py-2 text-right text-sm font-bold text-slate-900">
+                  ₹{(totalWithGstMinor / 100).toFixed(2)}
+                </td>
+              </tr>
+            </tbody>
             </table>
           </div>
         </div>
