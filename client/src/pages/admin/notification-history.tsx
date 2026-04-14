@@ -213,12 +213,7 @@ export default function NotificationHistoryPage() {
                 <SelectTrigger className="w-[140px] h-11 bg-slate-50 border-slate-200">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="sent">Sent</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
-                  <SelectItem value="failed">Failed</SelectItem>
-                </SelectContent>
+                
               </Select>
               <Button
                 variant="outline"

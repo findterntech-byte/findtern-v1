@@ -2742,7 +2742,29 @@ export class PostgresStorage implements IStorage {
   }
 
   async listPromoCodes(): Promise<PromoCode[]> {
-    return db.select().from(promoCodes).orderBy(desc(promoCodes.createdAt)) as Promise<PromoCode[]>;
+    const rows = await db
+      .select({
+        id: promoCodes.id,
+        code: promoCodes.code,
+        description: promoCodes.description,
+        discountType: promoCodes.discountType,
+        discountValue: promoCodes.discountValue,
+        maxUsages: promoCodes.maxUsages,
+        usedCount: sql<number>`coalesce(count(${promoCodeUsages.id}), 0)`.
+          mapWith(Number),
+        minOrderAmountMinor: promoCodes.minOrderAmountMinor,
+        validFrom: promoCodes.validFrom,
+        validUntil: promoCodes.validUntil,
+        isActive: promoCodes.isActive,
+        createdAt: promoCodes.createdAt,
+        updatedAt: promoCodes.updatedAt,
+      })
+      .from(promoCodes)
+      .leftJoin(promoCodeUsages, eq(promoCodeUsages.promoCodeId, promoCodes.id))
+      .groupBy(promoCodes.id)
+      .orderBy(desc(promoCodes.createdAt));
+
+    return rows as PromoCode[];
   }
 
   async createPromoCode(data: InsertPromoCode): Promise<PromoCode> {

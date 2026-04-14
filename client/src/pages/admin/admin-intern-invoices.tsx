@@ -46,6 +46,8 @@ type InternPayment = {
   internName: string;
   email: string;
   amountMinor: number;
+  discountAmountMinor?: number | null;
+  promoCode?: string | null;
   currency: string;
   status: string;
   paidAt: string | null;
@@ -68,11 +70,26 @@ export default function AdminInternInvoicesPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [promoAppliedFilter, setPromoAppliedFilter] = useState("all");
+  const [promoCodeFilter, setPromoCodeFilter] = useState("all");
   const [selectedPayment, setSelectedPayment] = useState<InternPayment | null>(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [invoiceData, setInvoiceData] = useState<any | null>(null);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const invoicePrintRef = useRef<HTMLDivElement>(null);
+
+  const getPromoCode = (p: InternPayment) => {
+    return String((p as any).promoCode ?? (p as any).promo_code ?? "").trim();
+  };
+
+  const getDiscountAmountMinor = (p: InternPayment) => {
+    const raw =
+      (p as any).discountAmountMinor ??
+      (p as any).discount_amount_minor ??
+      (p as any).discount_amount;
+    const n = Number(raw ?? 0);
+    return Number.isFinite(n) ? n : 0;
+  };
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -89,13 +106,25 @@ export default function AdminInternInvoicesPage() {
   const payments = data?.items ?? [];
   const totals = data?.totals ?? { totalPayments: 0, totalAmount: 0, paidAmount: 0, pendingAmount: 0 };
 
+  const promoCodeOptions = useMemo(() => {
+    const set = new Set<string>();
+    payments.forEach((p) => {
+      const code = getPromoCode(p);
+      if (code) set.add(code);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [payments]);
+
   const filteredPayments = useMemo(() => {
     return payments.filter((payment) => {
+      const discountMinor = getDiscountAmountMinor(payment);
+      const code = getPromoCode(payment);
+
       const matchesSearch = !searchQuery || 
         payment.internName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         payment.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         payment.invoiceNumber?.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
       const paymentDate = payment.createdAt ? new Date(payment.createdAt) : null;
       let matchesDate = true;
       if (fromDate && paymentDate) {
@@ -108,10 +137,78 @@ export default function AdminInternInvoicesPage() {
         to.setHours(23, 59, 59, 999);
         if (paymentDate > to) matchesDate = false;
       }
+
+      let matchesPromoApplied = true;
+      if (promoAppliedFilter === "yes") {
+        matchesPromoApplied = discountMinor > 0 || Boolean(code);
+      } else if (promoAppliedFilter === "no") {
+        matchesPromoApplied = !(discountMinor > 0 || Boolean(code));
+      }
+
+      let matchesPromoCode = true;
+      if (promoCodeFilter !== "all") {
+        matchesPromoCode = code.toLowerCase() === promoCodeFilter.toLowerCase();
+      }
       
-      return matchesSearch && matchesDate;
+      return matchesSearch && matchesDate && matchesPromoApplied && matchesPromoCode;
     });
-  }, [payments, searchQuery, fromDate, toDate]);
+  }, [payments, searchQuery, fromDate, toDate, promoAppliedFilter, promoCodeFilter]);
+
+  const exportCsv = () => {
+    const escape = (value: unknown) => {
+      const s = String(value ?? "");
+      if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
+
+    const headers = [
+      "Invoice Number",
+      "Intern Name",
+      "Email",
+      "Amount",
+      "GST (18%)",
+      "Discount",
+      "Promo Code",
+      "Status",
+      "Date",
+    ];
+
+    const rows = filteredPayments.map((p) => {
+      const date = p.paidAt
+        ? new Date(p.paidAt).toLocaleDateString("en-IN")
+        : p.createdAt
+          ? new Date(p.createdAt).toLocaleDateString("en-IN")
+          : "";
+
+      const amountMajor = (Number(p.amountMinor ?? 0) / 100).toFixed(2);
+      const gstMajor = (getGstMinorFromTotalMinor(Number(p.amountMinor ?? 0), GST_RATE) / 100).toFixed(2);
+      const discountMajor = (getDiscountAmountMinor(p) / 100).toFixed(2);
+
+      return [
+        p.invoiceNumber ?? "",
+        p.internName ?? "",
+        p.email ?? "",
+        amountMajor,
+        gstMajor,
+        discountMajor,
+        getPromoCode(p),
+        p.status ?? "",
+        date,
+      ].map(escape);
+    });
+
+    const csv = [headers.map(escape).join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `intern-invoices-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
   const formatCurrency = (amountMinor: number, currency: string) => {
     const cur = String(currency || "INR").toUpperCase();
@@ -123,6 +220,25 @@ export default function AdminInternInvoicesPage() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amountMajor);
+  };
+
+  const formatCurrencyWithDecimals = (amountMinor: number, currency: string) => {
+    const cur = String(currency || "INR").toUpperCase();
+    const amountMajor = amountMinor / 100;
+    const locale = cur === "INR" ? "en-IN" : "en-US";
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: cur,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amountMajor);
+  };
+
+  const GST_RATE = 18;
+
+  const getGstMinorFromTotalMinor = (totalWithGstMinor: number, gstRate: number) => {
+    const subtotalMinor = Math.round((totalWithGstMinor * 100) / (100 + gstRate));
+    return totalWithGstMinor - subtotalMinor;
   };
 
   const getStatusBadge = (status: string) => {
@@ -281,7 +397,7 @@ export default function AdminInternInvoicesPage() {
     const internEmail = String(intern?.email ?? "").trim();
 
     const originalAmountMinor = 249900;
-    const discountAmountMinor = Number(payment?.discountAmountMinor ?? 0);
+    const discountAmountMinor = getDiscountAmountMinor(payment);
     const finalAmountMinor = originalAmountMinor - discountAmountMinor;
     
     const gstRate = 18;
@@ -290,7 +406,7 @@ export default function AdminInternInvoicesPage() {
     const totalWithGstMinor = subtotalMinor + gstMinor;
     
     const hasDiscount = discountAmountMinor > 0;
-    const promoCode = payment?.promoCode ?? invoiceData.promoCode;
+    const promoCode = getPromoCode(payment);
 
     return (
       <div ref={invoicePrintRef} className="invoice-print-root mx-auto w-full max-w-[980px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -467,6 +583,10 @@ export default function AdminInternInvoicesPage() {
                   </p>
                 </div>
               </div>
+              <Button variant="outline" size="sm" className="h-9" onClick={exportCsv} disabled={filteredPayments.length === 0}>
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
             </div>
           </div>
 
@@ -528,6 +648,31 @@ export default function AdminInternInvoicesPage() {
                   <SelectItem value="failed">Failed</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Select value={promoAppliedFilter} onValueChange={setPromoAppliedFilter}>
+                <SelectTrigger className="w-[150px] h-10 text-xs">
+                  <SelectValue placeholder="Promo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Promo: All</SelectItem>
+                  <SelectItem value="yes">Promo Applied</SelectItem>
+                  <SelectItem value="no">No Promo</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={promoCodeFilter} onValueChange={setPromoCodeFilter}>
+                <SelectTrigger className="w-[160px] h-10 text-xs">
+                  <SelectValue placeholder="Promo Code" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Codes</SelectItem>
+                  {promoCodeOptions.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Table */}
@@ -544,6 +689,9 @@ export default function AdminInternInvoicesPage() {
                       <TableHead className="text-xs font-semibold">Intern Name</TableHead>
                       <TableHead className="text-xs font-semibold hidden md:table-cell">Email</TableHead>
                       <TableHead className="text-xs font-semibold">Amount</TableHead>
+                      <TableHead className="text-xs font-semibold">GST (18%)</TableHead>
+                      <TableHead className="text-xs font-semibold hidden lg:table-cell">Discount</TableHead>
+                      <TableHead className="text-xs font-semibold hidden lg:table-cell">Promo Code</TableHead>
                       <TableHead className="text-xs font-semibold">Status</TableHead>
                       <TableHead className="text-xs font-semibold">Date</TableHead>
                       <TableHead className="text-xs font-semibold text-right">Actions</TableHead>
@@ -563,12 +711,39 @@ export default function AdminInternInvoicesPage() {
                         </TableCell>
                         <TableCell className="py-3">
                           <span className="font-semibold text-sm">
-                            {formatCurrency(payment.amountMinor, payment.currency)}
+                            {formatCurrencyWithDecimals(payment.amountMinor, payment.currency)}
                           </span>
                         </TableCell>
                         <TableCell className="py-3">
+                          <span className="text-sm">
+                            {formatCurrencyWithDecimals(
+                              getGstMinorFromTotalMinor(payment.amountMinor, GST_RATE),
+                              payment.currency
+                            )}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-3 hidden lg:table-cell">
+                          {getDiscountAmountMinor(payment) > 0 ? (
+                            <span className="text-xs font-semibold text-emerald-700">
+                              {formatCurrencyWithDecimals(getDiscountAmountMinor(payment), payment.currency)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="py-3 hidden lg:table-cell">
+                          {getPromoCode(payment) ? (
+                            <span className="text-xs text-muted-foreground">{getPromoCode(payment)}</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="py-3">
                           {getStatusBadge(payment.status)}
                         </TableCell>
+
                         <TableCell className="py-3">
                           <div className="flex flex-col text-xs">
                             <span>{payment.paidAt ? new Date(payment.paidAt).toLocaleDateString("en-IN") : payment.createdAt ? new Date(payment.createdAt).toLocaleDateString("en-IN") : "-"}</span>

@@ -815,35 +815,7 @@ Clear
                   </Card>
                 )}
 
-                {/* Summary Cards */}
-                {txData?.totals && (
-                  <div className="grid gap-4 md:grid-cols-4">
-                    <Card className="p-4 border-l-4 border-l-emerald-500">
-                      <p className="text-xs text-muted-foreground uppercase">Paid Receivables</p>
-                      <p className="text-2xl font-bold text-emerald-600">
-                        {isTxLoading ? "..." : formatCurrency(txData.totals.receivables?.paidAmount ?? 0, "INR")}
-                      </p>
-                    </Card>
-                    <Card className="p-4 border-l-4 border-l-amber-500">
-                      <p className="text-xs text-muted-foreground uppercase">Pending Receivables</p>
-                      <p className="text-2xl font-bold text-amber-600">
-                        {isTxLoading ? "..." : formatCurrency(txData.totals.receivables?.pendingAmount ?? 0, "INR")}
-                      </p>
-                    </Card>
-                    <Card className="p-4 border-l-4 border-l-emerald-500">
-                      <p className="text-xs text-muted-foreground uppercase">Paid Payables</p>
-                      <p className="text-2xl font-bold text-emerald-600">
-                        {isTxLoading ? "..." : formatCurrency(txData.totals.payables?.paidAmount ?? 0, "INR")}
-                      </p>
-                    </Card>
-                    <Card className="p-4 border-l-4 border-l-amber-500">
-                      <p className="text-xs text-muted-foreground uppercase">Pending Payables</p>
-                      <p className="text-2xl font-bold text-amber-600">
-                        {isTxLoading ? "..." : formatCurrency(txData.totals.payables?.pendingAmount ?? 0, "INR")}
-                      </p>
-                    </Card>
-                  </div>
-                )}
+              
 
                 <Card className="p-6">
                   <div className="flex items-center justify-between mb-4">
@@ -857,7 +829,7 @@ Clear
                     </div>
                   </div>
                   <Table>
-                    <TableHeader><TableRow className="bg-muted/40"><TableHead className="text-xs">Date</TableHead><TableHead className="text-xs">Source</TableHead><TableHead className="text-xs">Description</TableHead><TableHead className="text-xs">Candidate</TableHead><TableHead className="text-xs">Company</TableHead><TableHead className="text-xs text-right">Amount</TableHead><TableHead className="text-xs">Status</TableHead><TableHead className="text-xs">Action</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow className="bg-muted/40"><TableHead className="text-xs">Date</TableHead><TableHead className="text-xs">Source</TableHead><TableHead className="text-xs">Description</TableHead><TableHead className="text-xs">Candidate</TableHead><TableHead className="text-xs">Company</TableHead><TableHead className="text-xs text-right">Amount</TableHead><TableHead className="text-xs">Status</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {(txData?.receivables ?? []).length === 0 && !isTxLoading ? (
                         <TableRow><TableCell colSpan={8}><EmptyState icon={DollarSign} title="No receivables" description="Receivables will appear here" /></TableCell></TableRow>

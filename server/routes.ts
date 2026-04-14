@@ -8211,6 +8211,7 @@ export async function registerRoutes(
         
         const originalAmountMinor = amountMinor;
         const discountAmountMinor = Number(paymentData?.discountAmountMinor ?? 0);
+        const promoCode = String(paymentData?.promoCode ?? paymentData?.promo_code ?? "").trim() || null;
         
         // Use actual payment from intern_payments table if available
         const paidFromTable = internPayment ? Number(internPayment.amountMinor ?? 0) : 0;
@@ -8246,6 +8247,7 @@ export async function registerRoutes(
           amountMinor: actualAmount,
           originalAmountMinor,
           discountAmountMinor,
+          promoCode,
           finalAmountMinor,
           currency: "INR",
           status,
@@ -14736,6 +14738,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         return res.status(400).json({ message: "Invalid payment signature" });
       }
 
+      const { amountMinor: activationFeeMinor } = getRazorpayConfig();
       const amountMinorDb = Number((order as any)?.amount ?? 0);
       const currencyDb = String((order as any)?.currency ?? "INR").toUpperCase();
       const rawDb = {
@@ -14783,7 +14786,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           orderId,
           paymentId,
           promoCode: promoCodeUsed || null,
-          originalAmountMinor: amountMinorDb,
+          originalAmountMinor: activationFeeMinor,
           discountAmountMinor: Number((notes as any)?.discountAmountMinor ?? 0),
           finalAmountMinor: amountMinorDb,
         },
@@ -14794,7 +14797,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
       if (promoCodeUsed) {
         try {
           const discountApplied = Number((notes as any)?.discountAmountMinor ?? 0);
-          const promoResult = await storage.validatePromoCode(promoCodeUsed, internId, amountMinorDb);
+          const promoResult = await storage.validatePromoCode(promoCodeUsed, internId, activationFeeMinor);
           if (promoResult.valid && promoResult.promoCode) {
             await storage.applyPromoCode(promoResult.promoCode.id, internId, orderId, discountApplied);
             await storage.updatePromoCode(promoResult.promoCode.id, {
