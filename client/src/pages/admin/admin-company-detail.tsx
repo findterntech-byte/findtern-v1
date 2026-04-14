@@ -227,6 +227,22 @@ export default function AdminCompanyDetailPage() {
   const [, params] = useRoute("/admin/companies/:id");
   const companyId = params?.id;
 
+  function orderPurpose(row: any) {
+    const raw = row?.raw ?? {};
+    const notes = raw?.notes ?? raw?.order?.notes ?? {};
+    return String((notes as any)?.purpose ?? "").trim().toLowerCase();
+  }
+
+  function orderPaymentMode(row: any) {
+    const raw = row?.raw ?? {};
+    const notes = raw?.notes ?? raw?.order?.notes ?? {};
+    return String((notes as any)?.paymentMode ?? (notes as any)?.payment_mode ?? "").trim().toLowerCase();
+  }
+
+  function orderStatus(row: any) {
+    return String(row?.status ?? "").trim().toLowerCase();
+  }
+
   type TabKey = "profile" | "projects" | "proposals" | "interviews" | "payments" | "upcomingPayments" | "hired";
   const [activeTab, setActiveTab] = useState<TabKey>("profile");
   const [tabSearch, setTabSearch] = useState<Record<TabKey, string>>({
@@ -1886,9 +1902,36 @@ export default function AdminCompanyDetailPage() {
                                 const hasFullTime = String(duration).toLowerCase().includes("full-time") || String(duration).toLowerCase().includes("pp") || (d?.offerDetails && String(d.offerDetails).toLowerCase().includes("full"));
                                 const paymentType = hasFullTime ? "Full-time" : "Internship";
                                 const currency = String(d?.currency ?? "INR").toUpperCase();
-                                const dueAmountMinor = Number(d?.dueAmountMinor ?? d?.dueAmount ?? d?.amountMinor ?? 0);
+                                const proposalId = String(d?.proposalId ?? d?.proposal_id ?? d?.id ?? "").trim();
+                                const rawDueAmountMinor = Number(d?.dueAmountMinor ?? d?.dueAmount ?? d?.amountMinor ?? 0);
+                                const rawTotalAmountMinor = Number(d?.totalAmountMinor ?? d?.amountMinor ?? 0);
+
+                                const paidForProposal = (Array.isArray(orders) ? orders : []).filter((o: any) => {
+                                  if (orderStatus(o) !== "paid") return false;
+                                  if (!proposalId) return false;
+                                  const ids = Array.isArray(o?.proposalIds) ? o.proposalIds : [];
+                                  const isInOrder = String(o?.proposalId ?? "").trim() === proposalId || ids.includes(proposalId);
+                                  if (!isInOrder) return false;
+                                  const purpose = orderPurpose(o);
+                                  return purpose === "employer_monthly_payment" || purpose === "employer_checkout";
+                                });
+
+                                const checkoutTotalPaidForThisProposal = paidForProposal.some((o: any) => {
+                                  if (orderPurpose(o) !== "employer_checkout") return false;
+                                  if (orderPaymentMode(o) !== "total") return false;
+                                  const ids = Array.isArray(o?.proposalIds) ? o.proposalIds : [];
+                                  if (ids.length > 0) return ids.length === 1 && ids[0] === proposalId;
+                                  return String(o?.proposalId ?? "").trim() === proposalId;
+                                });
+
+                                const paidAmountMinor = paidForProposal.reduce((sum: number, o: any) => {
+                                  const amt = Number(o?.amountMinor ?? o?.amount_minor ?? 0);
+                                  return sum + (Number.isFinite(amt) ? Math.max(0, amt) : 0);
+                                }, 0);
+
+                                const totalAmountMinor = checkoutTotalPaidForThisProposal ? Math.max(0, paidAmountMinor) : rawTotalAmountMinor;
+                                const dueAmountMinor = checkoutTotalPaidForThisProposal ? 0 : rawDueAmountMinor;
                                 const isCompleted = dueAmountMinor <= 0;
-                                const totalAmountMinor = Number(d?.totalAmountMinor ?? d?.amountMinor ?? 0);
                                 const findternScore = Number(d?.findternScore ?? 0);
                                 const upcomingPaymentMinor = isCompleted
                                   ? 0
