@@ -231,11 +231,16 @@ export default function AdminInternDetailPage() {
   const [employerDuesUpcomingFrom, setEmployerDuesUpcomingFrom] = useState<string>("");
 
   const filteredEmployerDues = useMemo(() => {
-    if (!employerDuesUpcomingFrom) return employerDues;
-    const filterDate = employerDuesUpcomingFrom.trim();
-    if (!filterDate || filterDate.length !== 10) return employerDues;
+    let filtered = employerDues.filter((r) => {
+      const v = String(r.duration ?? "").trim().toLowerCase();
+      return v !== "full-time";
+    });
     
-    return employerDues.filter((r) => {
+    if (!employerDuesUpcomingFrom) return filtered;
+    const filterDate = employerDuesUpcomingFrom.trim();
+    if (!filterDate || filterDate.length !== 10) return filtered;
+    
+    return filtered.filter((r) => {
       const internMonthlyMinor = Number(r.internMonthlyAmountMinor ?? 0) || 0;
       const monthlyAmountMinor = Number(r.monthlyAmountMinor ?? 0) || 0;
       const isLowScoringIntern = (Number(r.internDueAmountMinor ?? 0) || 0) === 0 && monthlyAmountMinor > 0;
