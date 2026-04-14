@@ -69,7 +69,7 @@ export default function EmployerOrdersPage() {
   const [hireFrom, setHireFrom] = useState<string>("");
   const [hireTo, setHireTo] = useState<string>("");
 
-  const [upcomingCurrency, setUpcomingCurrency] = useState<string>("INR");
+  const [upcomingCurrency, setUpcomingCurrency] = useState<string>("");
   const [upcomingPayStatus, setUpcomingPayStatus] = useState<"" | "partially_paid" | "fully_paid">("");
   const [upcomingFrom, setUpcomingFrom] = useState<string>("");
   const [upcomingTo, setUpcomingTo] = useState<string>("");
@@ -83,7 +83,7 @@ export default function EmployerOrdersPage() {
   const [decisionBusyId, setDecisionBusyId] = useState<string>("");
 
   const [status, setStatus] = useState<string>("");
-  const [currency, setCurrency] = useState<string>("INR");
+  const [currency, setCurrency] = useState<string>("");
   const [q, setQ] = useState<string>("");
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
@@ -849,7 +849,11 @@ export default function EmployerOrdersPage() {
         return sum + (Number.isFinite(amt) ? Math.max(0, amt) : 0);
       }, 0);
 
-      const dueAmountMinor = Math.max(0, totalAmountMinor - paidAmountMinor);
+      const effectiveTotalAmountMinor = checkoutTotalPaidForThisProposal
+        ? Math.max(0, paidAmountMinor)
+        : totalAmountMinor;
+
+      const dueAmountMinor = Math.max(0, effectiveTotalAmountMinor - paidAmountMinor);
       const isFullyPaid = dueAmountMinor <= 0 || totalAmountMinor <= 0;
 
       if (payStatus === "fully_paid" && !isFullyPaid) return false;
@@ -872,9 +876,7 @@ export default function EmployerOrdersPage() {
         return latest ? isoDateOnly(latest) : "";
       })();
 
-      const filterDate = String(upcomingDate || completedAt || "").slice(0, 10);
-      if (from && filterDate && filterDate < from) return false;
-      if (to && filterDate && filterDate > to) return false;
+      const upcomingAmountMinor = isFullyPaid ? 0 : Math.min(amountMinor, dueAmountMinor);
 
       return true;
     });
@@ -1923,7 +1925,7 @@ export default function EmployerOrdersPage() {
                   : "—";
 
                 const employerCompany = String(invoiceData?.employer?.companyName ?? "—").trim() || "—";
-                const employerEmail = String(invoiceData?.employer?.companyEmail ?? "").trim();
+                const employerEmail = String(invoiceData?.employer?.companyEmail ?? "");
 
                 const items = Array.isArray(invoiceData?.items) ? (invoiceData.items as any[]) : [];
                 const currencyCode = String(payment?.currency ?? "INR").toUpperCase();
@@ -1997,17 +1999,17 @@ export default function EmployerOrdersPage() {
                     <div className="px-6 py-5">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                          <p className="text-xs font-semibold text-slate-700">Invoice Date :</p>
-                          <p className="text-sm text-slate-900 mt-1">{invoiceDateLabel}</p>
+                          <p className="text-xs font-semibold !text-white">Invoice Date :</p>
+                          <p className="text-sm text-white mt-1">{invoiceDateLabel}</p>
 
-                          <p className="text-xs font-semibold text-slate-700 mt-4">Invoice Number :</p>
-                          <p className="text-sm text-slate-900 mt-1">{invoiceNumber}</p>
+                          <p className="text-xs font-semibold !text-white mt-4">Invoice Number :</p>
+                          <p className="text-sm text-white mt-1">{invoiceNumber}</p>
                         </div>
 
                         <div className="md:text-right">
-                          <p className="text-xs font-semibold text-slate-700">Invoice to :</p>
-                          <p className="text-sm text-slate-900 mt-1">{employerCompany}</p>
-                          {employerEmail ? <p className="text-sm text-slate-700">{employerEmail}</p> : null}
+                          <p className="text-xs font-semibold !text-white">Invoice to :</p>
+                          <p className="text-sm text-white mt-1">{employerCompany}</p>
+                          {employerEmail ? <p className="text-sm text-white">{employerEmail}</p> : null}
                         </div>
                       </div>
 
@@ -2416,8 +2418,6 @@ export default function EmployerOrdersPage() {
                           const offer = (p?.offerDetails ?? {}) as any;
                           const fullTimeOffer = (offer as any)?.fullTimeOffer ?? null;
                           const hasFullTimeOffer = !!fullTimeOffer && typeof fullTimeOffer === "object";
-                          const statusLower = String(p?.status ?? "").trim().toLowerCase();
-                          const shouldShowFullTime = hasFullTimeOffer && statusLower === "hired";
                           const startDate = String(offer?.startDate ?? "").trim();
                           const duration = String(offer?.duration ?? "").trim();
 
@@ -2454,7 +2454,7 @@ export default function EmployerOrdersPage() {
                                 >
                                   {internName}
                                 </Button>
-                                {shouldShowFullTime ? (
+                                {hasFullTimeOffer ? (
                                   <Badge className="ml-2 bg-slate-900 text-white text-[10px] font-semibold rounded-full">Full-time</Badge>
                                 ) : null}
                               </TableCell>
@@ -2583,11 +2583,12 @@ export default function EmployerOrdersPage() {
 
                     <div className="w-full md:w-40">
                       <p className="text-xs text-slate-600 mb-1">Currency</p>
-                      <Select value={currency || "INR"} onValueChange={(v) => setCurrency(v)}>
+                      <Select value={currency || "all"} onValueChange={(v) => setCurrency(v === "all" ? "" : v)}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
                           <SelectItem value="INR">INR</SelectItem>
                           <SelectItem value="USD">USD</SelectItem>
                         </SelectContent>
@@ -2728,13 +2729,14 @@ export default function EmployerOrdersPage() {
                     <div className="w-full md:w-40">
                       <p className="text-xs text-slate-600 mb-1">Currency</p>
                       <Select
-                        value={upcomingCurrency || "INR"}
-                        onValueChange={(v) => setUpcomingCurrency(String(v || "INR").toUpperCase())}
+                        value={upcomingCurrency || "all"}
+                        onValueChange={(v) => setUpcomingCurrency(v === "all" ? "" : String(v || "").toUpperCase())}
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
                           <SelectItem value="INR">INR</SelectItem>
                           <SelectItem value="USD">USD</SelectItem>
                         </SelectContent>
@@ -2881,11 +2883,15 @@ export default function EmployerOrdersPage() {
                               return sum + (Number.isFinite(amt) ? Math.max(0, amt) : 0);
                             }, 0);
 
-                            const dueAmountMinor = Math.max(0, totalAmountMinor - paidAmountMinor);
+                            const effectiveTotalAmountMinor = checkoutTotalPaidForThisProposal
+                              ? Math.max(0, paidAmountMinor)
+                              : totalAmountMinor;
+
+                            const dueAmountMinor = Math.max(0, effectiveTotalAmountMinor - paidAmountMinor);
                             const isFullyPaid = dueAmountMinor <= 0 || totalAmountMinor <= 0;
 
                             const paidMonths = paidForProposal.filter((o: any) => orderPurpose(o) === "employer_monthly_payment").length;
-                            const upcomingDate = !isFullyPaid && startDate ? addMonthsToIso(startDate, Math.max(1, paidMonths + 1)) : "";
+                            const upcomingDate = !isFullyPaid && startDate ? addMonthsToIso(startDate, Math.max(1, paidMonths)) : "";
 
                             const completedAt = (() => {
                               if (!isFullyPaid) return "";
@@ -2912,7 +2918,7 @@ export default function EmployerOrdersPage() {
                                 <TableCell className="text-xs">{completedAt || "—"}</TableCell>
                                 <TableCell className="text-xs">{formatAmount(upcomingAmountMinor, currencyCode)}</TableCell>
                                 <TableCell className="text-xs">
-                                  {formatAmount(totalAmountMinor, currencyCode)}
+                                  {formatAmount(effectiveTotalAmountMinor, currencyCode)}
                                   {discountEligible && totalAmountMinor < totalAmountMinorRaw && (
                                     <Badge variant="outline" className="ml-1 text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
                                       10% off
