@@ -285,9 +285,10 @@ export default function AdminInternInvoicesPage() {
     const finalAmountMinor = originalAmountMinor - discountAmountMinor;
     
     const gstRate = 18;
-    const gstMinor = Math.round(originalAmountMinor * gstRate / 100);
-    const totalWithGstMinor = finalAmountMinor + gstMinor;
-
+    const subtotalMinor = Math.round((finalAmountMinor * 100) / (100 + gstRate));
+    const gstMinor = finalAmountMinor - subtotalMinor;
+    const totalWithGstMinor = subtotalMinor + gstMinor;
+    
     const hasDiscount = discountAmountMinor > 0;
     const promoCode = payment?.promoCode ?? invoiceData.promoCode;
 
@@ -343,17 +344,11 @@ export default function AdminInternInvoicesPage() {
                 </td>
                 <td className="px-3 py-3 text-right">
                   <p className="text-sm font-semibold text-slate-900">
-                    ₹2499.00
+                    ₹2499
                   </p>
                 </td>
               </tr>
-              <tr className="border-b border-slate-200">
-                <td className="px-3 py-2 text-sm font-semibold text-slate-900">GST {gstRate}%</td>
-                <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
-                  ₹{(gstMinor / 100).toFixed(2)}
-                </td>
-              </tr>
-              {hasDiscount && (
+               {hasDiscount && (
               <tr className="border-b border-slate-200">
                 <td className="px-3 py-3">
                   <p className="text-sm font-medium text-emerald-600">Promo Code Discount ({promoCode})</p>
@@ -365,10 +360,23 @@ export default function AdminInternInvoicesPage() {
                 </td>
               </tr>
               )}
+              <tr className="border-b border-slate-200">
+                <td className="px-3 py-2 text-sm font-semibold text-slate-900">SubTotal</td>
+                <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
+                  ₹{(subtotalMinor / 100).toFixed(2)}
+                </td>
+              </tr>
+              <tr className="border-b border-slate-200">
+                <td className="px-3 py-2 text-sm font-semibold text-slate-900">GST {gstRate}%</td>
+                <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
+                  ₹{(gstMinor / 100).toFixed(2)}
+                </td>
+              </tr>
+             
               <tr>
                 <td className="px-3 py-2 text-sm font-bold text-slate-900">Total</td>
                 <td className="px-3 py-2 text-right text-sm font-bold text-slate-900">
-                  ₹{(totalWithGstMinor / 100).toFixed(2)}
+                  ₹{(finalAmountMinor / 100).toFixed(2)}
                 </td>
               </tr>
             </tbody>
