@@ -240,27 +240,39 @@ export default function AdminInternDetailPage() {
     const filterDate = employerDuesUpcomingFrom.trim();
     if (!filterDate || filterDate.length !== 10) return filtered;
     
+    const advanceIsoMonth = (iso: string, months: number) => {
+      const s = String(iso ?? "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+      const dt = new Date(`${s}T00:00:00`);
+      if (Number.isNaN(dt.getTime())) return "";
+      dt.setMonth(dt.getMonth() + Math.max(0, months));
+      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+    };
+
     return filtered.filter((r) => {
-      const internMonthlyMinor = Number(r.internMonthlyAmountMinor ?? 0) || 0;
       const monthlyAmountMinor = Number(r.monthlyAmountMinor ?? 0) || 0;
       const isLowScoringIntern = (Number(r.internDueAmountMinor ?? 0) || 0) === 0 && monthlyAmountMinor > 0;
       if (isLowScoringIntern) return false;
-      
-      const rawStartDate = String(r.startDate ?? "").trim();
-      if (!rawStartDate || rawStartDate.length !== 10) return false;
-      
-      const startParts = rawStartDate.split("-");
-      if (startParts.length !== 3) return false;
-      const startDateObj = new Date(`${startParts[0]}-${startParts[1]}-${startParts[2]}T00:00:00`);
-      if (Number.isNaN(startDateObj.getTime())) return false;
-      
-      const targetDate = new Date(startDateObj);
-      targetDate.setMonth(targetDate.getMonth() + 1);
-      const upcomingDateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(targetDate.getDate()).padStart(2, "0")}`;
-      
-      return upcomingDateStr === filterDate;
+
+      const proposalId = String(r.proposalId ?? "").trim();
+      const paidForProposal = payouts
+        .filter((p) => String(p.status ?? "").toLowerCase() === "paid")
+        .filter((p) => String(p.proposalId ?? "").trim() === proposalId)
+        .map((p) => String(p.scheduledFor ?? "").trim())
+        .filter((sf) => /^\d{4}-\d{2}-\d{2}$/.test(sf))
+        .sort();
+      const lastPaidScheduledFor = paidForProposal.length > 0 ? paidForProposal[paidForProposal.length - 1] : "";
+
+      const fallbackUpcoming = String(r.upcomingPaymentDate ?? "").trim() || (() => {
+        const rawStartDate = String(r.startDate ?? "").trim();
+        return rawStartDate ? advanceIsoMonth(rawStartDate, 1) : "";
+      })();
+
+      const computedUpcoming = lastPaidScheduledFor ? advanceIsoMonth(lastPaidScheduledFor, 1) : fallbackUpcoming;
+      if (!computedUpcoming) return false;
+      return computedUpcoming === filterDate;
     });
-  }, [employerDues, employerDuesUpcomingFrom]);
+  }, [employerDues, employerDuesUpcomingFrom, payouts]);
 
   const [openCreatePayout, setOpenCreatePayout] = useState(false);
   const [creatingPayout, setCreatingPayout] = useState(false);
@@ -2237,15 +2249,29 @@ export default function AdminInternDetailPage() {
                                 dt.setMonth(dt.getMonth() + Math.max(0, months));
                                 return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
                               };
-                              const upcomingPaymentDateDisplay = isLowScoringIntern ? "-" : (rawStartDate ? advanceIsoMonth(rawStartDate, 1) : "-");
 
-                              const scheduledFor = String(r.upcomingPaymentDate ?? "").trim();
+                              const proposalId = String(r.proposalId ?? "").trim();
+                              const paidForProposal = payouts
+                                .filter((p) => String(p.status ?? "").toLowerCase() === "paid")
+                                .filter((p) => String(p.proposalId ?? "").trim() === proposalId)
+                                .map((p) => String(p.scheduledFor ?? "").trim())
+                                .filter((sf) => /^\d{4}-\d{2}-\d{2}$/.test(sf))
+                                .sort();
+                              const lastPaidScheduledFor = paidForProposal.length > 0 ? paidForProposal[paidForProposal.length - 1] : "";
+
+                              const fallbackUpcoming = String(r.upcomingPaymentDate ?? "").trim() || (rawStartDate ? advanceIsoMonth(rawStartDate, 1) : "");
+                              const computedUpcoming = isLowScoringIntern
+                                ? ""
+                                : (lastPaidScheduledFor ? advanceIsoMonth(lastPaidScheduledFor, 1) : fallbackUpcoming);
+
+                              const upcomingPaymentDateDisplay = computedUpcoming || "-";
+
                               const cyclePayout = payouts.find((p) => {
                                 const pid = String(p.proposalId ?? "").trim();
                                 const sf = String(p.scheduledFor ?? "").trim();
-                                if (!pid || !scheduledFor) return false;
-                                if (pid !== String(r.proposalId ?? "").trim()) return false;
-                                return sf === scheduledFor;
+                                if (!pid || !computedUpcoming) return false;
+                                if (pid !== proposalId) return false;
+                                return sf === computedUpcoming;
                               });
                               const cyclePayoutStatus = String((cyclePayout as any)?.status ?? "").toLowerCase();
                               const hasPendingPayoutForCycle = cyclePayoutStatus === "pending";
@@ -2254,7 +2280,7 @@ export default function AdminInternDetailPage() {
                               const isComplete = internDueMinor <= 0;
 
                               const effectiveScheduledFor =
-                                hasPaidPayoutForCycle && scheduledFor ? advanceIsoMonth(scheduledFor, 1) : scheduledFor;
+                                hasPaidPayoutForCycle && computedUpcoming ? advanceIsoMonth(computedUpcoming, 1) : computedUpcoming;
 
                               return (
                                 <tr key={`${r.employerId}_${r.proposalId}`}
