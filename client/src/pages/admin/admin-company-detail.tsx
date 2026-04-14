@@ -739,7 +739,7 @@ export default function AdminCompanyDetailPage() {
     { key: "internName", label: "Candidate", filterKey: "internName" },
     { key: "projectName", label: "Project" },
     { key: "type", label: "Type" },
-    { key: "amount", label: "Amount" },
+    { key: "amount", label: "Start Date" },
     { key: "startDate", label: "Start Date" },
   ];
 

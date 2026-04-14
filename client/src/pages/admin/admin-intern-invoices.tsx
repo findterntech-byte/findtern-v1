@@ -270,26 +270,26 @@ export default function AdminInternInvoicesPage() {
     const intern = invoiceData.intern ?? {};
     const currencyCode = String(payment?.currency ?? "INR").toUpperCase();
 
-    const rawPaidAt = payment?.paidAt ?? payment?.paid_at ?? payment?.createdAt ?? payment?.created_at;
+    const rawPaidAt = invoiceData.invoiceDate ?? payment?.paidAt ?? payment?.paid_at ?? payment?.createdAt ?? payment?.created_at;
     const paidAt = rawPaidAt ? new Date(rawPaidAt) : null;
     const invoiceDate = paidAt && !Number.isNaN(paidAt.getTime()) ? paidAt : null;
     const invoiceDateLabel = invoiceDate
-      ? `${String(invoiceDate.getDate()).padStart(2, "0")}-${String(invoiceDate.getMonth() + 1).padStart(2, "0")}-${String(invoiceDate.getFullYear())}`
+      ? `${String(invoiceDate.getDate()).padStart(2, "0")}-${String(invoiceDate.getMonth() + 1).padStart(2, "0")}-${String(invoiceDate.getFullYear()).slice(2)}`
       : "—";
     const invoiceNumber = String(invoiceData.invoiceNumber ?? "").trim() || "—";
     const internName = String(intern?.name ?? "—").trim() || "—";
     const internEmail = String(intern?.email ?? "").trim();
 
-    const originalAmountMinor = Number(payment?.originalAmountMinor ?? payment?.amountMinor ?? 0);
+    const originalAmountMinor = 249900;
     const discountAmountMinor = Number(payment?.discountAmountMinor ?? 0);
-    const finalAmountMinor = Number(payment?.finalAmountMinor ?? payment?.amountMinor ?? 0);
-
-    const subtotalMinor = originalAmountMinor - discountAmountMinor;
+    const finalAmountMinor = originalAmountMinor - discountAmountMinor;
+    
+    const subtotalMinor = finalAmountMinor;
     const gstRate = 18;
     const gstApplicable = subtotalMinor > 0;
     const subtotalFromTotalMinor = gstApplicable ? Math.round((Math.max(0, finalAmountMinor) * 100) / 118) : subtotalMinor;
-    const gstMinor = gstApplicable ? Math.max(0, Math.max(0, finalAmountMinor) - subtotalFromTotalMinor) : 0;
-    const totalWithGstMinor = subtotalFromTotalMinor + gstMinor;
+    const gstMinor = gstApplicable ? Math.max(0, finalAmountMinor - subtotalFromTotalMinor) : 0;
+    const totalWithGstMinor = finalAmountMinor;
 
     const hasDiscount = discountAmountMinor > 0;
     const promoCode = payment?.promoCode ?? invoiceData.promoCode;
@@ -394,7 +394,7 @@ export default function AdminInternInvoicesPage() {
                 <tr>
                   <td className="px-3 py-2 text-sm font-bold text-slate-900">Total</td>
                   <td className="px-3 py-2 text-right text-sm font-bold text-slate-900">
-                    ₹{(totalWithGstMinor / 100).toFixed(2)}
+                    ₹{(finalAmountMinor / 100).toFixed(2)}
                   </td>
                 </tr>
               </tbody>

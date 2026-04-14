@@ -555,7 +555,7 @@ export default function AdminReportsPage() {
               <TabsContent value="interns" className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-4">
                   <MetricCard icon={Users} iconBg="bg-primary/10" iconColor="text-primary" label="Total Interns" value={platformMetrics.totalUsers.toLocaleString()} sublabel={`${platformMetrics.activeUsers.toLocaleString()} active`} />
-                  <MetricCard icon={Briefcase} iconBg="bg-emerald-100" iconColor="text-emerald-600" label="Avg Proposals/Intern" value={derived.avgAppsPerUser} sublabel={`${derived.internshipProposalCount} internship | ${derived.fullTimeProposalCount} full-time`} />
+                  <MetricCard icon={Briefcase} iconBg="bg-emerald-100" iconColor="text-emerald-600" label="Avg Proposals/Intern" value={derived.avgAppsPerUser}  />
                   <MetricCard icon={Target} iconBg="bg-purple-100" iconColor="text-purple-600" label="Internship Hired" value={hiredInternship.length} />
                   <MetricCard icon={CheckCircle2} iconBg="bg-amber-100" iconColor="text-amber-600" label="Full-time Hired" value={hiredFullTime.length} />
                 </div>
@@ -701,7 +701,7 @@ Clear
               <TabsContent value="companies" className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-3">
                   <MetricCard icon={Building2} iconBg="bg-emerald-100" iconColor="text-emerald-600" label="Total Companies" value={platformMetrics.totalCompanies} sublabel={`+${derived.newCompanies} new`} />
-                  <MetricCard icon={Briefcase} iconBg="bg-primary/10" iconColor="text-primary" label="Active Projects" value={platformMetrics.activeProjects} sublabel={`${derived.projectsPerCompany} per company`} />
+                  <MetricCard icon={Briefcase} iconBg="bg-primary/10" iconColor="text-primary" label="Active Projects" value={platformMetrics.activeProjects}  />
                   <MetricCard icon={CheckCircle2} iconBg="bg-purple-100" iconColor="text-purple-600" label="Completed Hires" value={platformMetrics.completedInternships} sublabel={`${derived.hiresPerCompany} per company`} />
                 </div>
 
