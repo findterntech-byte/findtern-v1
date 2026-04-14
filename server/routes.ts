@@ -7507,6 +7507,8 @@ export async function registerRoutes(
         }
       >();
 
+      const paidSumMinorByInternProposal = new Map<string, number>();
+
       for (const row of (Array.isArray(payouts) ? payouts : []) as any[]) {
         const internId = String(row?.internId ?? row?.intern_id ?? "").trim();
         if (!internId) continue;
@@ -7538,6 +7540,12 @@ export async function registerRoutes(
 
         if (status === "paid") {
           existing.paidSumMinor += inrAmountMinor;
+
+          const proposalId = String(row?.proposalId ?? row?.proposal_id ?? row?.raw?.proposalId ?? row?.raw?.proposal_id ?? "").trim();
+          if (proposalId) {
+            const k = `${internId}::${proposalId}`;
+            paidSumMinorByInternProposal.set(k, (paidSumMinorByInternProposal.get(k) ?? 0) + inrAmountMinor);
+          }
         }
 
         if (status === "pending") {
@@ -7712,29 +7720,43 @@ export async function registerRoutes(
           const scheduledAgg = (() => {
             if (allHiredProposals.length === 0) return null;
 
-            // Find the earliest start date among all hired proposals
-            let earliestStartDate: Date | null = null;
+            let minNextDueAt: Date | null = null;
+            let minUpcomingAmountMinor = 0;
+
             for (const prop of allHiredProposals) {
+              const proposalId = String((prop as any)?.id ?? "").trim();
               const od = (prop as any)?.offerDetails ?? (prop as any)?.offer_details ?? {};
               const sd = parseDateOnly(od?.startDate ?? od?.start_date);
-              if (sd) {
-                if (!earliestStartDate || sd.getTime() < earliestStartDate.getTime()) {
-                  earliestStartDate = sd;
-                }
+              if (!proposalId || !sd) continue;
+
+              const cur = String((prop as any)?.currency ?? od?.currency ?? "INR").trim().toUpperCase();
+              const isUsd = cur === "USD";
+              const maj = Number(od?.monthlyAmount ?? od?.monthly_amount ?? 0);
+              if (!Number.isFinite(maj) || maj <= 0) continue;
+
+              let empMin = Math.round(maj * 100);
+              let intMin = Math.round(empMin * 0.5);
+              if (isUsd) {
+                empMin = Math.round(empMin * 100);
+                intMin = Math.round(intMin * 100);
+              }
+              if (!Number.isFinite(intMin) || intMin <= 0) continue;
+
+              const totalMonths = Math.max(1, monthsFromDuration(od?.duration));
+              const paidMinorForProposal = paidSumMinorByInternProposal.get(`${internId}::${proposalId}`) ?? 0;
+              const paidMonths = Math.floor(Math.max(0, paidMinorForProposal) / intMin);
+              if (paidMonths >= totalMonths) continue;
+
+              const nextDueAt = addMonths(sd, Math.max(0, paidMonths + 1));
+              if (!Number.isFinite(nextDueAt.getTime())) continue;
+
+              if (!minNextDueAt || nextDueAt.getTime() < minNextDueAt.getTime()) {
+                minNextDueAt = nextDueAt;
+                minUpcomingAmountMinor = empMin;
               }
             }
 
-            if (!earliestStartDate || !Number.isFinite(internMonthlyMinor) || internMonthlyMinor <= 0) return null;
-
-            const paidMonths = Math.floor((Number(payoutAgg.paidSumMinor ?? 0) || 0) / internMonthlyMinor);
-            // Calculate total months from all hired proposals
-            let totalMonthsSum = 0;
-            for (const prop of allHiredProposals) {
-              const od = (prop as any)?.offerDetails ?? (prop as any)?.offer_details ?? {};
-              totalMonthsSum += monthsFromDuration(od?.duration);
-            }
-            const totalMonths = Math.max(1, totalMonthsSum);
-            if (paidMonths >= totalMonths) {
+            if (!minNextDueAt) {
               return {
                 nextDueIso: null as string | null,
                 computedToPayMinor: 0,
@@ -7742,33 +7764,17 @@ export async function registerRoutes(
               };
             }
 
-            // Month-wise due date on the same day as the earliest start date:
-            // Start: 2026-02-11 => 1st due: 2026-03-11
-            // After paying 1 month => 2026-04-11, and so on.
-            const nextDueAt = addMonths(earliestStartDate, Math.max(0, paidMonths + 1));
-            const nextDueIso = nextDueAt.toISOString();
+            const nextDueIso = minNextDueAt.toISOString();
 
             const now = new Date();
-            const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
+            void now;
 
-            const dueCount = (() => {
-              if (todayUtc.getTime() < earliestStartDate.getTime()) return 0;
-              const yDiff = todayUtc.getUTCFullYear() - earliestStartDate.getUTCFullYear();
-              const mDiff = todayUtc.getUTCMonth() - earliestStartDate.getUTCMonth();
-              let months = yDiff * 12 + mDiff;
-              const dueThisMonth = todayUtc.getUTCDate() >= earliestStartDate.getUTCDate();
-              months += dueThisMonth ? 1 : 0;
-              return Math.max(0, months);
-            })();
-
-            const expectedDueMinor = dueCount * internMonthlyMinor;
-            const paidMinor = Math.max(0, Number(payoutAgg.paidSumMinor ?? 0) || 0);
-            const computedToPayMinor = Math.max(0, expectedDueMinor - paidMinor);
+            const computedToPayMinor = Math.max(0, Number(leftToPayMinor ?? 0) || 0);
 
             return {
               nextDueIso,
               computedToPayMinor,
-              upcomingAmountMinor: employerMonthlyMinor,
+              upcomingAmountMinor: minUpcomingAmountMinor,
             };
           })();
 
