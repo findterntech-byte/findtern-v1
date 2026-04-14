@@ -417,6 +417,7 @@ const employersMap = useMemo(() => {
     const msgRole = item.meta.role?.toLowerCase();
     const msgKind = item.meta.kind;
     const firstName = String(m.firstName ?? "").toLowerCase();
+    const subjectLower = String(m.subject ?? "").trim().toLowerCase();
     
     if (filter.startsWith("qt:")) {
       const qtVal = filter.replace("qt:", "").toLowerCase();
@@ -430,9 +431,17 @@ const employersMap = useMemo(() => {
       } else if (qtVal === "employer report") {
         return msgQt.includes("employer") && msgQt.includes("report");
       } else if (qtVal === "hiring") {
-        return msgQt.includes("hiring") && firstName !== "employer";
+        if (!msgQt.includes("hiring") || firstName === "employer") return false;
+        if (msgQt.includes("support") || msgQt.includes("report") || msgQt.includes("feedback")) return false;
+        if (msgKind === "feedback" || msgKind === "report") return false;
+        if (subjectLower.includes("support feedback") || subjectLower.includes("support report")) return false;
+        return true;
       } else if (qtVal === "intern") {
-        return !msgQt.includes("support") && !msgQt.includes("report") && msgQt.includes("intern") && firstName !== "intern";
+        if (!msgQt.includes("intern") || firstName === "intern") return false;
+        if (msgQt.includes("support") || msgQt.includes("report") || msgQt.includes("feedback")) return false;
+        if (msgKind === "feedback" || msgKind === "report") return false;
+        if (subjectLower.includes("support feedback") || subjectLower.includes("support report")) return false;
+        return true;
       } else if (qtVal === "employer") {
         return !msgQt.includes("support") && !msgQt.includes("report") && msgQt.includes("employer") && firstName !== "employer";
       } else if (qtVal === "general") {
@@ -461,6 +470,12 @@ const employersMap = useMemo(() => {
   const filteredItems = useMemo(() => {
     const q = String(search ?? "").trim().toLowerCase();
 
+    const qtFilters = queryTypeFilters.filter((f) => f.startsWith("qt:"));
+    const roleFilters = queryTypeFilters.filter((f) => f.startsWith("role:"));
+    const kindFilters = queryTypeFilters.filter(
+      (f) => !f.startsWith("qt:") && !f.startsWith("role:"),
+    );
+
     return enrichedItems.filter((x) => {
       const m = x.message;
       const meta = x.meta;
@@ -468,9 +483,19 @@ const employersMap = useMemo(() => {
       const subjectLower = String(m.subject ?? "").toLowerCase();
       if (subjectLower.includes("full-time offer") || subjectLower.includes("full time offer")) return false;
 
-      if (queryTypeFilters.length > 0) {
-        const matchesAny = queryTypeFilters.some(filter => checkFilterMatch(x, filter));
-        if (!matchesAny) return false;
+      if (qtFilters.length > 0) {
+        const matchesQt = qtFilters.some((filter) => checkFilterMatch(x, filter));
+        if (!matchesQt) return false;
+      }
+
+      if (roleFilters.length > 0) {
+        const matchesRole = roleFilters.some((filter) => checkFilterMatch(x, filter));
+        if (!matchesRole) return false;
+      }
+
+      if (kindFilters.length > 0) {
+        const matchesKind = kindFilters.some((filter) => checkFilterMatch(x, filter));
+        if (!matchesKind) return false;
       }
 
       if (!q) return true;

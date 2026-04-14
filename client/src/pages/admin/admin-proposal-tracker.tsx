@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Eye, Filter, Calendar, Building2, GraduationCap, FolderKanban, Info, Link as LinkIcon, FileText, Clock, User, Briefcase, Activity, CheckCircle2, XCircle, AlertCircle, CalendarRange, X, Send } from "lucide-react";
+import { Search, Eye, Filter, Calendar, Building2, GraduationCap, FolderKanban, Info, Link as LinkIcon, FileText, Clock, User, Briefcase, Activity, CheckCircle2, XCircle, AlertCircle, CalendarRange, X, Send, Mail, Receipt } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { format, isAfter, isBefore, startOfDay, endOfDay, subDays, startOfWeek, startOfMonth } from "date-fns";
 
@@ -1059,7 +1059,7 @@ export default function AdminProposalTrackerPage() {
 
       {/* Proposal Details Dialog */}
       <Dialog open={openProposalDetails} onOpenChange={setOpenProposalDetails}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader className="border-b pb-4 mb-4">
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <FileText className="h-5 w-5 text-emerald-600" />
@@ -1069,122 +1069,231 @@ export default function AdminProposalTrackerPage() {
           <ScrollArea className="max-h-[75vh] pr-4">
             {selectedProposal && (
               <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-6 bg-slate-50/50 p-6 rounded-xl border border-slate-100">
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-emerald-100 rounded-lg">
-                        <User className="h-4 w-4 text-emerald-700" />
-                      </div>
-                      <div>
-                        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">Intern</h4>
-                        <p className="font-semibold text-slate-900 leading-none">
-                          {internsById.get(selectedProposal.internId)?.firstName} {internsById.get(selectedProposal.internId)?.lastName}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">{internsById.get(selectedProposal.internId)?.email}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <Building2 className="h-4 w-4 text-blue-700" />
-                      </div>
-                      <div>
-                        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">Employer</h4>
-                        <p className="font-semibold text-slate-900 leading-none">{employersById.get(selectedProposal.employerId)?.companyName}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{employersById.get(selectedProposal.employerId)?.companyEmail}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-amber-100 rounded-lg">
-                        <Briefcase className="h-4 w-4 text-amber-700" />
-                      </div>
-                      <div>
-                        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">Project</h4>
-                        <p className="font-semibold text-slate-900 leading-none">{projectsById.get(selectedProposal.projectId)?.projectName}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-slate-200 rounded-lg">
-                        <Info className="h-4 w-4 text-slate-700" />
-                      </div>
-                      <div>
-                        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">Status</h4>
-                        <div className="mt-1">{getStatusBadge(selectedProposal.status)}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                {(() => {
+                  const intern = internsById.get(selectedProposal.internId);
+                  const employer = employersById.get(selectedProposal.employerId);
+                  const project = projectsById.get(selectedProposal.projectId);
+                  const offerDetails = selectedProposal.offerDetails || {};
 
-                <div className="border-t pt-4">
-                  <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-emerald-600" />
-                    Offer Details
-                  </h4>
-                  <div className="bg-muted/30 rounded-xl overflow-hidden border">
-                    {selectedProposal.offerDetails ? (
-                      <div className="divide-y divide-muted/50">
-                        {Object.entries(selectedProposal.offerDetails).map(([key, value]) => {
-                          const formattedKey = formatKey(key);
+                  const employerName = String(employer?.companyName ?? "-");
+                  const projectName = String(project?.projectName ?? "-");
+                  const internName = `${String(intern?.firstName ?? "")} ${String(intern?.lastName ?? "")}`.trim() || "-";
+                  const internEmail = String(intern?.email ?? "-");
 
-                          if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-                            const nestedEntries = Object.entries(value as Record<string, any>);
-                            if (nestedEntries.length === 0) return null;
-                            return (
-                              <div key={key} className="p-4">
-                                <div className="grid grid-cols-[160px,1fr] items-start gap-4 mb-2">
-                                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                                    {formattedKey}
+                  const startDate = String(offerDetails?.startDate ?? offerDetails?.start_date ?? "").trim();
+                  const duration = String(offerDetails?.duration ?? offerDetails?.Duration ?? "").trim();
+                  const workMode = String(offerDetails?.mode ?? offerDetails?.workMode ?? offerDetails?.work_mode ?? "").trim();
+                  const timezone = String(offerDetails?.timezone ?? "").trim();
+                  const monthlyAmount = String(offerDetails?.monthlyAmount ?? offerDetails?.monthly_amount ?? "").trim();
+
+                  const shiftFrom = String(offerDetails?.shiftFrom ?? offerDetails?.shift_from ?? offerDetails?.shiftStart ?? "").trim();
+                  const shiftTo = String(offerDetails?.shiftTo ?? offerDetails?.shift_to ?? offerDetails?.shiftEnd ?? "").trim();
+                  const weeklySchedule = String(offerDetails?.weeklySchedule ?? offerDetails?.weekly_schedule ?? "").trim();
+                  const leavePerMonth = String(offerDetails?.leavePerMonth ?? offerDetails?.leave_per_month ?? "").trim();
+                  const location = String(offerDetails?.location ?? offerDetails?.workLocation ?? offerDetails?.work_location ?? "").trim();
+                  const laptop = String(offerDetails?.laptop ?? offerDetails?.Laptop ?? offerDetails?.laptopPolicy ?? "").trim();
+
+                  const avatarLetter = (employerName || projectName || "P").trim().charAt(0).toUpperCase() || "P";
+
+                  return (
+                    <>
+                      <Card className="p-5 sm:p-6">
+                        <div className="flex items-start gap-4">
+                          <div className="h-12 w-12 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
+                            {avatarLetter}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                              <div>
+                                <h2 className="text-lg sm:text-xl font-bold text-slate-900 leading-tight">
+                                  {employerName}
+                                </h2>
+                                <p className="text-sm text-emerald-700 font-semibold">Project: {projectName}</p>
+                                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                  <span className="inline-flex items-center gap-1">
+                                    <User className="h-3.5 w-3.5" />
+                                    {internName}
                                   </span>
-                                  <div className="text-xs text-muted-foreground">
-                                    {nestedEntries.map(([k, v]) => (
-                                      <div key={k} className="flex gap-2 py-0.5">
-                                        <span className="font-medium text-slate-700">{formatKey(k)}:</span>
-                                        <span className="font-normal">{v !== null && typeof v === "object" ? JSON.stringify(v) : String(v ?? "-")}</span>
-                                      </div>
-                                    ))}
-                                  </div>
+                                  <span className="text-muted-foreground/50">|</span>
+                                  <span className="inline-flex items-center gap-1">
+                                    <Mail className="h-3.5 w-3.5" />
+                                    {internEmail}
+                                  </span>
                                 </div>
                               </div>
-                            );
-                          }
-
-                          const valStr = String(value);
-                          const isValueHTML = isHTML(valStr);
-
-                          return (
-                            <div key={key} className="grid grid-cols-[160px,1fr] p-4 items-start gap-4">
-                              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                                {formattedKey}
-                              </span>
-                              <div className="text-sm">
-                                {isValueHTML ? (
-                                  <div
-                                    className="prose prose-sm max-w-none prose-emerald"
-                                    dangerouslySetInnerHTML={{ __html: valStr }}
-                                  />
-                                ) : (
-                                  <span className="font-medium">{valStr}</span>
-                                )}
+                              <div className="flex items-center gap-2 justify-start sm:justify-end">
+                                <div>{getStatusBadge(selectedProposal.status)}</div>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground p-4 text-center italic">No extra offer details available.</p>
-                    )}
-                  </div>
-                </div>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {duration ? (
+                                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                                  {duration}
+                                </Badge>
+                              ) : null}
+                              {monthlyAmount ? (
+                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                                  Stipend: {monthlyAmount} / month
+                                </Badge>
+                              ) : null}
+                              {workMode ? (
+                                <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">
+                                  {workMode}
+                                </Badge>
+                              ) : null}
+                              {timezone ? (
+                                <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">
+                                  {timezone}
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
 
-                <div className="grid grid-cols-2 gap-4 text-xs text-muted-foreground">
-                  <p>Created: {formatDate(selectedProposal.createdAt)}</p>
-                  <p>Last Updated: {formatDate(selectedProposal.updatedAt)}</p>
-                </div>
+                      <Card className="p-5 sm:p-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-3">
+                            <div className="p-2.5 bg-blue-100 rounded-xl">
+                              <Building2 className="h-5 w-5 text-blue-700" />
+                            </div>
+                            <div>
+                              <h3 className="font-bold text-slate-900">Company details</h3>
+                              <p className="text-sm text-muted-foreground mt-1">{employerName}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{String(employer?.companyEmail ?? "-")}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <Card className="p-5 sm:p-6">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Briefcase className="h-5 w-5 text-emerald-600" />
+                            <h3 className="font-bold text-slate-900">Internship details</h3>
+                          </div>
+                          <div className="grid gap-3 text-sm">
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Start date</span>
+                              <span className="font-semibold text-slate-900">{startDate ? formatDate(startDate) : "-"}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Duration</span>
+                              <span className="font-semibold text-slate-900">{duration || "-"}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Weekly schedule</span>
+                              <span className="font-semibold text-slate-900">{weeklySchedule || "-"}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Shift timings</span>
+                              <span className="font-semibold text-slate-900">{shiftFrom || shiftTo ? `${shiftFrom || "-"} - ${shiftTo || "-"}` : "-"}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Leave per month</span>
+                              <span className="font-semibold text-slate-900">{leavePerMonth || "-"}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Work mode</span>
+                              <span className="font-semibold text-slate-900">{workMode || "-"}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Location</span>
+                              <span className="font-semibold text-slate-900">{location || "-"}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Laptop</span>
+                              <span className="font-semibold text-slate-900">{laptop || "-"}</span>
+                            </div>
+                          </div>
+                        </Card>
+
+                        <Card className="p-5 sm:p-6">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Receipt className="h-5 w-5 text-emerald-600" />
+                            <h3 className="font-bold text-slate-900">Compensation</h3>
+                          </div>
+                          <div className="grid gap-3 text-sm">
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Monthly pay</span>
+                              <span className="font-semibold text-slate-900">{monthlyAmount ? `${monthlyAmount} / month` : "-"}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Currency</span>
+                              <span className="font-semibold text-slate-900">{String(selectedProposal.currency ?? "-")}</span>
+                            </div>
+                          </div>
+                        </Card>
+                      </div>
+
+                      <div className="border-t pt-4">
+                        <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-emerald-600" />
+                          Offer Details
+                        </h4>
+                        <div className="bg-muted/30 rounded-xl overflow-hidden border">
+                          {selectedProposal.offerDetails ? (
+                            <div className="divide-y divide-muted/50">
+                              {Object.entries(selectedProposal.offerDetails).map(([key, value]) => {
+                                const formattedKey = formatKey(key);
+
+                                if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+                                  const nestedEntries = Object.entries(value as Record<string, any>);
+                                  if (nestedEntries.length === 0) return null;
+                                  return (
+                                    <div key={key} className="p-4">
+                                      <div className="grid grid-cols-[160px,1fr] items-start gap-4 mb-2">
+                                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                          {formattedKey}
+                                        </span>
+                                        <div className="text-xs text-muted-foreground">
+                                          {nestedEntries.map(([k, v]) => (
+                                            <div key={k} className="flex gap-2 py-0.5">
+                                              <span className="font-medium text-slate-700">{formatKey(k)}:</span>
+                                              <span className="font-normal">{v !== null && typeof v === "object" ? JSON.stringify(v) : String(v ?? "-")}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+
+                                const valStr = String(value);
+                                const isValueHTML = isHTML(valStr);
+
+                                return (
+                                  <div key={key} className="grid grid-cols-[160px,1fr] p-4 items-start gap-4">
+                                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                      {formattedKey}
+                                    </span>
+                                    <div className="text-sm">
+                                      {isValueHTML ? (
+                                        <div
+                                          className="prose prose-sm max-w-none prose-emerald"
+                                          dangerouslySetInnerHTML={{ __html: valStr }}
+                                        />
+                                      ) : (
+                                        <span className="font-medium">{valStr}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground p-4 text-center italic">No extra offer details available.</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
+                        <p>Created: {formatDate(selectedProposal.createdAt)}</p>
+                        <p>Last Updated: {formatDate(selectedProposal.updatedAt)}</p>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
           </ScrollArea>
