@@ -16874,7 +16874,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           const proposalId = String(raw?.proposalId ?? raw?.proposal_id ?? "").trim();
           const cur = String((row as any)?.currency ?? "INR").trim().toUpperCase();
           const amt = Number((row as any)?.amountMinor ?? (row as any)?.amount_minor ?? 0) || 0;
-          const inrAmt = cur === "USD" ? Math.round(amt * 100) : amt;
+          const inrAmt = amt;
           return {
             id: String((row as any)?.id ?? ""),
             proposalId,
@@ -16966,12 +16966,6 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
             ? Math.round(Math.max(0, totalPriceMajor) * 100)
             : monthlyAmountMinor * totalMonths;
 
-        // Convert to INR paise if the offer is in USD
-        if (currency === "USD") {
-          monthlyAmountMinor = Math.round(monthlyAmountMinor * 100);
-          totalAmountMinorRaw = Math.round(totalAmountMinorRaw * 100);
-        }
-
         const internMonthlyAmountMinorBase = Math.floor(monthlyAmountMinor / 2);
         const internMonthlyAmountMinor = isLowScore ? 0 : internMonthlyAmountMinorBase;
         const internTotalAmountMinor = internMonthlyAmountMinor * totalMonths;
@@ -17001,7 +16995,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           }
           const amt = Number((o as any)?.amountMinor ?? (o as any)?.amount_minor ?? 0);
           const payCur = String((o as any)?.currency ?? "INR").trim().toUpperCase();
-          const inrAmt = payCur === "USD" ? Math.round(amt * 100) : amt;
+          const inrAmt = amt;
           return sum + (Number.isFinite(inrAmt) ? Math.max(0, inrAmt) : 0);
         }, 0);
 

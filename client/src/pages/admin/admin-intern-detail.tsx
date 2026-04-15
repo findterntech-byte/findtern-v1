@@ -885,10 +885,14 @@ export default function AdminInternDetailPage() {
     const cur = String(currency || "INR").toUpperCase();
     const locale = cur === "INR" ? "en-IN" : "en-US";
     const major = Number.isFinite(amountMinor) ? amountMinor / 100 : 0;
+    const hasMinorUnits = Number.isFinite(amountMinor) && Math.abs(amountMinor) % 100 !== 0;
+    const maximumFractionDigits = cur === "USD" ? 2 : hasMinorUnits ? 2 : 0;
+    const minimumFractionDigits = cur === "USD" ? 2 : 0;
     return new Intl.NumberFormat(locale, {
       style: "currency",
       currency: cur,
-      maximumFractionDigits: 2,
+      minimumFractionDigits,
+      maximumFractionDigits,
     }).format(major || 0);
   };
 
