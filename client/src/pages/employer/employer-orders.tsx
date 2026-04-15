@@ -1971,6 +1971,19 @@ export default function EmployerOrdersPage() {
                 const subtotalFromTotalMinor = gstApplicable ? Math.round((Math.max(0, totalMinor) * 100) / 118) : subtotalAfterDiscountMinor;
                 const gstMinor = gstApplicable ? Math.round(subtotalFromTotalMinor * gstRate / 100) : 0;
 
+                const computedTotalMinor = gstApplicable
+                  ? Math.max(0, subtotalFromTotalMinor + gstMinor)
+                  : subtotalAfterDiscountMinor;
+
+                const totalDisplayMinor = (() => {
+                  if (!Number.isFinite(totalMinor) || totalMinor <= 0) return computedTotalMinor;
+                  const looksRoundedToWhole = totalMinor % 100 === 0;
+                  const computedHasCents = computedTotalMinor % 100 !== 0;
+                  const smallDiff = Math.abs(totalMinor - computedTotalMinor) < 100;
+                  if (looksRoundedToWhole && computedHasCents && smallDiff) return computedTotalMinor;
+                  return totalMinor;
+                })();
+
                 return (
                   <div
                     ref={invoicePrintRef}
@@ -1997,21 +2010,21 @@ export default function EmployerOrdersPage() {
                     </div>
 
                     <div className="px-6 py-5">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <p className="text-xs font-semibold !text-white">Invoice Date :</p>
-                          <p className="text-sm text-white mt-1">{invoiceDateLabel}</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <p className="text-xs font-semibold text-slate-700">Invoice Date :</p>
+              <p className="text-sm text-slate-900 mt-1">{invoiceDateLabel}</p>
 
-                          <p className="text-xs font-semibold !text-white mt-4">Invoice Number :</p>
-                          <p className="text-sm text-white mt-1">{invoiceNumber}</p>
-                        </div>
+              <p className="text-xs font-semibold text-slate-700 mt-4">Invoice Number :</p>
+              <p className="text-sm text-slate-900 mt-1">{invoiceNumber}</p>
+            </div>
 
-                        <div className="md:text-right">
-                          <p className="text-xs font-semibold !text-white">Invoice to :</p>
-                          <p className="text-sm text-white mt-1">{employerCompany}</p>
-                          {employerEmail ? <p className="text-sm text-white">{employerEmail}</p> : null}
-                        </div>
-                      </div>
+            <div className="md:text-right">
+              <p className="text-xs font-semibold text-slate-700">Invoice to :</p>
+              <p className="text-sm text-slate-900 mt-1">{employerCompany}</p>
+              {employerEmail ? <p className="text-sm text-slate-700">{employerEmail}</p> : null}
+            </div>
+          </div>
 
                       <div className="mt-6 overflow-x-auto">
                         <table className="w-full border-collapse">
@@ -2119,7 +2132,7 @@ export default function EmployerOrdersPage() {
                             <tr>
                               <td className="px-3 py-2 text-sm font-semibold text-slate-900">Total</td>
                               <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
-                                {formatAmount(totalMinor, currencyCode)}
+                                {formatAmount(totalDisplayMinor, currencyCode)}
                               </td>
                             </tr>
                           </tbody>
