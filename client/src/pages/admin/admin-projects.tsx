@@ -426,21 +426,16 @@ export default function AdminProjectsPage() {
                                   {items.map((p) => (
                                     <TableRow key={p.id} className="group hover:bg-muted/30 transition-colors">
                                       <TableCell className="font-medium">{p.projectName}</TableCell>
-                                      <TableCell className="max-w-[200px]">
+                                      <TableCell>
                                         <div className="flex flex-wrap gap-1">
                                           {p.skills.length === 0 ? (
                                             <span className="text-xs text-muted-foreground">—</span>
                                           ) : (
-                                            p.skills.slice(0, 3).map((s) => (
-                                              <Badge key={s} variant="outline" className="text-[10px] rounded-full">
+                                            p.skills.map((s) => (
+                                              <Badge key={`${p.id}-${s}`} variant="outline" className="text-[10px] rounded-full">
                                                 {s}
                                               </Badge>
                                             ))
-                                          )}
-                                          {p.skills.length > 3 && (
-                                            <Badge variant="outline" className="text-[10px] rounded-full">
-                                              +{p.skills.length - 3}
-                                            </Badge>
                                           )}
                                         </div>
                                       </TableCell>
