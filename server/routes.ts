@@ -887,6 +887,19 @@ async function createGoogleMeetLinkForFindtern(opts: {
   };
 }
 
+const isInterviewExpiredBySlots = (i: any) => {
+  if (!i) return false;
+  const nowMs = Date.now();
+  const slot1 = i?.slot1 ? new Date(i.slot1) : null;
+  const slot2 = i?.slot2 ? new Date(i.slot2) : null;
+  const slot3 = i?.slot3 ? new Date(i.slot3) : null;
+  const latestSlot = [slot1, slot2, slot3]
+    .filter((d): d is Date => !!d && Number.isFinite(d.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+  if (!latestSlot) return false;
+  return nowMs > latestSlot.getTime();
+};
+
 function serializeInterview(i: any) {
   if (!i) return i;
   const notes = String(i?.notes ?? "");
@@ -11207,7 +11220,11 @@ export async function registerRoutes(
         data.projectId ?? null,
       );
 
-      if (latestExisting && (latestExisting.status === "pending" || latestExisting.status === "scheduled")) {
+      if (
+        latestExisting &&
+        (latestExisting.status === "pending" || latestExisting.status === "scheduled") &&
+        !isInterviewExpiredBySlots(latestExisting)
+      ) {
         return res.status(409).json({
           message: "Cannot send a proposal while interview confirmation is pending",
           interview: serializeInterview(latestExisting),
@@ -12713,7 +12730,7 @@ export async function registerRoutes(
         data.projectId,
       );
 
-      if (latestInterview && latestInterview.status === "pending") {
+      if (latestInterview && latestInterview.status === "pending" && !isInterviewExpiredBySlots(latestInterview)) {
         return res.status(409).json({
           message: "Cannot send a proposal while interview confirmation is pending",
           interview: serializeInterview(latestInterview),
