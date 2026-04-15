@@ -9855,6 +9855,7 @@ export async function registerRoutes(
       const totalBilledMinorByEmployerId = new Map<string, number>();
       const totalPaidMinorByEmployerId = new Map<string, number>();
       const totalDealMinorByEmployerId = new Map<string, number>();
+      const totalDueOnlyMinorByEmployerId = new Map<string, number>();
 
       const paidOrdersByEmployerId = new Map<string, any[]>();
 
@@ -9864,7 +9865,10 @@ export async function registerRoutes(
         const minor = Number.isFinite(amountMinor) ? amountMinor : 0;
         if (cur !== "USD") return minor;
         const safeRate = Number.isFinite(usdToInrRate) && usdToInrRate > 0 ? usdToInrRate : 100;
-        return Math.round(minor * safeRate);
+        // Company Remaining uses a simplified conversion: whole USD only.
+        // Example: $176.xx should behave like $176 for Remaining aggregation.
+        const wholeUsdMinor = Math.max(0, Math.floor(minor / 100)) * 100;
+        return Math.round(wholeUsdMinor * safeRate);
       };
 
       const monthsFromDuration = (duration: unknown) => {
@@ -10012,6 +10016,7 @@ export async function registerRoutes(
       for (const [employerId, list] of proposalsByEmployerId.entries()) {
         const paidOrders = paidOrdersByEmployerId.get(employerId) ?? [];
         let totalDealMinor = 0;
+        let totalDueOnlyMinor = 0;
 
         for (const p of list) {
           const offer = ((p as any)?.offerDetails ?? (p as any)?.offer_details ?? {}) as any;
@@ -10089,6 +10094,8 @@ export async function registerRoutes(
           const upcomingDate = startDate ? addMonthsToIso(startDate, Math.max(1, paidMonths + 1)) : "";
           const upcomingInstallmentMinorInr = toInrMinorIfUsd(monthlyMinor, cur);
 
+          totalDueOnlyMinor += Math.max(0, Math.min(dueAmountMinorInr, upcomingInstallmentMinorInr));
+
           if (upcomingDate) {
             const prev = upcomingByEmployerId.get(employerId);
             if (!prev || upcomingDate < prev.at) {
@@ -10102,6 +10109,7 @@ export async function registerRoutes(
         }
 
         totalDealMinorByEmployerId.set(employerId, totalDealMinor);
+        totalDueOnlyMinorByEmployerId.set(employerId, totalDueOnlyMinor);
       }
 
       const proposalTotalsByEmployerId = new Map<string, number>();
@@ -10184,7 +10192,7 @@ export async function registerRoutes(
 
         const totalDealMinor = totalDealMinorByEmployerId.get(employerId) ?? 0;
         const totalPaidMinor = totalPaidMinorByEmployerId.get(employerId) ?? 0;
-        const totalRemainingMinor = Math.max(0, totalDealMinor - totalPaidMinor);
+        const totalRemainingMinor = Math.max(0, totalDueOnlyMinorByEmployerId.get(employerId) ?? 0);
 
         const proposalsTotal = proposalTotalsByEmployerId.get(employerId) ?? 0;
         const proposalsSent = proposalSentByEmployerId.get(employerId) ?? 0;
