@@ -7521,10 +7521,26 @@ export async function registerRoutes(
       >();
 
       const paidSumMinorByInternProposal = new Map<string, number>();
+      const paidCyclesByInternProposal = new Map<string, Set<string>>();
 
       for (const row of (Array.isArray(payouts) ? payouts : []) as any[]) {
         const internId = String(row?.internId ?? row?.intern_id ?? "").trim();
         if (!internId) continue;
+
+        const rawPayload = (row as any)?.raw;
+        const rawObj = (() => {
+          if (!rawPayload) return {};
+          if (typeof rawPayload === "object") return rawPayload;
+          if (typeof rawPayload === "string") {
+            try {
+              const parsed = JSON.parse(rawPayload);
+              return parsed && typeof parsed === "object" ? parsed : {};
+            } catch {
+              return {};
+            }
+          }
+          return {};
+        })();
 
         const status = String(row?.status ?? "").trim().toLowerCase();
         const currency = String(row?.currency ?? "INR").trim().toUpperCase();
@@ -7554,10 +7570,33 @@ export async function registerRoutes(
         if (status === "paid") {
           existing.paidSumMinor += inrAmountMinor;
 
-          const proposalId = String(row?.proposalId ?? row?.proposal_id ?? row?.raw?.proposalId ?? row?.raw?.proposal_id ?? "").trim();
+          const proposalId = String(
+            row?.proposalId ??
+              row?.proposal_id ??
+              (rawObj as any)?.proposalId ??
+              (rawObj as any)?.proposal_id ??
+              "",
+          ).trim();
           if (proposalId) {
             const k = `${internId}::${proposalId}`;
             paidSumMinorByInternProposal.set(k, (paidSumMinorByInternProposal.get(k) ?? 0) + inrAmountMinor);
+
+            const scheduledForRaw = String((rawObj as any)?.scheduledFor ?? (rawObj as any)?.scheduled_for ?? "").trim();
+            const scheduledFor = /^\d{4}-\d{2}-\d{2}$/.test(scheduledForRaw)
+              ? scheduledForRaw
+              : scheduledForRaw
+                ? String(new Date(scheduledForRaw).toISOString()).slice(0, 10)
+                : "";
+
+            const paidAtRaw = (row as any)?.paidAt ?? (row as any)?.paid_at ?? null;
+            const paidAtIso = paidAtRaw ? String(paidAtRaw).slice(0, 10) : "";
+            const createdAtIso = createdIso ? String(createdIso).slice(0, 10) : "";
+            const cycleKey = scheduledFor || paidAtIso || createdAtIso;
+            if (cycleKey) {
+              const set = paidCyclesByInternProposal.get(k) ?? new Set<string>();
+              set.add(cycleKey);
+              paidCyclesByInternProposal.set(k, set);
+            }
           }
         }
 
@@ -7756,11 +7795,22 @@ export async function registerRoutes(
               if (!Number.isFinite(intMin) || intMin <= 0) continue;
 
               const totalMonths = Math.max(1, monthsFromDuration(od?.duration));
-              const paidMinorForProposal = paidSumMinorByInternProposal.get(`${internId}::${proposalId}`) ?? 0;
-              const paidMonths = Math.floor(Math.max(0, paidMinorForProposal) / intMin);
+              const paidKey = `${internId}::${proposalId}`;
+              const paidSet = paidCyclesByInternProposal.get(paidKey);
+              const paidMonths = paidSet ? paidSet.size : 0;
               if (paidMonths >= totalMonths) continue;
 
-              const nextDueAt = addMonths(sd, Math.max(0, paidMonths + 1));
+              const lastPaidScheduledFor = (() => {
+                if (!paidSet || paidSet.size === 0) return null;
+                const sorted = Array.from(paidSet)
+                  .map((x) => String(x).slice(0, 10))
+                  .filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x))
+                  .sort();
+                if (sorted.length === 0) return null;
+                return parseDateOnly(sorted[sorted.length - 1]);
+              })();
+
+              const nextDueAt = lastPaidScheduledFor ? addMonths(lastPaidScheduledFor, 1) : addMonths(sd, 1);
               if (!Number.isFinite(nextDueAt.getTime())) continue;
 
               if (!minNextDueAt || nextDueAt.getTime() < minNextDueAt.getTime()) {
@@ -7793,34 +7843,31 @@ export async function registerRoutes(
 
           const payoutAggFinal = (() => {
             if (!scheduledAgg) {
+              const pendingSumMinor = Number(payoutAgg.pendingSumMinor ?? 0) || 0;
               return {
                 ...payoutAgg,
                 upcomingDueAt: null as string | null,
-                pendingSumMinor: payoutAgg.pendingSumMinor ?? 0,
+                pendingSumMinor,
               };
             }
 
             // Completed: all months are already paid.
             if (!scheduledAgg.nextDueIso) {
               const pendingSumMinor = Number(payoutAgg.pendingSumMinor ?? 0) || 0;
-              const derivedToPay = Number(scheduledAgg.computedToPayMinor ?? 0) || 0;
-              const finalToPay = Math.max(0, Math.max(pendingSumMinor, derivedToPay));
               return {
                 ...payoutAgg,
-                pendingSumMinor: finalToPay,
+                pendingSumMinor,
                 upcomingAmountMinor: 0,
                 upcomingDueAt: null as string | null,
               };
             }
 
             const pendingSumMinor = Number(payoutAgg.pendingSumMinor ?? 0) || 0;
-            const derivedToPay = scheduledAgg.computedToPayMinor;
-            const finalToPay = Math.max(pendingSumMinor, derivedToPay, internMonthlyMinor);
             const upcomingAmountMinor = scheduledAgg.upcomingAmountMinor;
 
             return {
               ...payoutAgg,
-              pendingSumMinor: finalToPay,
+              pendingSumMinor,
               upcomingAmountMinor,
               upcomingDueAt: scheduledAgg.nextDueIso,
             };

@@ -176,17 +176,7 @@ export default function NotificationHistoryPage() {
               />
             </div>
             <div className="flex flex-wrap gap-3">
-              <Select value={filterSenderRole} onValueChange={setFilterSenderRole}>
-                <SelectTrigger className="w-[160px] h-11 bg-slate-50 border-slate-200">
-                  <SelectValue placeholder="Sender Role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Senders</SelectItem>
-                  {senderRoleOptions.map(role => (
-                    <SelectItem key={role} value={role}>{role}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+             
               <Select value={filterRecipientType} onValueChange={setFilterRecipientType}>
                 <SelectTrigger className="w-[160px] h-11 bg-slate-50 border-slate-200">
                   <SelectValue placeholder="Recipient Type" />
@@ -209,12 +199,7 @@ export default function NotificationHistoryPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[140px] h-11 bg-slate-50 border-slate-200">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                
-              </Select>
+           
               <Button
                 variant="outline"
                 className="h-11 px-4"

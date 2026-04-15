@@ -177,6 +177,9 @@ export default function AdminReportsPage() {
     return amount;
   };
   const [receivablesFilter, setReceivablesFilter] = useState<"candidate" | "company" | "both">("both");
+  const [receivablesCandidateFilter, setReceivablesCandidateFilter] = useState<string>("all");
+  const [receivablesCompanyFilter, setReceivablesCompanyFilter] = useState<string>("all");
+  const [receivablesStatusFilter, setReceivablesStatusFilter] = useState<"all" | "upcoming" | "paid">("all");
   const payablesFilter: "candidate" = "candidate";
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
@@ -235,6 +238,58 @@ export default function AdminReportsPage() {
   const topInterns = data?.topInterns ?? [];
   const hiredFullTime = data?.hiredInterns?.fullTime ?? [];
   const hiredInternship = data?.hiredInterns?.internship ?? [];
+
+  const receivablesCandidateOptions = useMemo(() => {
+    const rows = txData?.receivables ?? [];
+    const map = new Map<string, string>();
+    for (const r of rows as any[]) {
+      const id = String((r as any)?.candidateId ?? "").trim();
+      const name = String((r as any)?.candidateName ?? "").trim();
+      if (!id || !name) continue;
+      if (!map.has(id)) map.set(id, name);
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [txData?.receivables]);
+
+  const receivablesCompanyOptions = useMemo(() => {
+    const rows = txData?.receivables ?? [];
+    const map = new Map<string, string>();
+    for (const r of rows as any[]) {
+      const id = String((r as any)?.companyId ?? "").trim();
+      const name = String((r as any)?.companyName ?? "").trim();
+      if (!id || !name) continue;
+      if (!map.has(id)) map.set(id, name);
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [txData?.receivables]);
+
+  const filteredReceivables = useMemo(() => {
+    const rows = (txData?.receivables ?? []) as any[];
+    return rows.filter((r) => {
+      if (receivablesStatusFilter !== "all") {
+        const st = String(r?.status ?? "").trim().toLowerCase();
+        if (receivablesStatusFilter === "paid") {
+          if (st !== "paid" && st !== "completed") return false;
+        }
+        if (receivablesStatusFilter === "upcoming") {
+          if (st !== "upcoming" && st !== "pending" && st !== "created" && st !== "unpaid") return false;
+        }
+      }
+      if (receivablesCandidateFilter !== "all") {
+        const id = String(r?.candidateId ?? "").trim();
+        if (id !== receivablesCandidateFilter) return false;
+      }
+      if (receivablesCompanyFilter !== "all") {
+        const id = String(r?.companyId ?? "").trim();
+        if (id !== receivablesCompanyFilter) return false;
+      }
+      return true;
+    });
+  }, [receivablesCandidateFilter, receivablesCompanyFilter, receivablesStatusFilter, txData?.receivables]);
   
   const filteredHires = useMemo(() => {
     let hires: typeof hiredFullTime = [];
@@ -333,13 +388,7 @@ export default function AdminReportsPage() {
                 <SelectItem value="custom">Custom Range</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={currencyFilter} onValueChange={(v) => setCurrencyFilter(v as "INR" | "USD")}>
-              <SelectTrigger className="h-10 w-[120px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="INR">INR</SelectItem>
-                <SelectItem value="USD">USD</SelectItem>
-              </SelectContent>
-            </Select>
+            
             {dateRange === "custom" && (
               <div className="flex items-center gap-2">
                 <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-10 w-[150px]" />
@@ -820,20 +869,43 @@ Clear
                 <Card className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div><h3 className="font-semibold">Receivables</h3><p className="text-xs text-muted-foreground">Employer billing & candidate activation</p></div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
                       <Filter className="h-4 w-4 text-muted-foreground" />
-                      <Select value={receivablesFilter} onValueChange={(v) => setReceivablesFilter(v as any)}>
-                        <SelectTrigger className="h-9 w-[150px]"><SelectValue /></SelectTrigger>
-                        <SelectContent><SelectItem value="both">Both</SelectItem><SelectItem value="candidate">Candidate</SelectItem><SelectItem value="company">Company</SelectItem></SelectContent>
+                   
+                      <Select value={receivablesStatusFilter} onValueChange={(v) => setReceivablesStatusFilter(v as any)}>
+                        <SelectTrigger className="h-9 w-[140px]"><SelectValue placeholder="Status" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All status</SelectItem>
+                          <SelectItem value="upcoming">Upcoming</SelectItem>
+                          <SelectItem value="paid">Paid</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={receivablesCandidateFilter} onValueChange={setReceivablesCandidateFilter}>
+                        <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Candidate" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All candidates</SelectItem>
+                          {receivablesCandidateOptions.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select value={receivablesCompanyFilter} onValueChange={setReceivablesCompanyFilter}>
+                        <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Company" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All companies</SelectItem>
+                          {receivablesCompanyOptions.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
                       </Select>
                     </div>
                   </div>
                   <Table>
                     <TableHeader><TableRow className="bg-muted/40"><TableHead className="text-xs">Date</TableHead><TableHead className="text-xs">Source</TableHead><TableHead className="text-xs">Description</TableHead><TableHead className="text-xs">Candidate</TableHead><TableHead className="text-xs">Company</TableHead><TableHead className="text-xs text-right">Amount</TableHead><TableHead className="text-xs">Status</TableHead></TableRow></TableHeader>
                     <TableBody>
-                      {(txData?.receivables ?? []).length === 0 && !isTxLoading ? (
+                      {filteredReceivables.length === 0 && !isTxLoading ? (
                         <TableRow><TableCell colSpan={8}><EmptyState icon={DollarSign} title="No receivables" description="Receivables will appear here" /></TableCell></TableRow>
-                      ) : (txData?.receivables ?? []).map((r) => (
+                      ) : filteredReceivables.map((r) => (
                         <TableRow key={r.id} className="hover:bg-muted/30 transition-colors">
                           <TableCell className="text-sm whitespace-nowrap">{r.date}</TableCell>
                           <TableCell><Badge className={r.source === "company" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"}>{r.source}</Badge></TableCell>
@@ -842,7 +914,7 @@ Clear
                           <TableCell className="text-sm max-w-[120px] truncate">{r.companyName ?? "—"}</TableCell>
                           <TableCell className="text-sm text-right font-medium">{formatCurrency(r.amountMajor, r.currency)}</TableCell>
                           <TableCell><Badge className={r.status?.toLowerCase() === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}>{r.status}</Badge></TableCell>
-                          <TableCell>
+                          {/* <TableCell>
                             {r.status?.toLowerCase() === "paid" && (
                               <Button
                                 variant="ghost"
@@ -856,7 +928,7 @@ Clear
                                 Invoice
                               </Button>
                             )}
-                          </TableCell>
+                          </TableCell> */}
                         </TableRow>
                       ))}
                     </TableBody>
