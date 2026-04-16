@@ -16488,7 +16488,9 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         const intern = firstProposal?.internId ? internMap.get(firstProposal.internId) : null;
         const internName = intern ? `${intern.firstName ?? ""} ${intern.lastName ?? ""}`.trim() : "-";
 
-        const minorAmount = Number(payment.amountMinor) || 0;
+        const amountMinorRaw = Number(payment?.amountMinor ?? payment?.amount_minor ?? 0);
+        const computedMinorRaw = Number((notes as any)?.computedAmountMinor ?? (notes as any)?.computed_amount_minor ?? 0);
+        const minorAmount = Number.isFinite(computedMinorRaw) && computedMinorRaw > 0 ? computedMinorRaw : (Number.isFinite(amountMinorRaw) ? amountMinorRaw : 0);
         const curr = String(payment.currency ?? "INR").toUpperCase();
         const majorAmount = curr === "INR" ? minorAmount / 100 : minorAmount / 100;
 
