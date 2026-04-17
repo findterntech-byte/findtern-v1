@@ -2861,6 +2861,8 @@ function StepAcademics({
     (nextStart: string, nextEnd: string, nextStatus: string) => {
       const s = String(nextStart || "").trim();
       const e = String(nextEnd || "").trim();
+      const isPursuing = nextStatus === "Pursuing";
+      const maxPursuingEndYear = currentYear + 6;
 
       if (s.length === 4) {
         const sn = Number(s);
@@ -2869,10 +2871,14 @@ function StepAcademics({
 
       if (e.length === 4) {
         const en = Number(e);
-        if (Number.isFinite(en) && en > currentYear) return "Year cannot be greater than current year.";
+        if (Number.isFinite(en)) {
+          if (!isPursuing && en > currentYear) return "Year cannot be greater than current year.";
+          if (isPursuing && en < currentYear) return "End year cannot be less than current year.";
+          if (isPursuing && en > maxPursuingEndYear) return "End year is too far in the future.";
+        }
       }
 
-      if (nextStatus === "Pursuing" && !e) return null;
+      if (isPursuing && !e) return null;
 
       if (s.length === 4 && e.length === 4) {
         const sn = Number(s);
@@ -2884,6 +2890,18 @@ function StepAcademics({
     },
     [currentYear],
   );
+
+  useEffect(() => {
+    if (status !== "Completed") return;
+    const e = String(endYear || "").trim();
+    if (e.length !== 4) return;
+    const en = Number(e);
+    if (!Number.isFinite(en) || en <= currentYear) return;
+
+    const clamped = String(currentYear);
+    setEndYear(clamped);
+    setYearError(validateYears(startYear, clamped, status));
+  }, [status, endYear, currentYear, startYear, validateYears]);
 
   return (
     <div className="space-y-5">
@@ -3023,7 +3041,18 @@ function StepAcademics({
             value={endYear}
             onChange={(e) => {
               const value = e.target.value.replace(/\D/g, "").slice(0, 4);
-              const clamped = value.length === 4 && Number(value) > currentYear ? String(currentYear) : value;
+              const numeric = value.length === 4 ? Number(value) : NaN;
+              const clamped = (() => {
+                if (value.length !== 4 || !Number.isFinite(numeric)) return value;
+                if (status === "Pursuing") {
+                  const max = currentYear + 6;
+                  if (numeric < currentYear) return String(currentYear);
+                  if (numeric > max) return String(max);
+                  return String(numeric);
+                }
+                if (numeric > currentYear) return String(currentYear);
+                return String(numeric);
+              })();
               setEndYear(clamped);
               setYearError(validateYears(startYear, clamped, status));
             }}
