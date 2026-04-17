@@ -7898,10 +7898,12 @@ export async function registerRoutes(
           })();
 
           const isFullTime = (() => {
-            if (!offerSource) return false;
-            const offer = (offerSource as any)?.offerDetails ?? (offerSource as any)?.offer_details ?? {};
-            const ft = offer?.fullTimeOffer;
-            return !!ft && typeof ft === "object";
+            if (allHiredProposals.length > 0) {
+              return allHiredProposals.some((p: any) => hasFullTimeOffer(p));
+            }
+            if (hired) return hasFullTimeOffer(hired);
+            if (accepted) return hasFullTimeOffer(accepted);
+            return false;
           })();
 
           return {
@@ -15483,23 +15485,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
               const currency = String((hiredProposal as any)?.currency ?? "INR").toUpperCase();
               const internMonthlyMinor = Math.round(monthlyAmount * 100 * 0.5);
 
-              if (internMonthlyMinor > 0) {
-                const existingPayouts = await storage.listInternPayoutsByInternId(internId, { limit: 1 }).catch(() => []);
-                const hasExisting = (Array.isArray(existingPayouts) ? existingPayouts : []).length > 0;
-                if (!hasExisting) {
-                  await storage.createInternPayout({
-                    internId,
-                    amountMinor: internMonthlyMinor,
-                    currency: currency === "USD" ? "USD" : "INR",
-                    status: "pending",
-                    method: "bank",
-                    notes: String((offerDetails as any)?.roleTitle ?? "Internship payout").trim() || "Internship payout",
-                    source: "initial_hire",
-                    proposalId: String((hiredProposal as any)?.id ?? "").trim() || null,
-                    employerId: employerId || null,
-                  } as any);
-                }
-              }
+              void internMonthlyMinor;
             } catch {
               return;
             }
