@@ -83,7 +83,7 @@ export default function EmployerOrdersPage() {
   const [decisionBusyId, setDecisionBusyId] = useState<string>("");
 
   const [status, setStatus] = useState<string>("");
-  const [currency, setCurrency] = useState<string>("INR");
+  const [currency, setCurrency] = useState<string>("");
   const [q, setQ] = useState<string>("");
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
@@ -2583,11 +2583,12 @@ export default function EmployerOrdersPage() {
 
                     <div className="w-full md:w-40">
                       <p className="text-xs text-slate-600 mb-1">Currency</p>
-                      <Select value={currency || "INR"} onValueChange={(v) => setCurrency(v)}>
+                      <Select value={currency || "all"} onValueChange={(v) => setCurrency(v === "all" ? "" : v)}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
                           <SelectItem value="INR">INR</SelectItem>
                           <SelectItem value="USD">USD</SelectItem>
                         </SelectContent>

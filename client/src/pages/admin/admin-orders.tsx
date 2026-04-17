@@ -1,4 +1,6 @@
 
+
+
 import { useMemo, useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import newlogo from "@assets/logo-remove.png";
@@ -208,12 +210,11 @@ export default function AdminOrdersPage() {
 
   const formatCurrency = (amount: number, currency: string) => {
     const c = String(currency ?? "INR").toUpperCase();
-    const isUsd = c === "USD";
     return new Intl.NumberFormat(c === "INR" ? "en-IN" : "en-US", {
       style: "currency",
       currency: c,
-      minimumFractionDigits: isUsd ? 2 : 0,
-      maximumFractionDigits: isUsd ? 2 : 0,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 
@@ -409,30 +410,18 @@ export default function AdminOrdersPage() {
     };
 
     const subtotalMinor = items.reduce((sum: number, it: any) => sum + invoiceItemBaseMinor(it), 0);
-    const totalMinorFromPayment = Number(payment?.amountMinor ?? payment?.amount_minor ?? subtotalMinor);
+    const totalMinor = Number(payment?.amountMinor ?? payment?.amount_minor ?? subtotalMinor);
 
     const gstRate = 18;
-    const gstApplicable = currencyCode === "INR" && Number.isFinite(totalMinorFromPayment) && totalMinorFromPayment > 0;
+    const gstApplicable = currencyCode === "INR" && Number.isFinite(totalMinor) && totalMinor > 0;
 
     const serverDiscountMinor = Number(invoiceData?.discountMinor ?? 0);
-    const discountMinor = (() => {
-      if (serverDiscountMinor > 0) return Math.max(0, Math.floor(serverDiscountMinor));
-      if (!isFullTimeInvoice && Number.isFinite(totalMinorFromPayment) && totalMinorFromPayment > 0 && subtotalMinor > 0 && totalMinorFromPayment < subtotalMinor) {
-        return Math.max(0, Math.floor(subtotalMinor - totalMinorFromPayment));
-      }
-      return 0;
-    })();
-    const subtotalAfterDiscountMinor = Math.max(0, subtotalMinor - discountMinor);
-    const subtotalDisplayMinor = gstApplicable
-      ? Math.round((Math.max(0, totalMinorFromPayment) * 100) / 118)
-      : subtotalAfterDiscountMinor;
-    const gstMinor = gstApplicable
-      ? Math.max(0, totalMinorFromPayment - Math.round((Math.max(0, totalMinorFromPayment) * 100) / 118))
-      : 0;
-
-    const totalMinor = Number.isFinite(totalMinorFromPayment) && totalMinorFromPayment > 0
-      ? Math.floor(totalMinorFromPayment)
-      : Math.max(0, subtotalAfterDiscountMinor + gstMinor);
+    const hasDiscount = serverDiscountMinor > 0 || (!isFullTimeInvoice && totalMinor > 0 && subtotalMinor > 0 && Math.abs((totalMinor / subtotalMinor) - 0.9) <= 0.005);
+    const preDiscountMinor = hasDiscount && subtotalMinor > 0 ? subtotalMinor : totalMinor;
+    const discountMinor = hasDiscount ? Math.round(preDiscountMinor * 0.1) : 0;
+    const subtotalAfterDiscountMinor = Math.max(0, preDiscountMinor - discountMinor);
+    const subtotalDisplayMinor = gstApplicable ? Math.round((Math.max(0, totalMinor) * 100) / 118) : subtotalAfterDiscountMinor;
+    const gstMinor = gstApplicable ? Math.max(0, totalMinor - Math.round((Math.max(0, totalMinor) * 100) / 118)) : 0;
 
     return (
       <div ref={invoicePrintRef} className="invoice-print-root mx-auto w-full max-w-[980px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -529,7 +518,7 @@ export default function AdminOrdersPage() {
                     if (isFullTimeOffer && Number.isFinite(annualCtc) && annualCtc > 0) {
                       displayPriceMinor = Math.round(annualCtc * 100);
                     } else {
-                      displayPriceMinor = rowMinor;
+                      displayPriceMinor = hasDiscount ? preDiscountMinor : rowMinor;
                     }
                     const rowKey = String(item?.proposalId ?? item?.id ?? item?.internId ?? idx);
 
