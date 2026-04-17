@@ -898,7 +898,10 @@ export default function AdminInternDetailPage() {
 
   const formatMoneyInInrIfUsd = (amountMinor: number, currency: string) => {
     const cur = String(currency || "INR").toUpperCase();
-    const inrMinor = cur === "USD" ? amountMinor * DEFAULT_USD_TO_INR_RATE : amountMinor;
+    const safeAmountMinor = Number.isFinite(amountMinor) ? amountMinor : 0;
+    const inrMinor = cur === "USD"
+      ? Math.round(safeAmountMinor * DEFAULT_USD_TO_INR_RATE)
+      : safeAmountMinor;
     return formatMoney(inrMinor, "INR");
   };
 
@@ -2369,10 +2372,21 @@ export default function AdminInternDetailPage() {
                                         setCreateProposalId(String(r.proposalId ?? ""));
                                         setCreateEmployerId(String(r.employerId ?? ""));
 
-                                        setCreateInternDueMinor(Number(r.internDueAmountMinor ?? 0) || 0);
-                                        setCreateBaseMonthlyMinor(internMonthlyMinor);
+                                        const convertUsdMinorToInrMinor = (amountMinor: number, currency: string) => {
+                                          const cur = String(currency || "INR").toUpperCase();
+                                          return cur === "USD"
+                                            ? Math.round(amountMinor * DEFAULT_USD_TO_INR_RATE)
+                                            : amountMinor;
+                                        };
 
-                                        const major = Math.floor(internMonthlyMinor / 100);
+                                        const sourceCurrency = String(r.currency ?? "INR").toUpperCase();
+                                        const convertedInternMonthlyMinor = convertUsdMinorToInrMinor(internMonthlyMinor, sourceCurrency);
+                                        const convertedInternDueMinor = convertUsdMinorToInrMinor(Number(r.internDueAmountMinor ?? 0) || 0, sourceCurrency);
+
+                                        setCreateInternDueMinor(convertedInternDueMinor);
+                                        setCreateBaseMonthlyMinor(convertedInternMonthlyMinor);
+
+                                        const major = Math.floor(convertedInternMonthlyMinor / 100);
                                         setCreateAmountMajor(major > 0 ? String(major) : "");
                                         setOpenCreatePayout(true);
                                       }}
@@ -4601,7 +4615,7 @@ export default function AdminInternDetailPage() {
                 {skillDraft.length < 7 && (
                   <Button
                     variant="outline"
-                    className="w-full border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-500 py-5"
+                      className="w-full border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-500 py-5"
                     onClick={() => {
                       setSkillDraft([...skillDraft, { id: `new-${Date.now()}`, name: "", rating: 1 }]);
                     }}

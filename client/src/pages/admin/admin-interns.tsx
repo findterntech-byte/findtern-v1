@@ -274,6 +274,7 @@ export default function AdminInternsPage() {
         { key: "onboardingStatus" as const, label: "Onboarding status", filterKey: "onboardingStatus" as const },
         // { key: "pendingProposals" as const, label: "Pending Interviews", sortKey: "pendingInterviewCount" as const },
         { key: "toPay" as const, label: "Pending Payout", sortKey: "toPay" as const },
+        
         { key: "upcomingPaymentDate" as const, label: "Upcoming payment date", sortKey: "upcomingPaymentDate" as const },
         { key: "totalToPay" as const, label: "Total to pay" },
         { key: "paidTillNow" as const, label: "Paid till now" },
@@ -410,6 +411,36 @@ export default function AdminInternsPage() {
     return String(rounded);
   };
 
+  const fetchEmployerDuesForIntern = async (internId: string): Promise<string | null> => {
+    try {
+      const res = await apiRequest("GET", `/api/admin/interns/${encodeURIComponent(internId)}/employer-dues`);
+      const json = await res.json();
+      const employerDues = (json?.employerDues || []) as any[];
+      
+      if (!Array.isArray(employerDues) || employerDues.length === 0) {
+        return null;
+      }
+
+      // Extract all upcomingPaymentDate values and find the earliest
+      const dates = employerDues
+        .map((due) => String(due?.upcomingPaymentDate ?? "").trim())
+        .filter((d) => d && d !== "-")
+        .map((d) => new Date(d).getTime())
+        .filter((t) => !Number.isNaN(t));
+
+      if (dates.length === 0) {
+        return null;
+      }
+
+      const earliestTime = Math.min(...dates);
+      const earliestDate = new Date(earliestTime);
+      return earliestDate.toISOString().slice(0, 10);
+    } catch (e) {
+      console.error(`Failed to fetch employer dues for intern ${internId}:`, e);
+      return null;
+    }
+  };
+
   const loadInterns = async (options?: { showLoading?: boolean }) => {
     const showLoading = options?.showLoading ?? false;
     try {
@@ -420,7 +451,7 @@ export default function AdminInternsPage() {
       const json = await res.json();
       const list = (json?.interns || []) as any[];
 
-      const mapped: Intern[] = list
+      let mapped: Intern[] = list
         .map((item) => {
           const onboarding = (item as any)?.onboarding ?? {};
           const user = (item as any)?.user ?? {};
@@ -582,7 +613,22 @@ export default function AdminInternsPage() {
         })
         .filter((x) => x.id);
 
-      setInterns(mapped);
+      // Fetch employer dues for each intern and update upcomingPaymentDueAt
+      const mappedWithDues = await Promise.all(
+        mapped.map(async (intern) => {
+          if (!intern.isHired) {
+            return intern;
+          }
+          
+          const earliestDueDate = await fetchEmployerDuesForIntern(intern.id);
+          if (earliestDueDate) {
+            return { ...intern, upcomingPaymentDueAt: earliestDueDate };
+          }
+          return intern;
+        })
+      );
+
+      setInterns(mappedWithDues);
     } catch (e: any) {
       setError(e?.message ?? "Failed to load interns");
     } finally {
@@ -975,6 +1021,7 @@ export default function AdminInternsPage() {
   };
 
   const formatDueDateOnly = (value: string | null | undefined) => {
+    
     if (!value) return "-";
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return "-";
@@ -1357,7 +1404,6 @@ export default function AdminInternsPage() {
       setSavingLinks(false);
     }
   };
-
   return (
     <AdminLayout
       title="Interns"
