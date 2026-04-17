@@ -1964,10 +1964,14 @@ export default function EmployerOrdersPage() {
                 const gstApplicable = currencyCode === "INR" && Number.isFinite(totalMinor) && totalMinor > 0;
 
                 const serverDiscountMinor = Number(invoiceData?.discountMinor ?? 0);
-                const hasDiscount = serverDiscountMinor > 0 || (!isFullTimeInvoice && totalMinor > 0 && subtotalMinor > 0 && Math.abs((totalMinor / subtotalMinor) - 0.9) <= 0.005);
-                const preDiscountMinor = hasDiscount && subtotalMinor > 0 ? subtotalMinor : totalMinor;
-                const discountMinor = hasDiscount ? Math.round(preDiscountMinor * 0.1) : 0;
-                const subtotalAfterDiscountMinor = Math.max(0, preDiscountMinor - discountMinor);
+                const discountMinor = (() => {
+                  if (serverDiscountMinor > 0) return Math.max(0, Math.floor(serverDiscountMinor));
+                  if (!isFullTimeInvoice && Number.isFinite(totalMinor) && totalMinor > 0 && subtotalMinor > 0 && totalMinor < subtotalMinor) {
+                    return Math.max(0, Math.floor(subtotalMinor - totalMinor));
+                  }
+                  return 0;
+                })();
+                const subtotalAfterDiscountMinor = Math.max(0, subtotalMinor - discountMinor);
                 const subtotalFromTotalMinor = gstApplicable ? Math.round((Math.max(0, totalMinor) * 100) / 118) : subtotalAfterDiscountMinor;
                 const gstMinor = gstApplicable ? Math.round(subtotalFromTotalMinor * gstRate / 100) : 0;
 
@@ -1976,12 +1980,8 @@ export default function EmployerOrdersPage() {
                   : subtotalAfterDiscountMinor;
 
                 const totalDisplayMinor = (() => {
-                  if (!Number.isFinite(totalMinor) || totalMinor <= 0) return computedTotalMinor;
-                  const looksRoundedToWhole = totalMinor % 100 === 0;
-                  const computedHasCents = computedTotalMinor % 100 !== 0;
-                  const smallDiff = Math.abs(totalMinor - computedTotalMinor) < 100;
-                  if (looksRoundedToWhole && computedHasCents && smallDiff) return computedTotalMinor;
-                  return totalMinor;
+                  if (Number.isFinite(totalMinor) && totalMinor > 0) return Math.floor(totalMinor);
+                  return computedTotalMinor;
                 })();
 
                 return (

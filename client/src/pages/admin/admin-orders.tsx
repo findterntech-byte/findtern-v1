@@ -415,12 +415,14 @@ export default function AdminOrdersPage() {
     const gstApplicable = currencyCode === "INR" && Number.isFinite(totalMinorFromPayment) && totalMinorFromPayment > 0;
 
     const serverDiscountMinor = Number(invoiceData?.discountMinor ?? 0);
-    const hasDiscount =
-      serverDiscountMinor > 0 ||
-      (!isFullTimeInvoice && totalMinorFromPayment > 0 && subtotalMinor > 0 && Math.abs((totalMinorFromPayment / subtotalMinor) - 0.9) <= 0.005);
-    const preDiscountMinor = hasDiscount && subtotalMinor > 0 ? subtotalMinor : totalMinorFromPayment;
-    const discountMinor = hasDiscount ? Math.round(preDiscountMinor * 0.1) : 0;
-    const subtotalAfterDiscountMinor = Math.max(0, preDiscountMinor - discountMinor);
+    const discountMinor = (() => {
+      if (serverDiscountMinor > 0) return Math.max(0, Math.floor(serverDiscountMinor));
+      if (!isFullTimeInvoice && Number.isFinite(totalMinorFromPayment) && totalMinorFromPayment > 0 && subtotalMinor > 0 && totalMinorFromPayment < subtotalMinor) {
+        return Math.max(0, Math.floor(subtotalMinor - totalMinorFromPayment));
+      }
+      return 0;
+    })();
+    const subtotalAfterDiscountMinor = Math.max(0, subtotalMinor - discountMinor);
     const subtotalDisplayMinor = gstApplicable
       ? Math.round((Math.max(0, totalMinorFromPayment) * 100) / 118)
       : subtotalAfterDiscountMinor;
@@ -428,7 +430,9 @@ export default function AdminOrdersPage() {
       ? Math.max(0, totalMinorFromPayment - Math.round((Math.max(0, totalMinorFromPayment) * 100) / 118))
       : 0;
 
-    const totalMinor = currencyCode === "INR" ? totalMinorFromPayment : subtotalAfterDiscountMinor;
+    const totalMinor = Number.isFinite(totalMinorFromPayment) && totalMinorFromPayment > 0
+      ? Math.floor(totalMinorFromPayment)
+      : Math.max(0, subtotalAfterDiscountMinor + gstMinor);
 
     return (
       <div ref={invoicePrintRef} className="invoice-print-root mx-auto w-full max-w-[980px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -525,7 +529,7 @@ export default function AdminOrdersPage() {
                     if (isFullTimeOffer && Number.isFinite(annualCtc) && annualCtc > 0) {
                       displayPriceMinor = Math.round(annualCtc * 100);
                     } else {
-                      displayPriceMinor = hasDiscount ? preDiscountMinor : rowMinor;
+                      displayPriceMinor = rowMinor;
                     }
                     const rowKey = String(item?.proposalId ?? item?.id ?? item?.internId ?? idx);
 
