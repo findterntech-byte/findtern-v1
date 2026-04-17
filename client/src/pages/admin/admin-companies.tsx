@@ -215,6 +215,7 @@ export default function AdminCompaniesPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<5 | 10 | 25 | 50>(10);
   const [profileStatus, setProfileStatus] = useState<"all" | "complete" | "incomplete">("all");
+  const [internationalFteFilter, setInternationalFteFilter] = useState<"all" | "approved" | "applied" | "none">("all");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -249,7 +250,7 @@ export default function AdminCompaniesPage() {
         { key: "proposalsRejected" as const, label: "Rejected" },
         { key: "proposalsExpired" as const, label: "Withdrawn" },
         { key: "totalHires" as const, label: "Hires" },
-        { key: "internationalFte" as const, label: "International FTE" },
+        { key: "internationalFte" as const, label: "International FTE", filterKey: "internationalFte" as const },
         { key: "actions" as const, label: "Action" },
         { key: "status" as const, label: "Status" },
       ] as const,
@@ -453,11 +454,37 @@ export default function AdminCompaniesPage() {
       const cfCountry = String(columnFilters.country ?? "").trim().toLowerCase();
       if (cfCountry && !String(company.country ?? "").toLowerCase().includes(cfCountry)) return false;
 
+      const cfCity = String(columnFilters.city ?? "").trim().toLowerCase();
+      if (cfCity && !String(company.city ?? "").toLowerCase().includes(cfCity)) return false;
+
       const cfSpoc = String(columnFilters.spocName ?? "").trim().toLowerCase();
       if (cfSpoc && !String(company.spocName ?? "").toLowerCase().includes(cfSpoc)) return false;
 
       const cfPhone = String(columnFilters.phone ?? "").trim().toLowerCase();
       if (cfPhone && !String(company.phone ?? "").toLowerCase().includes(cfPhone)) return false;
+
+      const cfIfte = String(columnFilters.internationalFte ?? "").trim().toLowerCase();
+      if (cfIfte) {
+        const st = String(company.internationalFteStatus ?? "none").trim().toLowerCase();
+        const isApproved = st === "approved";
+        const isApplied = st === "applied";
+        const isNone = st === "none";
+
+        if (cfIfte === "approved" || cfIfte === "yes" || cfIfte === "true") {
+          if (!isApproved) return false;
+        } else if (cfIfte === "applied") {
+          if (!isApplied) return false;
+        } else if (cfIfte === "none" || cfIfte === "no" || cfIfte === "false" || cfIfte === "-" || cfIfte === "—") {
+          if (!isNone) return false;
+        } else {
+          if (!st.includes(cfIfte)) return false;
+        }
+      }
+
+      if (internationalFteFilter !== "all") {
+        const st = String(company.internationalFteStatus ?? "none").trim().toLowerCase();
+        if (internationalFteFilter !== st) return false;
+      }
 
       const q = search.trim().toLowerCase();
       if (!q) return true;
@@ -466,7 +493,7 @@ export default function AdminCompaniesPage() {
       const tokens = q.split(/\s+/).filter(Boolean);
       return tokens.every((t) => haystack.includes(t));
     });
-  }, [rows, columnFilters, search]);
+  }, [rows, columnFilters, search, internationalFteFilter]);
 
   const sorted = useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;
@@ -498,7 +525,7 @@ export default function AdminCompaniesPage() {
     });
   }, [filtered, sortBy, sortDir]);
 
-  useEffect(() => { setPage(1); }, [search, pageSize, sortBy, sortDir, columnFilters]);
+  useEffect(() => { setPage(1); }, [search, pageSize, sortBy, sortDir, columnFilters, internationalFteFilter]);
 
   const total = sorted.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -517,6 +544,12 @@ export default function AdminCompaniesPage() {
       if (!sortKey) return;
       setSortBy(sortKey);
       setSortDir(dir);
+    };
+
+    const openFilter = () => {
+      if (!(col as any).filterKey) return;
+      setOpenFilterFor(col.key);
+      setFilterDraft(currentFilter);
     };
 
     const applyFilter = () => {
@@ -538,7 +571,7 @@ export default function AdminCompaniesPage() {
     };
 
     return (
-      <div className="relative flex items-center gap-1">
+      <div className="relative flex items-center gap-1 group">
         <Popover open={openFilterFor === col.key} onOpenChange={(open) => { if (!open) { setOpenFilterFor(null); setFilterDraft(""); } }}>
           <PopoverTrigger asChild>
             <button 
@@ -573,19 +606,20 @@ export default function AdminCompaniesPage() {
           </PopoverContent>
         </Popover>
         {(col as any).filterKey && (
-          <Popover open={false} onOpenChange={() => {}}>
-            <PopoverTrigger asChild>
-              <button 
-                className={cn(
-                  "p-0.5 rounded hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity",
-                  openFilterFor === col.key && "opacity-100"
-                )}
-                onClick={(e) => { e.stopPropagation(); setOpenFilterFor(col.key); setFilterDraft(currentFilter); }}
-              >
-                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-              </button>
-            </PopoverTrigger>
-          </Popover>
+          <button
+            type="button"
+            title="Filter"
+            className={cn(
+              "p-0.5 rounded hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity",
+              openFilterFor === col.key && "opacity-100"
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              openFilter();
+            }}
+          >
+            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
         )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -604,6 +638,9 @@ export default function AdminCompaniesPage() {
                 <ArrowDown className="h-4 w-4 mr-2" /> Sort Z → A
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem disabled={!((col as any).filterKey)} onClick={openFilter}>
+                <Filter className="h-4 w-4 mr-2" /> Filter
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setColumnVisibility((prev) => ({ ...prev, [col.key]: false }))} disabled={col.key === "actions"}>
                 <EyeOff className="h-4 w-4 mr-2" /> Hide Column
               </DropdownMenuItem>
@@ -693,6 +730,18 @@ export default function AdminCompaniesPage() {
                   <SelectItem value="all">All Profiles</SelectItem>
                   <SelectItem value="complete">Complete</SelectItem>
                   <SelectItem value="incomplete">Incomplete</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={internationalFteFilter} onValueChange={(v) => setInternationalFteFilter(v as any)}>
+                <SelectTrigger className="h-11 w-full sm:w-[180px] bg-white">
+                  <SelectValue placeholder="International FTE" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All FTE</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="applied">Applied</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                 </SelectContent>
               </Select>
 

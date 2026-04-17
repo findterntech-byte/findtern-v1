@@ -9867,10 +9867,9 @@ export async function registerRoutes(
         const minor = Number.isFinite(amountMinor) ? amountMinor : 0;
         if (cur !== "USD") return minor;
         const safeRate = Number.isFinite(usdToInrRate) && usdToInrRate > 0 ? usdToInrRate : 100;
-        // Company Remaining uses a simplified conversion: whole USD only.
-        // Example: $176.xx should behave like $176 for Remaining aggregation.
-        const wholeUsdMinor = Math.max(0, Math.floor(minor / 100)) * 100;
-        return Math.round(wholeUsdMinor * safeRate);
+        // Convert USD minor (cents) to INR minor (paise) using 1 USD = 100 INR.
+        // USD cents -> USD major: /100, then * rate, then INR paise: *100 => cents * rate.
+        return Math.round(Math.max(0, minor) * safeRate);
       };
 
       const monthsFromDuration = (duration: unknown) => {
@@ -10019,6 +10018,7 @@ export async function registerRoutes(
         const paidOrders = paidOrdersByEmployerId.get(employerId) ?? [];
         let totalDealMinor = 0;
         let totalDueOnlyMinor = 0;
+        let totalDueSumMinor = 0;
 
         for (const p of list) {
           const offer = ((p as any)?.offerDetails ?? (p as any)?.offer_details ?? {}) as any;
@@ -10092,6 +10092,8 @@ export async function registerRoutes(
           const dueAmountMinorInr = Math.max(0, totalAmountMinorInr - paidAmountMinor);
           if (dueAmountMinorInr <= 0) continue;
 
+          totalDueSumMinor += dueAmountMinorInr;
+
           const paidMonths = paidForProposal.filter((o: any) => orderPurpose(o) === "employer_monthly_payment").length;
           const upcomingDate = startDate ? addMonthsToIso(startDate, Math.max(1, paidMonths + 1)) : "";
           const upcomingInstallmentMinorInr = toInrMinorIfUsd(monthlyMinor, cur);
@@ -10111,7 +10113,9 @@ export async function registerRoutes(
         }
 
         totalDealMinorByEmployerId.set(employerId, totalDealMinor);
-        totalDueOnlyMinorByEmployerId.set(employerId, totalDueOnlyMinor);
+        // Remaining amount should reflect total due amount across upcoming payments.
+        // USD values are converted to INR minor (paise) above.
+        totalDueOnlyMinorByEmployerId.set(employerId, totalDueSumMinor);
       }
 
       const proposalTotalsByEmployerId = new Map<string, number>();
