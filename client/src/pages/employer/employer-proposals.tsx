@@ -50,6 +50,7 @@ interface EmployerProposal {
   createdAt: string; // ISO date
   amountPerMonth: number;
   offerCurrency?: "INR" | "USD";
+  totalPrice: number;
   durationLabel: string;
   mode: string;
   location: string;
@@ -209,8 +210,9 @@ function mapToEmployerProposal(p: any): EmployerProposal {
     projectName: p.projectName || "Project",
     status: mappedStatus,
     createdAt: p.createdAt || new Date().toISOString(),
-    amountPerMonth: hasFullTimeOffer ? 0 : typeof offer.monthlyAmount === "number" ? offer.monthlyAmount : 0,
+    amountPerMonth: hasFullTimeOffer ? 0 : Number((offer as any)?.monthlyAmount ?? 0) || 0,
     offerCurrency,
+    totalPrice: hasFullTimeOffer ? 0 : Number((offer as any)?.totalPrice ?? 0) || 0,
     durationLabel,
     mode: (() => {
       if (hasFullTimeOffer) {
@@ -569,7 +571,9 @@ export default function EmployerProposalsPage() {
                       (proposal.annualCtcCurrency ?? proposal.offerCurrency ?? expectedCurrency) as "INR" | "USD";
                     const annualCtc = formatMoney(Number(proposal.annualCtc ?? 0), annualCtcCurrency);
                     const isLowScore = Number(proposal.findternScore ?? 0) > 0 && Number(proposal.findternScore ?? 0) < 6;
-                    const oneTimeFee = formatMoney(5000, "INR");
+                    const oneTimeFee = proposal.totalPrice > 0
+                      ? formatMoney(proposal.totalPrice, proposal.offerCurrency ?? expectedCurrency)
+                      : formatMoney(5000, proposal.offerCurrency ?? expectedCurrency);
 
                     return (
                       <tr
@@ -827,7 +831,9 @@ export default function EmployerProposalsPage() {
                 (proposal.annualCtcCurrency ?? proposal.offerCurrency ?? expectedCurrency) as "INR" | "USD";
               const annualCtc = formatMoney(Number(proposal.annualCtc ?? 0), annualCtcCurrency);
               const isLowScore = Number(proposal.findternScore ?? 0) > 0 && Number(proposal.findternScore ?? 0) < 6;
-              const oneTimeFee = formatMoney(5000, "INR");
+              const oneTimeFee = proposal.totalPrice > 0
+                ? formatMoney(proposal.totalPrice, proposal.offerCurrency ?? currency)
+                : formatMoney(5000, proposal.offerCurrency ?? currency);
 
               return (
                 <Card
