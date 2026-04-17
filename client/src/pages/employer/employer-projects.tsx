@@ -63,8 +63,28 @@ export default function EmployerProjectsPage() {
   const employerId = auth?.id ? String(auth.id) : "";
 
   const MAX_SELECTED_PROJECTS = 5;
-  const selectedProjectIdStorageKey = "employerSelectedProjectId";
-  const selectedProjectIdsStorageKey = "employerSelectedProjectIds";
+  const selectedProjectIdStorageKey = employerId
+    ? `employerSelectedProjectId:${employerId}`
+    : "employerSelectedProjectId";
+  const selectedProjectIdsStorageKey = employerId
+    ? `employerSelectedProjectIds:${employerId}`
+    : "employerSelectedProjectIds";
+
+  const saveSelectedProjectIds = (ids: string[]) => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(selectedProjectIdsStorageKey, JSON.stringify(ids));
+      if (ids.length > 0) {
+        window.localStorage.setItem(selectedProjectIdStorageKey, String(ids[0] ?? ""));
+      } else {
+        window.localStorage.removeItem(selectedProjectIdStorageKey);
+      }
+      window.dispatchEvent(new Event("employerProjectChanged"));
+      window.dispatchEvent(new Event("employerProjectsUpdated"));
+    } catch {
+      // ignore
+    }
+  };
 
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
@@ -212,7 +232,9 @@ export default function EmployerProjectsPage() {
         });
         return existing;
       }
-      return [id, ...existing];
+      const next = [id, ...existing];
+      saveSelectedProjectIds(next);
+      return next;
     });
   };
 
@@ -231,6 +253,7 @@ export default function EmployerProjectsPage() {
       return;
     }
 
+    saveSelectedProjectIds(remaining);
     setSelectedProjectIds(remaining);
   };
 
