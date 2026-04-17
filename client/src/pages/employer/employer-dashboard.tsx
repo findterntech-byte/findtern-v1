@@ -341,8 +341,6 @@ export default function EmployerDashboardPage() {
   const [resultsSearch, setResultsSearch] = useState("");
   const [currentLocation, setLocation] = useLocation();
   const { toast, dismiss } = useToast();
-  const auth = getEmployerAuth();
-  const employerId = auth?.id ? String(auth.id) : "";
   const [acceptedInternIds, setAcceptedInternIds] = useState<Set<string>>(new Set());
   const [proposalMetaByInternId, setProposalMetaByInternId] = useState<Record<string, ProposalMeta>>({});
   const [hiredInternIdSet, setHiredInternIdSet] = useState<Set<string>>(new Set());
@@ -769,12 +767,8 @@ export default function EmployerDashboardPage() {
     sortDirection: "desc" as "desc" | "asc",
   }));
 
-  const selectedProjectIdStorageKey = employerId
-    ? `employerSelectedProjectId:${employerId}`
-    : "employerSelectedProjectId";
-  const selectedProjectIdsStorageKey = employerId
-    ? `employerSelectedProjectIds:${employerId}`
-    : "employerSelectedProjectIds";
+  const selectedProjectIdStorageKey = "employerSelectedProjectId";
+  const selectedProjectIdsStorageKey = "employerSelectedProjectIds";
   const legacyFiltersMigratedFlagKey = "employerLegacyFiltersMigrated";
   const getCompareStorageKey = (projectId: string | null | undefined) =>
     projectId ? `employerCompareIds:${projectId}` : "employerCompareIds";
@@ -823,16 +817,6 @@ export default function EmployerDashboardPage() {
       window.removeEventListener("focus", onUpdate);
     };
   }, [selectedProjectIdsStorageKey]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(selectedProjectIdsStorageKey, JSON.stringify(includedProjectIds));
-      window.dispatchEvent(new Event("employerProjectsUpdated"));
-    } catch {
-      // ignore
-    }
-  }, [includedProjectIds, selectedProjectIdsStorageKey]);
 
   const includedProjectIdsLowerSet = useMemo(
     () => new Set((includedProjectIds ?? []).map((id) => String(id ?? "").trim().toLowerCase()).filter(Boolean)),
@@ -1715,7 +1699,7 @@ export default function EmployerDashboardPage() {
         setSortDirection(nextSortDirection);
 
         const nextAppliedFilters: typeof appliedFilters = {
-          ...appliedFilters,
+          ...prev,
           includeRemote: nextIncludeRemote,
           selectedCities: effectiveSelectedCities,
           selectedSkills: nextSelectedSkills,
@@ -2611,7 +2595,6 @@ export default function EmployerDashboardPage() {
           });
         }
       })();
-      return next;
     });
   };
 
