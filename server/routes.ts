@@ -14730,6 +14730,77 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
       const finalAmountMinor = Math.max(0, amountMinor - discountAmountMinor);
 
       const receipt = `intern_${internId.slice(0, 8)}_${Date.now().toString(36)}`;
+
+      // If the final amount is zero (e.g. 100% promo), bypass Razorpay
+      // and mark the onboarding as paid locally.
+      if (Number(finalAmountMinor) === 0) {
+        const freeOrderId = `free_${receipt}`;
+        try {
+          await storage.createInternPayment({
+            internId,
+            gateway: "free",
+            orderId: freeOrderId,
+            paymentId: null as any,
+            signature: null as any,
+            amountMinor: 0,
+            currency,
+            status: "paid",
+            raw: { reason: "free_promo", promoCode: promoCode || null, originalAmountMinor: amountMinor, discountAmountMinor },
+            paidAt: new Date(),
+          } as any);
+        } catch (e) {
+          console.error("Failed to create free intern payment record:", e);
+        }
+
+        const onboarding = await storage.getInternOnboardingByUserId(internId);
+        if (!onboarding) {
+          return res.status(404).json({ message: "Onboarding data not found" });
+        }
+
+        const promoCodeUsed = promoCode || null;
+        const nextExtra = {
+          ...((onboarding as any).extraData ?? {}),
+          payment: {
+            ...(((onboarding as any).extraData as any)?.payment ?? {}),
+            isPaid: true,
+            paidAt: new Date().toISOString(),
+            gateway: "free",
+            orderId: freeOrderId,
+            paymentId: null,
+            promoCode: promoCodeUsed || null,
+            originalAmountMinor: amountMinor,
+            discountAmountMinor,
+            finalAmountMinor: 0,
+          },
+        };
+
+        await storage.updateInternOnboarding(internId, { extraData: nextExtra } as any);
+
+        if (promoCodeUsed) {
+          try {
+            const promoResult = await storage.validatePromoCode(promoCodeUsed, internId, amountMinor);
+            if (promoResult.valid && promoResult.promoCode) {
+              await storage.applyPromoCode(promoResult.promoCode.id, internId, freeOrderId, discountAmountMinor);
+              await storage.updatePromoCode(promoResult.promoCode.id, {
+                usedCount: (promoResult.promoCode.usedCount ?? 0) + 1,
+              } as any);
+            }
+          } catch (promoErr) {
+            console.error("Failed to record promo code usage for free order:", promoErr);
+          }
+        }
+
+        return res.json({
+          keyId,
+          orderId: null,
+          amountMinor: 0,
+          currency,
+          originalAmountMinor: amountMinor,
+          discountAmountMinor,
+          finalAmountMinor: 0,
+        });
+      }
+
       const order = await createRazorpayOrder({
         amountMinor: finalAmountMinor,
         currency,
