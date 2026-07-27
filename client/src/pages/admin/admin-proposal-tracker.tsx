@@ -147,13 +147,33 @@ export default function AdminProposalTrackerPage() {
     }
   }, [dateRangeOption]);
 
+  const processProposalStatus = (p: Proposal): Proposal => {
+    const status = (p.status || "").toLowerCase();
+    if (status === "sent" || status === "pending") {
+      if (p.createdAt) {
+        const createdAt = new Date(p.createdAt);
+        if (!isNaN(createdAt.getTime())) {
+          const now = new Date();
+          const nextDate = new Date(createdAt);
+          nextDate.setDate(nextDate.getDate() + 1);
+          nextDate.setHours(0, 0, 0, 0);
+
+          if (now >= nextDate) {
+            return { ...p, status: "expired" };
+          }
+        }
+      }
+    }
+    return p;
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
       const res = await apiRequest("GET", "/api/admin/proposals-tracker");
       const json = await res.json();
-      setProposals(json.proposals || []);
+      setProposals((json.proposals || []).map(processProposalStatus));
       setInterviews(json.interviews || []);
       setInterns(json.interns || []);
       setEmployers(json.employers || []);
@@ -285,8 +305,9 @@ export default function AdminProposalTrackerPage() {
       case "sent":
       case "pending":
         return <Badge className="bg-purple-100 text-purple-700 border-purple-200 flex items-center gap-1 w-fit"><Send className="h-3 w-3" />sent</Badge>;
-      case "rejected":
       case "expired":
+        return <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1 w-fit"><Clock className="h-3 w-3" />expired</Badge>;
+      case "rejected":
       case "withdrawn":
         return <Badge className="bg-rose-100 text-rose-700 border-rose-200 flex items-center gap-1 w-fit"><XCircle className="h-3 w-3" />{status}</Badge>;
       case "processing":

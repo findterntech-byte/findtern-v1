@@ -1963,8 +1963,12 @@ export default function EmployerOrdersPage() {
                 const serverDiscountMinor = Number(invoiceData?.discountMinor ?? 0);
                 const hasDiscount = serverDiscountMinor > 0 || (!isFullTimeInvoice && totalMinor > 0 && subtotalMinor > 0 && Math.abs((totalMinor / subtotalMinor) - 0.9) <= 0.005);
                 const preDiscountMinor = hasDiscount && subtotalMinor > 0 ? subtotalMinor : totalMinor;
-                const discountMinor = hasDiscount ? Math.round(preDiscountMinor * 0.1) : 0;
-                const subtotalAfterDiscountMinor = Math.max(0, preDiscountMinor - discountMinor);
+                const discountMinor = hasDiscount
+                  ? (serverDiscountMinor > 0 ? serverDiscountMinor : Math.max(0, preDiscountMinor - totalMinor))
+                  : 0;
+                const subtotalAfterDiscountMinor = hasDiscount
+                  ? (totalMinor > 0 ? totalMinor : Math.max(0, preDiscountMinor - discountMinor))
+                  : subtotalMinor;
                 const subtotalFromTotalMinor = gstApplicable ? Math.round((Math.max(0, totalMinor) * 100) / 118) : subtotalAfterDiscountMinor;
                 const gstMinor = gstApplicable ? Math.round(subtotalFromTotalMinor * gstRate / 100) : 0;
 
@@ -2863,7 +2867,7 @@ export default function EmployerOrdersPage() {
 
                             const discountEligible = checkoutTotalPaidForThisProposal && totalMonths > 1 && rawMonthlyAmount > 0;
                             const totalAmountMinor = discountEligible
-                              ? Math.max(0, Math.round(totalAmountMinorRaw * 0.9))
+                              ? Math.max(0, Math.round(Math.round(totalAmountMinorRaw * 0.9 / 100) * 100))
                               : totalAmountMinorRaw;
 
                             const paidAmountMinor = paidForProposal.reduce((sum: number, o: any) => {

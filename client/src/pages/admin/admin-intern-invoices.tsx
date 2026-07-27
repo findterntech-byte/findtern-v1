@@ -405,6 +405,17 @@ export default function AdminInternInvoicesPage() {
     const gstMinor = finalAmountMinor - subtotalMinor;
     const totalWithGstMinor = subtotalMinor + gstMinor;
     
+    // GST type: CGST+SGST for Rajasthan (same state as Findtern), IGST for other states
+    const internState = String(intern?.state ?? "").trim().toLowerCase();
+    const internStateDisplay = String(intern?.state ?? "").trim();
+    const internCity = String(intern?.city ?? "").trim();
+    const internAddress = String(intern?.address ?? "").trim();
+    // Rajasthan → same state → CGST + SGST; all other states → IGST
+    const isRajasthan = internState !== "" && (internState === "rajasthan" || internState.includes("rajasthan") || internState === "raj");
+    const halfGstMinor = Math.round(gstMinor / 2);
+    const cgstMinor = halfGstMinor;
+    const sgstMinor = gstMinor - halfGstMinor; // handle odd paise
+    
     const hasDiscount = discountAmountMinor > 0;
     const promoCode = getPromoCode(payment);
 
@@ -442,6 +453,12 @@ export default function AdminInternInvoicesPage() {
               <p className="text-xs font-semibold text-slate-700">Invoice to :</p>
               <p className="text-sm text-slate-900 mt-1">{internName}</p>
               {internEmail ? <p className="text-sm text-slate-700">{internEmail}</p> : null}
+              {internAddress ? <p className="text-sm text-slate-600 mt-0.5">{internAddress}</p> : null}
+              {(internCity || internStateDisplay) ? (
+                <p className="text-sm text-slate-600">
+                  {[internCity, internStateDisplay].filter(Boolean).join(", ")}
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -482,12 +499,29 @@ export default function AdminInternInvoicesPage() {
                   ₹{(subtotalMinor / 100).toFixed(2)}
                 </td>
               </tr>
-              <tr className="border-b border-slate-200">
-                <td className="px-3 py-2 text-sm font-semibold text-slate-900">GST {gstRate}%</td>
-                <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
-                  ₹{(gstMinor / 100).toFixed(2)}
-                </td>
-              </tr>
+              {isRajasthan ? (
+                <>
+                  <tr className="border-b border-slate-200">
+                    <td className="px-3 py-2 text-sm font-semibold text-slate-900">CGST 9%</td>
+                    <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
+                      ₹{(cgstMinor / 100).toFixed(2)}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-slate-200">
+                    <td className="px-3 py-2 text-sm font-semibold text-slate-900">SGST 9%</td>
+                    <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
+                      ₹{(sgstMinor / 100).toFixed(2)}
+                    </td>
+                  </tr>
+                </>
+              ) : (
+                <tr className="border-b border-slate-200">
+                  <td className="px-3 py-2 text-sm font-semibold text-slate-900">IGST {gstRate}%</td>
+                  <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
+                    ₹{(gstMinor / 100).toFixed(2)}
+                  </td>
+                </tr>
+              )}
              
               <tr>
                 <td className="px-3 py-2 text-sm font-bold text-slate-900">Total</td>

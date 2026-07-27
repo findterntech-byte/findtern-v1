@@ -148,6 +148,11 @@ export default function DashboardPage() {
       const amount = Number(orderJson?.amountMinor ?? 0);
       const currency = String(orderJson?.currency ?? "INR");
 
+      // Free/full-promo case: server already activated, no Razorpay needed
+      if (amount === 0) {
+        return; // success — server has already marked isPaid = true
+      }
+
       if (!keyId || !orderId || !Number.isFinite(amount) || amount <= 0) {
         throw new Error("Invalid payment order response");
       }

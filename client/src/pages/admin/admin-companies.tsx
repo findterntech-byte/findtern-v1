@@ -302,7 +302,9 @@ export default function AdminCompaniesPage() {
 
           const totalPaidAmountMinor = Number(e?.totalPaidAmountMinor ?? 0) || 0;
           const totalRemainingAmountMinor = Number(e?.totalRemainingAmountMinor ?? 0) || 0;
-          const computedTotalBilledAmountMinor = totalPaidAmountMinor + totalRemainingAmountMinor;
+          const computedTotalBilledAmountMinor = totalRemainingAmountMinor > 0 
+            ? Math.max(totalPaidAmountMinor + totalRemainingAmountMinor, Number(e?.totalBilledAmountMinor ?? 0) || 0)
+            : totalPaidAmountMinor;
 
           return {
             id: String(e?.id ?? ""),

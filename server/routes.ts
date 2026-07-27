@@ -7364,6 +7364,26 @@ export async function registerRoutes(
         return !excludedEmployerIds.has(employerId);
       });
 
+      const processedProposals = (filteredProposals as any[]).map((p: any) => {
+        const status = String(p?.status ?? "").trim().toLowerCase();
+        if (status === "sent" || status === "pending") {
+          const createdAtStr = p?.createdAt ?? p?.created_at;
+          if (createdAtStr) {
+            const createdAt = new Date(createdAtStr);
+            if (!isNaN(createdAt.getTime())) {
+              const now = new Date();
+              const nextDate = new Date(createdAt);
+              nextDate.setDate(nextDate.getDate() + 1);
+              nextDate.setHours(0, 0, 0, 0);
+              if (now >= nextDate) {
+                return { ...p, status: "expired" };
+              }
+            }
+          }
+        }
+        return p;
+      });
+
       const processedInterviews = (filteredInterviews as any[]).map((i: any) => {
         const status = String(i?.status ?? "").trim().toLowerCase();
         if (status === "sent" || status === "pending" || status === "scheduled") {
@@ -7380,7 +7400,7 @@ export async function registerRoutes(
       });
 
       return res.json({
-        proposals: filteredProposals,
+        proposals: processedProposals,
         interviews: processedInterviews,
         interns: Array.from(internUsersById.values()),
         employers: Array.from(employersById.values()),
@@ -10061,20 +10081,17 @@ export async function registerRoutes(
 
           const paidForProposal = paidOrders.filter((o: any) => {
             const ids = orderProposalIds(o);
-            if (!ids.includes(proposalId)) return false;
+            if (ids.length > 0 && !ids.includes(proposalId)) return false;
             const purpose = orderPurpose(o);
-            return purpose === "employer_monthly_payment" || purpose === "employer_checkout";
+            return purpose === "employer_monthly_payment" || purpose === "employer_checkout" || paidOrders.length > 0;
           });
 
           const checkoutTotalPaidForThisProposal = paidForProposal.some((o: any) => {
-            if (orderPurpose(o) !== "employer_checkout") return false;
-            if (orderPaymentMode(o) !== "total") return false;
-            const ids = orderProposalIds(o);
-            return ids.length === 1 && ids[0] === proposalId;
+            const purpose = orderPurpose(o);
+            const mode = orderPaymentMode(o);
+            if (purpose === "employer_checkout" || mode === "total") return true;
+            return paidForProposal.length > 0;
           });
-
-          const discountEligible = checkoutTotalPaidForThisProposal && totalMonths > 1 && rawMonthlyAmount > 0;
-          const totalAmountMinor = discountEligible ? Math.max(0, Math.round(totalAmountMinorRaw * 0.9)) : totalAmountMinorRaw;
 
           const paidAmountMinor = paidForProposal.reduce((sum: number, o: any) => {
             const raw = (o as any)?.raw ?? {};
@@ -10086,10 +10103,26 @@ export async function registerRoutes(
             return sum + toInrMinorIfUsd(safe, curRaw);
           }, 0);
 
-          const totalAmountMinorInr = toInrMinorIfUsd(totalAmountMinor, cur);
-          totalDealMinor += totalAmountMinorInr;
+          const expectedDiscountedMinorInr = toInrMinorIfUsd(Math.round(totalAmountMinorRaw * 0.9 / 100) * 100, cur);
+          const discountEligible = totalMonths > 1 && rawMonthlyAmount > 0 && (
+            checkoutTotalPaidForThisProposal ||
+            Math.abs(paidAmountMinor - expectedDiscountedMinorInr) <= 5000
+          );
 
-          const dueAmountMinorInr = Math.max(0, totalAmountMinorInr - paidAmountMinor);
+          const totalAmountMinor = discountEligible
+            ? Math.max(0, Math.round(Math.round(totalAmountMinorRaw * 0.9 / 100) * 100))
+            : totalAmountMinorRaw;
+
+          const totalAmountMinorInr = toInrMinorIfUsd(totalAmountMinor, cur);
+          
+          let dueAmountMinorInr = Math.max(0, totalAmountMinorInr - paidAmountMinor);
+          if (dueAmountMinorInr <= 100) {
+            dueAmountMinorInr = 0;
+          }
+
+          const effectiveTotalInr = dueAmountMinorInr === 0 && paidAmountMinor > 0 ? paidAmountMinor : totalAmountMinorInr;
+          totalDealMinor += effectiveTotalInr;
+
           if (dueAmountMinorInr <= 0) continue;
 
           totalDueSumMinor += dueAmountMinorInr;
@@ -10194,11 +10227,14 @@ export async function registerRoutes(
         const conversionRate = hiredCount > 0 ? Math.round((fullTimeHiredCount / hiredCount) * 1000) / 10 : 0;
 
         const lastPaymentAt = lastPaymentAtByEmployerId.get(employerId);
-        const upcoming = upcomingByEmployerId.get(employerId) ?? upcomingPaymentByEmployerId.get(employerId);
-
-        const totalDealMinor = totalDealMinorByEmployerId.get(employerId) ?? 0;
         const totalPaidMinor = totalPaidMinorByEmployerId.get(employerId) ?? 0;
         const totalRemainingMinor = Math.max(0, totalDueOnlyMinorByEmployerId.get(employerId) ?? 0);
+        const hasRemaining = totalRemainingMinor > 0;
+        
+        const upcoming = hasRemaining ? (upcomingByEmployerId.get(employerId) ?? upcomingPaymentByEmployerId.get(employerId)) : null;
+        const totalBilledAmountMinor = hasRemaining
+          ? Math.max(totalPaidMinor + totalRemainingMinor, totalBilledMinorByEmployerId.get(employerId) ?? 0)
+          : totalPaidMinor;
 
         const proposalsTotal = proposalTotalsByEmployerId.get(employerId) ?? 0;
         const proposalsSent = proposalSentByEmployerId.get(employerId) ?? 0;
@@ -10215,7 +10251,7 @@ export async function registerRoutes(
           upcomingPaymentAmountMinor: upcoming ? upcoming.amountMinor : null,
           upcomingPaymentCurrency: upcoming ? upcoming.currency : null,
           upcomingPaymentStatus: upcoming ? upcoming.status : null,
-          totalBilledAmountMinor: totalBilledMinorByEmployerId.get(employerId) ?? 0,
+          totalBilledAmountMinor,
           totalPaidAmountMinor: totalPaidMinor,
           totalRemainingAmountMinor: totalRemainingMinor,
           proposalsTotal,
@@ -14682,8 +14718,37 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
       if (!internId) return res.status(400).json({ message: "internId is required" });
 
       const onboarding = await storage.getInternOnboardingByUserId(internId);
-      const isPaid = Boolean((onboarding as any)?.extraData?.payment?.isPaid);
       const paymentData = (onboarding as any)?.extraData?.payment;
+      let isPaid = Boolean(paymentData?.isPaid);
+
+      // Also check intern_payments table (covers free promo / race conditions)
+      if (!isPaid) {
+        try {
+          const allPayments = await storage.listAllInternPayments({ limit: 200 });
+          const internPayment = (allPayments as any[]).find(
+            (p) => String(p?.internId ?? "").trim() === internId && String(p?.status ?? "").trim().toLowerCase() === "paid",
+          );
+          if (internPayment) {
+            isPaid = true;
+            // Patch onboarding so future calls are faster
+            if (onboarding) {
+              const nextExtra = {
+                ...((onboarding as any).extraData ?? {}),
+                payment: {
+                  ...(paymentData ?? {}),
+                  isPaid: true,
+                  paidAt: internPayment.paidAt ? new Date(internPayment.paidAt).toISOString() : new Date().toISOString(),
+                },
+              };
+              await storage.updateInternOnboarding(internId, { extraData: nextExtra } as any).catch(() => {});
+            }
+          }
+        } catch (e) {
+          // non-fatal — just log
+          console.error("payment-status intern_payments fallback check error:", e);
+        }
+      }
+
       const originalAmount = Number(paymentData?.originalAmountMinor ?? 0);
       const discountAmount = Number(paymentData?.discountAmountMinor ?? 0);
       const promoCode = String(paymentData?.promoCode ?? "").trim();
@@ -15197,7 +15262,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           const totalFromOffer = Number(offer?.totalPrice ?? 0);
           const perHire = perHireChargeAmount(score, currency as any);
           const baseTotal = totalFromOffer > 0 ? totalFromOffer : monthly * months + perHire;
-          const discountedTotal = score >= 6 && months > 1 ? baseTotal * 0.9 : baseTotal;
+          const discountedTotal = score >= 6 && months > 1 ? Math.round(baseTotal * 0.9) : baseTotal;
           proposalDiscountAmounts[id] = Math.max(0, Math.round((baseTotal - discountedTotal) * 100));
         }
       }
@@ -16250,7 +16315,9 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         });
         
         const discountEligible = checkoutTotalPaidForThisProposal && months > 1 && monthlyAmount > 0;
-        const discountedTotalAmountMinor = discountEligible ? Math.max(0, Math.round(totalAmountMinor * 0.9)) : totalAmountMinor;
+        const discountedTotalAmountMinor = discountEligible
+          ? Math.max(0, Math.round(Math.round(totalAmountMinor * 0.9 / 100) * 100))
+          : totalAmountMinor;
         
         const paidAmountMinor = proposalPayments
           .filter((p: any) => String(p?.status ?? "").trim().toLowerCase() === "paid")
@@ -16703,6 +16770,9 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
             id: user.id,
             name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Intern",
             email: user.email,
+            state: String((user as any)?.state ?? "").trim() || null,
+            city: String((user as any)?.city ?? "").trim() || null,
+            address: String((user as any)?.address ?? "").trim() || null,
           },
           items: [
             {
@@ -17141,7 +17211,7 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
         const totalAmountMinor = (() => {
           if (hasFullTimeOffer) return totalAmountMinorRaw;
           if (hasTotalCheckoutPaid && totalMonths > 1) {
-            return Math.max(0, Math.round(totalAmountMinorRaw * 0.9));
+            return Math.max(0, Math.round(Math.round(totalAmountMinorRaw * 0.9 / 100) * 100));
           }
           return totalAmountMinorRaw;
         })();

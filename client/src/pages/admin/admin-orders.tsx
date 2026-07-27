@@ -418,8 +418,12 @@ export default function AdminOrdersPage() {
     const serverDiscountMinor = Number(invoiceData?.discountMinor ?? 0);
     const hasDiscount = serverDiscountMinor > 0 || (!isFullTimeInvoice && totalMinor > 0 && subtotalMinor > 0 && Math.abs((totalMinor / subtotalMinor) - 0.9) <= 0.005);
     const preDiscountMinor = hasDiscount && subtotalMinor > 0 ? subtotalMinor : totalMinor;
-    const discountMinor = hasDiscount ? Math.round(preDiscountMinor * 0.1) : 0;
-    const subtotalAfterDiscountMinor = Math.max(0, preDiscountMinor - discountMinor);
+    const discountMinor = hasDiscount
+      ? (serverDiscountMinor > 0 ? serverDiscountMinor : Math.max(0, preDiscountMinor - totalMinor))
+      : 0;
+    const subtotalAfterDiscountMinor = hasDiscount
+      ? (totalMinor > 0 ? totalMinor : Math.max(0, preDiscountMinor - discountMinor))
+      : subtotalMinor;
     const subtotalDisplayMinor = gstApplicable ? Math.round((Math.max(0, totalMinor) * 100) / 118) : subtotalAfterDiscountMinor;
     const gstMinor = gstApplicable ? Math.max(0, totalMinor - Math.round((Math.max(0, totalMinor) * 100) / 118)) : 0;
 
