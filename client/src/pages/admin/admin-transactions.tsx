@@ -257,11 +257,8 @@ export default function AdminTransactionsPage() {
   };
 
   const getInvoiceNumber = (transaction: Transaction, index: number = 0) => {
-    if (transaction.referenceId && transaction.referenceId.includes('-')) {
-      const parts = transaction.referenceId.split('-');
-      if (parts.length >= 2) {
-        return transaction.referenceId;
-      }
+    if (transaction.referenceId && /^\d{6}-\d{2,}$/.test(transaction.referenceId)) {
+      return transaction.referenceId;
     }
     const dateObj = transaction.date ? new Date(transaction.date) : new Date();
     const dd = String(dateObj.getDate()).padStart(2, '0');

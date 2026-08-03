@@ -427,6 +427,19 @@ export default function AdminOrdersPage() {
     const subtotalDisplayMinor = gstApplicable ? Math.round((Math.max(0, totalMinor) * 100) / 118) : subtotalAfterDiscountMinor;
     const gstMinor = gstApplicable ? Math.max(0, totalMinor - Math.round((Math.max(0, totalMinor) * 100) / 118)) : 0;
 
+    const employerState = String(employer?.state ?? "").trim().toLowerCase();
+    const employerCity = String(employer?.city ?? "").trim().toLowerCase();
+    const employerAddress = String(employer?.address ?? "").trim().toLowerCase();
+
+    const isEmployerRajasthan =
+      (employerState !== "" && (employerState === "rajasthan" || employerState.includes("rajasthan") || employerState === "raj")) ||
+      (employerCity !== "" && employerCity.includes("rajasthan")) ||
+      (employerAddress !== "" && employerAddress.includes("rajasthan"));
+
+    const halfGstMinor = Math.round(gstMinor / 2);
+    const cgstMinor = halfGstMinor;
+    const sgstMinor = gstMinor - halfGstMinor;
+
     return (
       <div ref={invoicePrintRef} className="invoice-print-root mx-auto w-full max-w-[980px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="bg-emerald-900 text-white">
@@ -563,12 +576,29 @@ export default function AdminOrdersPage() {
                 </tr>
 
                 {gstApplicable ? (
-                  <tr className="bg-slate-50">
-                    <td className="px-3 py-2 text-sm font-semibold text-slate-900">GST {gstRate}%</td>
-                    <td className="px-3 py-2 text-right text-sm text-slate-900">
-                      {formatAmount(gstMinor, currencyCode)}
-                    </td>
-                  </tr>
+                  isEmployerRajasthan ? (
+                    <>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <td className="px-3 py-2 text-sm font-semibold text-slate-900">CGST 9%</td>
+                        <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
+                          {formatAmount(cgstMinor, currencyCode)}
+                        </td>
+                      </tr>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <td className="px-3 py-2 text-sm font-semibold text-slate-900">SGST 9%</td>
+                        <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
+                          {formatAmount(sgstMinor, currencyCode)}
+                        </td>
+                      </tr>
+                    </>
+                  ) : (
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <td className="px-3 py-2 text-sm font-semibold text-slate-900">IGST {gstRate}%</td>
+                      <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
+                        {formatAmount(gstMinor, currencyCode)}
+                      </td>
+                    </tr>
+                  )
                 ) : null}
                 <tr>
                   <td className="px-3 py-2 text-sm font-semibold text-slate-900">Total</td>

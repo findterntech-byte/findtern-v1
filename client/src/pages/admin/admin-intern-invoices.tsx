@@ -411,7 +411,10 @@ export default function AdminInternInvoicesPage() {
     const internCity = String(intern?.city ?? "").trim();
     const internAddress = String(intern?.address ?? "").trim();
     // Rajasthan → same state → CGST + SGST; all other states → IGST
-    const isRajasthan = internState !== "" && (internState === "rajasthan" || internState.includes("rajasthan") || internState === "raj");
+    const isRajasthan =
+      (internState !== "" && (internState === "rajasthan" || internState.includes("rajasthan") || internState === "raj")) ||
+      (internAddress !== "" && internAddress.toLowerCase().includes("rajasthan")) ||
+      (internCity !== "" && internCity.toLowerCase().includes("rajasthan"));
     const halfGstMinor = Math.round(gstMinor / 2);
     const cgstMinor = halfGstMinor;
     const sgstMinor = gstMinor - halfGstMinor; // handle odd paise

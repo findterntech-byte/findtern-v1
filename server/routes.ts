@@ -8335,7 +8335,31 @@ export async function registerRoutes(
           status,
           paidAt: isPaid ? (paidAt || created.toISOString()) : null,
           createdAt: created.toISOString(),
-          invoiceNumber: isPaid ? `${Date.now()}-${internId.slice(0, 8)}` : null,
+          invoiceNumber: null,
+        });
+      }
+
+      const paidItemsByDate = new Map<string, any[]>();
+      for (const item of items) {
+        if (item.status === "paid") {
+          const itemDt = item.paidAt ? new Date(item.paidAt) : new Date(item.createdAt);
+          const validDt = itemDt && !Number.isNaN(itemDt.getTime()) ? itemDt : new Date();
+          const dd = String(validDt.getDate()).padStart(2, "0");
+          const mm = String(validDt.getMonth() + 1).padStart(2, "0");
+          const yy = String(validDt.getFullYear() % 100).padStart(2, "0");
+          const dateKey = `${dd}${mm}${yy}`;
+          if (!paidItemsByDate.has(dateKey)) {
+            paidItemsByDate.set(dateKey, []);
+          }
+          paidItemsByDate.get(dateKey)!.push({ item, dt: validDt });
+        }
+      }
+
+      for (const [dateKey, list] of paidItemsByDate.entries()) {
+        list.sort((a, b) => a.dt.getTime() - b.dt.getTime());
+        list.forEach(({ item }, index) => {
+          const seq = String(index + 1).padStart(2, "0");
+          item.invoiceNumber = `${dateKey}-${seq}`;
         });
       }
 
@@ -16514,6 +16538,10 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           id: (employer as any)?.id,
           companyName: (employer as any)?.companyName,
           companyEmail: (employer as any)?.companyEmail,
+          state: (employer as any)?.state ?? "",
+          city: (employer as any)?.city ?? "",
+          address: (employer as any)?.address ?? "",
+          gst: (employer as any)?.gst ?? (employer as any)?.gstNumber ?? "",
         },
         payment,
         items,
@@ -16750,8 +16778,35 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
           : paymentData?.paidAt ?? (onboarding as any)?.createdAt ?? new Date().toISOString();
         const isPaid = Boolean(paymentData?.isPaid) || (internPayment?.status === "paid");
 
-        const now = new Date();
-        const invoiceNumber = `${String(now.getDate()).padStart(2, "0")}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getFullYear()).slice(2)}-${String(now.getTime() % 100).padStart(2, "0")}`;
+        const rawPaidAt = paidAt;
+        const dt = rawPaidAt ? new Date(rawPaidAt) : new Date();
+        const validDt = dt && !Number.isNaN(dt.getTime()) ? dt : new Date();
+
+        const dayStart = new Date(validDt);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(validDt);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        const sameDayInternPayments = (allPayments as any[])
+          .filter((p: any) => {
+            const pPaidAt = p?.paidAt ?? p?.createdAt;
+            const pDt = pPaidAt ? new Date(pPaidAt) : null;
+            return pDt && pDt >= dayStart && pDt <= dayEnd;
+          })
+          .sort((a: any, b: any) => {
+            const aDt = new Date(a.paidAt ?? a.createdAt).getTime();
+            const bDt = new Date(b.paidAt ?? b.createdAt).getTime();
+            if (aDt !== bDt) return aDt - bDt;
+            return String(a.internId ?? "").localeCompare(String(b.internId ?? ""));
+          });
+
+        const idx = sameDayInternPayments.findIndex((p: any) => String(p?.internId ?? "").trim() === internId);
+        const seq = String((idx >= 0 ? idx + 1 : sameDayInternPayments.length + 1) ?? 1).padStart(2, "0");
+
+        const dd = String(validDt.getDate()).padStart(2, "0");
+        const mm = String(validDt.getMonth() + 1).padStart(2, "0");
+        const yy = String(validDt.getFullYear() % 100).padStart(2, "0");
+        const invoiceNumber = `${dd}${mm}${yy}-${seq}`;
 
         return res.json({
           invoiceNumber,
@@ -16770,9 +16825,9 @@ app.get("/api/intern/:internId/payment-status", async (req, res) => {
             id: user.id,
             name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Intern",
             email: user.email,
-            state: String((user as any)?.state ?? "").trim() || null,
-            city: String((user as any)?.city ?? "").trim() || null,
-            address: String((user as any)?.address ?? "").trim() || null,
+            state: String((user as any)?.state ?? (onboarding as any)?.state ?? (onboarding as any)?.extraData?.state ?? "").trim() || null,
+            city: String((user as any)?.city ?? (onboarding as any)?.city ?? (onboarding as any)?.extraData?.city ?? "").trim() || null,
+            address: String((user as any)?.address ?? (onboarding as any)?.extraData?.address ?? (onboarding as any)?.extraData?.location ?? "").trim() || null,
           },
           items: [
             {
