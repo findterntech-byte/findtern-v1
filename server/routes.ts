@@ -8022,7 +8022,46 @@ export async function registerRoutes(
 
         for (let i = 0; i < rows.length; i++) {
           const row = rows[i] ?? {};
-          const email = String(row.email ?? row.Email ?? "").trim().toLowerCase();
+
+          const getRowVal = (rowObj: any, candidateKeys: string[]): any => {
+            if (!rowObj || typeof rowObj !== "object") return undefined;
+
+            for (const k of candidateKeys) {
+              if (rowObj[k] !== undefined && rowObj[k] !== null && String(rowObj[k]).trim() !== "") {
+                return rowObj[k];
+              }
+            }
+
+            const normMap = new Map<string, any>();
+            for (const [k, v] of Object.entries(rowObj)) {
+              if (v !== undefined && v !== null && String(v).trim() !== "") {
+                const cleanK = String(k).toLowerCase().replace(/[\s\-_]/g, "");
+                if (!normMap.has(cleanK)) {
+                  normMap.set(cleanK, v);
+                }
+              }
+            }
+
+            for (const k of candidateKeys) {
+              const cleanCandidate = String(k).toLowerCase().replace(/[\s\-_]/g, "");
+              if (normMap.has(cleanCandidate)) {
+                return normMap.get(cleanCandidate);
+              }
+            }
+
+            return undefined;
+          };
+
+          const rawEmail = getRowVal(row, [
+            "email",
+            "email address",
+            "emailaddress",
+            "user email",
+            "useremail",
+            "e-mail",
+            "mail",
+          ]);
+          const email = String(rawEmail ?? "").trim().toLowerCase();
           if (!email) {
             failures.push({ row: i + 2, reason: "Missing email" });
             continue;
@@ -8034,50 +8073,31 @@ export async function registerRoutes(
             continue;
           }
 
-          const existing = await storage.getInternOnboardingByUserId(user.id);
-          if (!existing) {
-            failures.push({ row: i + 2, email, reason: "Onboarding not found" });
-            continue;
-          }
-
           const toNumberOrNull = (v: any) => {
-            const n = Number(String(v ?? "").trim());
+            if (v === undefined || v === null || String(v).trim() === "") return null;
+            const n = Number(String(v).trim());
             return Number.isFinite(n) ? n : null;
           };
 
-          const getCell = (r: any, key: string) => {
-            if (!r) return undefined;
-            const direct = r[key];
-            if (direct !== undefined) return direct;
-            const upper = r[key.toUpperCase()];
-            if (upper !== undefined) return upper;
-            const title = r[key[0].toUpperCase() + key.slice(1)];
-            if (title !== undefined) return title;
-            const spaced = key.replace(/[A-Z]/g, (m) => ` ${m.toLowerCase()}`).trim();
-            const spacedTitle = spaced.replace(/^\w/, (m) => m.toUpperCase());
-            return r[spaced] ?? r[spacedTitle] ?? undefined;
-          };
-
           const ratingsPatch: Record<string, number> = {};
-          const keys = [
-            "communication",
-            "coding",
-            "aptitude",
-            "interview",
-            "ai interview",
-            "overall",
-            "academic",
+          const ratingKeyConfigs = [
+            { target: "communication", keys: ["communication", "comm", "communication rating"] },
+            { target: "coding", keys: ["coding", "code", "coding rating"] },
+            { target: "aptitude", keys: ["aptitude", "apt", "aptitude rating"] },
+            { target: "interview", keys: ["ai interview", "ai_interview", "aiinterview", "interview", "ai interview rating", "interview rating"] },
+            { target: "academic", keys: ["academic", "academic rating"] },
+            { target: "overall", keys: ["overall", "overall rating"] },
           ];
-          for (const k of keys) {
-            const val = toNumberOrNull(getCell(row, k));
+
+          for (const cfg of ratingKeyConfigs) {
+            const val = toNumberOrNull(getRowVal(row, cfg.keys));
             if (val !== null) {
-              const targetKey = k === "ai interview" ? "interview" : k;
-              ratingsPatch[targetKey] = val;
+              ratingsPatch[cfg.target] = val;
             }
           }
 
           const providedFindternScore = toNumberOrNull(
-            getCell(row, "findternScore") ?? getCell(row, "findtern score") ?? getCell(row, "findtern_score"),
+            getRowVal(row, ["findternscore", "findtern score", "findtern_score", "findtern", "score"]),
           );
 
           if (Object.keys(ratingsPatch).length === 0 && providedFindternScore === null) {
@@ -8085,6 +8105,7 @@ export async function registerRoutes(
             continue;
           }
 
+          const existing = await storage.getInternOnboardingByUserId(user.id);
           const prevExtra = ((existing as any)?.extraData ?? {}) as Record<string, any>;
           const prevRatings = (prevExtra as any).ratings ?? {};
 
@@ -8107,18 +8128,29 @@ export async function registerRoutes(
 
           const computedFindternScore = (() => {
             if (providedFindternScore !== null) return round1(clampRating(providedFindternScore));
-            return comm !== null && coding !== null && aptitude !== null && interview !== null
-              ? round1((clampRating(comm) + clampRating(coding) + clampRating(aptitude) + clampRating(interview)) / 4)
+            const valid = [comm, coding, aptitude, interview].filter((v): v is number => v !== null);
+            return valid.length > 0
+              ? round1(clampRating(valid.reduce((a, b) => a + b, 0) / valid.length))
               : null;
           })();
 
-          const saved = await storage.updateInternOnboarding(user.id, {
-            extraData: {
-              ...prevExtra,
-              ratings: nextRatings,
-              ...(computedFindternScore !== null ? { findternScore: computedFindternScore } : {}),
-            },
-          } as any);
+          const nextExtraData = {
+            ...prevExtra,
+            ratings: nextRatings,
+            ...(computedFindternScore !== null ? { findternScore: computedFindternScore } : {}),
+          };
+
+          let saved: any = null;
+          if (existing) {
+            saved = await storage.updateInternOnboarding(user.id, {
+              extraData: nextExtraData,
+            } as any);
+          } else {
+            saved = await storage.createInternOnboarding({
+              userId: user.id,
+              extraData: nextExtraData,
+            } as any);
+          }
 
           if (saved) updatedCount++;
         }

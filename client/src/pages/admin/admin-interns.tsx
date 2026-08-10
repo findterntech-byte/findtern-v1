@@ -1152,10 +1152,15 @@ export default function AdminInternsPage() {
 
   const hydrateRatingsForm = (intern: Intern | null) => {
     const r: any = intern?.ratings ?? {};
-    setCommunicationRating(r.communication != null ? String(r.communication) : "");
-    setInterviewRating(r.interview != null ? String(r.interview) : "");
-    setAptitudeRating(r.aptitude != null ? String(r.aptitude) : "");
-    setCodingRating(r.coding != null ? String(r.coding) : "");
+    const comm = r.communication ?? r["communication rating"] ?? "";
+    const intr = r.interview ?? r["ai interview"] ?? r.aiInterview ?? r.ai_interview ?? "";
+    const apt = r.aptitude ?? r["aptitude rating"] ?? "";
+    const code = r.coding ?? r["coding rating"] ?? "";
+
+    setCommunicationRating(comm !== "" && comm != null ? String(comm) : "");
+    setInterviewRating(intr !== "" && intr != null ? String(intr) : "");
+    setAptitudeRating(apt !== "" && apt != null ? String(apt) : "");
+    setCodingRating(code !== "" && code != null ? String(code) : "");
     setFindternScore(intern?.findternScore != null ? String(intern.findternScore) : "");
   };
 
