@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import useReveal from '../../hooks/useReveal.ts';
 import {
   FaBolt,
@@ -12,6 +12,8 @@ import {
   FaQuestionCircle,
   FaShieldAlt,
   FaUserPlus,
+  FaCalendarAlt,
+  FaArrowRight,
 } from 'react-icons/fa';
 import Businesspeople from '@assets/businesspeople.png';
 import TeamSixOffice from '@assets/team-six-office.jpg';
@@ -162,13 +164,42 @@ export default function Employers() {
   return (
     <div className="employers-landing-v1">
   
- <section className="coffe-hero-v2">
+      <section className="coffe-hero-v2">
         <div className="coffe-hero-v2__bg" aria-hidden="true"></div>
         <div className="container coffe-hero-v2__inner">
           <div className="coffe-hero-v2__content reveal reveal--up is-visible">
             <h1>Findtern for Employers</h1>
             <p>Coffee or Intern? Choice is yours!</p>
           </div>
+        </div>
+      </section>
+
+      <section className="employer-demo-box-section reveal reveal--up">
+        <div className="container">
+          <a
+            href="https://calendly.com/abhinav-findtern/30min"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="employer-demo-box"
+          >
+            <div className="employer-demo-box__badge">
+              <span className="employer-demo-box__pulse"></span>
+              <span>💡 Need Guidance?</span>
+            </div>
+            <div className="employer-demo-box__content">
+              <div className="employer-demo-box__icon-wrap">
+                <FaCalendarAlt aria-hidden="true" />
+              </div>
+              <div className="employer-demo-box__text">
+                <h3 className="employer-demo-box__title">Hiring but confused?</h3>
+                <p className="employer-demo-box__subtitle">Book a demo call with our team &amp; find the perfect intern effortlessly.</p>
+              </div>
+            </div>
+            <div className="employer-demo-box__btn">
+              <span>Book a Demo</span>
+              <FaArrowRight aria-hidden="true" />
+            </div>
+          </a>
         </div>
       </section>
       <section className="employers-landing-v1__hero reveal reveal--up">
